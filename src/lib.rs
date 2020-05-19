@@ -79,12 +79,19 @@ mod tests {
     //     assert_eq!(BareItem::Boolean(false), Parser::parse_bare_item("?0").unwrap());
     // }
     //
-    // #[test]
-    // fn parse_bool() {
-    //     assert_eq!((false, ""), Parser::parse_bool("?0").unwrap());
-    //     assert_eq!((true, ""), Parser::parse_bool("?1").unwrap());
-    //     assert_eq!((false, "gk"), Parser::parse_bool("?0gk").unwrap());
-    //     assert_eq!(Err(()), Parser::parse_bool(""));
-    //     assert_eq!(Err(()), Parser::parse_bool("?"));
-    // }
+    #[test]
+    fn parse_bool() {
+        let res = Parser::parse_bool("?0".chars().peekable()).unwrap();
+        assert_eq!(
+            (false, "".to_owned()),
+            (res.0, res.1.collect())
+        );
+        // assert_eq!(
+        //     (true, "".chars().peekable()),
+        //     Parser::parse_bool("?1".chars().peekable()).unwrap()
+        // );
+        // assert_eq!((false, "gk"), Parser::parse_bool("?0gk").unwrap());
+        // assert_eq!(Err(()), Parser::parse_bool(""));
+        // assert_eq!(Err(()), Parser::parse_bool("?"));
+    }
 }
