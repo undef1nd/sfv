@@ -1,7 +1,7 @@
+use crate::utils;
 use indexmap::IndexMap;
 use std::iter::Peekable;
 use std::str::Chars;
-use crate::utils;
 
 type Parameters = IndexMap<String, BareItem>;
 
@@ -154,6 +154,10 @@ mod tests {
 
     #[test]
     fn parse_bool() {
+        let mut input = "?0gk".chars().peekable();
+        assert_eq!(false, Parser::parse_bool(&mut input).unwrap());
+        assert_eq!(input.collect::<String>(), "gk");
+
         assert_eq!(
             false,
             Parser::parse_bool(&mut "?0".chars().peekable()).unwrap()
@@ -162,10 +166,7 @@ mod tests {
             true,
             Parser::parse_bool(&mut "?1".chars().peekable()).unwrap()
         );
-        assert_eq!(
-            false,
-            Parser::parse_bool(&mut "?0gk".chars().peekable()).unwrap()
-        );
+
         assert_eq!(
             Err("bool: first char is not '?'"),
             Parser::parse_bool(&mut "".chars().peekable())
@@ -178,6 +179,13 @@ mod tests {
 
     #[test]
     fn parse_string() {
+        let mut input = "\"some string\" ;not string".chars().peekable();
+        assert_eq!(
+            "some string".to_owned(),
+            Parser::parse_string(&mut input).unwrap()
+        );
+        assert_eq!(input.collect::<String>(), " ;not string");
+
         assert_eq!(
             "test".to_owned(),
             Parser::parse_string(&mut "\"test\"".chars().peekable()).unwrap()
@@ -190,6 +198,7 @@ mod tests {
             "some string".to_owned(),
             Parser::parse_string(&mut "\"some string\"".chars().peekable()).unwrap()
         );
+
         assert_eq!(
             Err("string: first char is not '\"'"),
             Parser::parse_string(&mut "test".chars().peekable())
@@ -214,10 +223,25 @@ mod tests {
 
     #[test]
     fn parse_token() {
+        let mut input = "*some:token}not token".chars().peekable();
+        assert_eq!(
+            "*some:token".to_owned(),
+            Parser::parse_token(&mut input).unwrap()
+        );
+        assert_eq!(input.collect::<String>(), "}not token");
+
+        let mut input = "765token".chars().peekable();
+        assert_eq!(
+            Err("token: first char is not ALPHA or '*'"),
+            Parser::parse_token(&mut input)
+        );
+        assert_eq!(input.collect::<String>(), "765token");
+
         assert_eq!(
             "token".to_owned(),
             Parser::parse_token(&mut "token".chars().peekable()).unwrap()
         );
+
         assert_eq!(
             "a_b-c.d3:f%00/*".to_owned(),
             Parser::parse_token(&mut "a_b-c.d3:f%00/*".chars().peekable()).unwrap()
@@ -251,4 +275,5 @@ mod tests {
             Parser::parse_token(&mut "".chars().peekable())
         );
     }
+
 }
