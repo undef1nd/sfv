@@ -1,4 +1,5 @@
 use crate::utils;
+use base64;
 use indexmap::IndexMap;
 use std::iter::Peekable;
 use std::str::Chars;
@@ -52,11 +53,11 @@ impl Parser {
         match input.peek() {
             Some(&'?') => Ok(BareItem::Boolean(Self::parse_bool(&mut input)?)),
             Some(&'"') => Ok(BareItem::String(Self::parse_string(&mut input)?)),
-            // Some(&'*') => Ok(BareItem::Token(Self::parse_token(&mut input)?)),
             Some(&c) if c == '*' || c.is_ascii_alphabetic() => {
                 Ok(BareItem::Token(Self::parse_token(&mut input)?))
             }
-            _ => Err("parse_bare_item: not an item"),
+            Some(&':') => Ok(BareItem::ByteSeq(Self::parse_byte_sequence(&mut input)?)),
+            _ => Err("parse_bare_item: item type is unrecognized"),
         }
     }
 
@@ -102,7 +103,7 @@ impl Parser {
     }
 
     fn parse_token(input: &mut Peekable<Chars>) -> Result<String, &'static str> {
-        //https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-token
+        // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-token
 
         if let Some(first_char) = input.peek() {
             if !first_char.is_ascii_alphabetic() && first_char != &'*' {
@@ -123,6 +124,29 @@ impl Parser {
             }
         }
         Ok(output_string)
+    }
+
+    fn parse_byte_sequence(input: &mut Peekable<Chars>) -> Result<Vec<u8>, &'static str> {
+        // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-binary
+
+        if input.next() != Some(':') {
+            return Err("byte_seq: first char is not ':'");
+        }
+
+        if !input.clone().any(|c| c == ':') {
+            return Err("byte_seq: no closing ':'");
+        }
+        let b64_content = input.take_while(|c| c != &':').collect::<String>();
+        if !b64_content
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '=' || c == '/')
+        {
+            return Err("byte_seq: invalid char in byte sequence");
+        }
+        return match base64::decode(b64_content) {
+            Ok(content) => Ok(content),
+            Err(err) => Err("byte_seq: decoding error"),
+        };
     }
 
     fn parse_parameters() -> Result<(), ()> {
@@ -149,6 +173,25 @@ mod tests {
         assert_eq!(
             Ok(BareItem::Token("*token".to_owned())),
             Parser::parse_bare_item(&mut "*token".chars().peekable())
+        );
+        assert_eq!(
+            Ok(BareItem::ByteSeq(
+                "base_64 encoding test".to_owned().into_bytes()
+            )),
+            Parser::parse_bare_item(&mut ":YmFzZV82NCBlbmNvZGluZyB0ZXN0:".chars().peekable())
+        );
+
+        assert_eq!(
+            Err("parse_bare_item: item type is unrecognized"),
+            Parser::parse_bare_item(&mut "!?0".chars().peekable())
+        );
+        assert_eq!(
+            Err("parse_bare_item: item type is unrecognized"),
+            Parser::parse_bare_item(&mut "_11abc".chars().peekable())
+        );
+        assert_eq!(
+            Err("parse_bare_item: item type is unrecognized"),
+            Parser::parse_bare_item(&mut "   ".chars().peekable())
         );
     }
 
@@ -276,4 +319,42 @@ mod tests {
         );
     }
 
+    #[test]
+    fn parse_byte_sequence() {
+        let mut input = ":aGVsbG8:rest_of_str".chars().peekable();
+        assert_eq!(
+            "hello".to_owned().into_bytes(),
+            Parser::parse_byte_sequence(&mut input).unwrap()
+        );
+        assert_eq!("rest_of_str", input.collect::<String>());
+
+        assert_eq!(
+            "hello".to_owned().into_bytes(),
+            Parser::parse_byte_sequence(&mut ":aGVsbG8:".chars().peekable()).unwrap()
+        );
+        assert_eq!(
+            "test_encode".to_owned().into_bytes(),
+            Parser::parse_byte_sequence(&mut ":dGVzdF9lbmNvZGU:".chars().peekable()).unwrap()
+        );
+        assert_eq!(
+            "new:year tree".to_owned().into_bytes(),
+            Parser::parse_byte_sequence(&mut ":bmV3OnllYXIgdHJlZQ==:".chars().peekable()).unwrap()
+        );
+        assert_eq!(
+            "".to_owned().into_bytes(),
+            Parser::parse_byte_sequence(&mut "::".chars().peekable()).unwrap()
+        );
+        assert_eq!(
+            Err("byte_seq: first char is not ':'"),
+            Parser::parse_byte_sequence(&mut "aGVsbG8".chars().peekable())
+        );
+        assert_eq!(
+            Err("byte_seq: invalid char in byte sequence"),
+            Parser::parse_byte_sequence(&mut ":aGVsb G8=:".chars().peekable())
+        );
+        assert_eq!(
+            Err("byte_seq: no closing ':'"),
+            Parser::parse_byte_sequence(&mut ":aGVsbG8=".chars().peekable())
+        );
+    }
 }
