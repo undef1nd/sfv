@@ -47,15 +47,15 @@ impl Parser {
     //     })
     // }
 
-    fn parse_bare_item(mut input: &mut Chars) -> Result<BareItem, ()> {
-        match input.clone().peekable().peek() {
+    fn parse_bare_item(mut input: &mut Peekable<Chars>) -> Result<BareItem, ()> {
+        match input.peek() {
             Some(&'?') => Ok(BareItem::Boolean(Self::parse_bool(&mut input)?)),
             Some(&'"') => Ok(BareItem::String(Self::parse_string(&mut input)?)),
             _ => Err(()),
         }
     }
 
-    fn parse_bool(input: &mut Chars) -> Result<bool, ()> {
+    fn parse_bool(input: &mut Peekable<Chars>) -> Result<bool, ()> {
         if input.next() != Some('?') {
             return Err(());
         }
@@ -67,7 +67,7 @@ impl Parser {
         }
     }
 
-    fn parse_string(input: &mut Chars) -> Result<String, ()> {
+    fn parse_string(input: &mut Peekable<Chars>) -> Result<String, ()> {
         if input.next() != Some('\"') {
             return Err(());
         }
@@ -105,33 +105,36 @@ mod tests {
     fn parse_bare_item() {
         assert_eq!(
             Ok(BareItem::Boolean(false)),
-            Parser::parse_bare_item(&mut "?0".chars())
+            Parser::parse_bare_item(&mut "?0".chars().peekable())
         );
         assert_eq!(
             Ok(BareItem::String("test string".to_owned())),
-            Parser::parse_bare_item(&mut "\"test string\"".chars())
+            Parser::parse_bare_item(&mut "\"test string\"".chars().peekable())
         );
     }
     #[test]
     fn parse_bool() {
-        assert_eq!(false, Parser::parse_bool(&mut "?0".chars()).unwrap());
-        assert_eq!(true, Parser::parse_bool(&mut "?1".chars()).unwrap());
-        assert_eq!(false, Parser::parse_bool(&mut "?0gk".chars()).unwrap());
-        assert_eq!(Err(()), Parser::parse_bool(&mut "".chars()));
-        assert_eq!(Err(()), Parser::parse_bool(&mut "?".chars()));
+        assert_eq!(false, Parser::parse_bool(&mut "?0".chars().peekable()).unwrap());
+        assert_eq!(true, Parser::parse_bool(&mut "?1".chars().peekable()).unwrap());
+        assert_eq!(false, Parser::parse_bool(&mut "?0gk".chars().peekable()).unwrap());
+        assert_eq!(Err(()), Parser::parse_bool(&mut "".chars().peekable()));
+        assert_eq!(Err(()), Parser::parse_bool(&mut "?".chars().peekable()));
     }
 
     #[test]
     fn parse_string() {
         assert_eq!(
             "test".to_owned(),
-            Parser::parse_string(&mut "\"test\"".chars()).unwrap()
+            Parser::parse_string(&mut "\"test\"".chars().peekable()).unwrap()
         );
         assert_eq!(
             "".to_owned(),
-            Parser::parse_string(&mut "\"\"".chars()).unwrap()
+            Parser::parse_string(&mut "\"\"".chars().peekable()).unwrap()
         );
-        assert_eq!(Err(()), Parser::parse_string(&mut "\"\\".chars()));
-        assert_eq!(Err(()), Parser::parse_string(&mut "\"\\l\"".chars()));
+        assert_eq!(Err(()), Parser::parse_string(&mut "test".chars().peekable()));
+        assert_eq!(Err(()), Parser::parse_string(&mut "\"\\".chars().peekable()));
+        assert_eq!(Err(()), Parser::parse_string(&mut "\"\\l\"".chars().peekable()));
+        assert_eq!(Err(()), Parser::parse_string(&mut "\"\u{1f}\"".chars().peekable()));
+        assert_eq!(Err(()), Parser::parse_string(&mut "\"smth".chars().peekable()));
     }
 }
