@@ -75,19 +75,16 @@ impl Parser {
         let mut output_string = String::from("");
         while let Some(curr_char) = input.next() {
             if curr_char == '\\' {
-                if input.count() == 0 {
-                    return Err(());
+                match input.next() {
+                    Some('\\') =>  { output_string.push(curr_char) },
+                    Some ('\"') => { output_string.push(curr_char) },
+                    None => { return Err(()) }
+                    _ => { return Err(()) }
                 }
-                if let Some(curr_char) = input.next() {
-                    if curr_char != '\\' && curr_char != '\"' {
-                        return Err(());
-                    }
-                    output_string.push(curr_char)
-                }
-            } else if curr_char == '\"' {
-                return Ok(output_string);
             } else if (curr_char >= '\x00' && curr_char <= '\x1f') || curr_char == '\x7f' {
                 return Err(());
+            } else if curr_char == '\"' {
+                return Ok(output_string);
             } else {
                 output_string.push(curr_char);
             }
