@@ -1,6 +1,7 @@
 use crate::utils;
 use base64;
 use indexmap::IndexMap;
+use std::cmp::min;
 use std::iter::Peekable;
 use std::str::Chars;
 
@@ -13,9 +14,14 @@ struct Item {
 }
 
 #[derive(Debug, PartialEq)]
-enum BareItem {
-    Decimal(i64),
+enum Num {
+    Decimal(f64), // Need to change it later to smth more precise
     Integer(i64),
+}
+
+#[derive(Debug, PartialEq)]
+enum BareItem {
+    Number(Num),
     String(String),
     ByteSeq(Vec<u8>),
     Boolean(bool),
@@ -53,10 +59,13 @@ impl Parser {
         match input.peek() {
             Some(&'?') => Ok(BareItem::Boolean(Self::parse_bool(&mut input)?)),
             Some(&'"') => Ok(BareItem::String(Self::parse_string(&mut input)?)),
+            Some(&':') => Ok(BareItem::ByteSeq(Self::parse_byte_sequence(&mut input)?)),
             Some(&c) if c == '*' || c.is_ascii_alphabetic() => {
                 Ok(BareItem::Token(Self::parse_token(&mut input)?))
             }
-            Some(&':') => Ok(BareItem::ByteSeq(Self::parse_byte_sequence(&mut input)?)),
+            Some(&c) if c == '-' || c.is_ascii_digit() => {
+                Ok(BareItem::Number(Self::parse_number(&mut input)?))
+            }
             _ => Err("parse_bare_item: item type is unrecognized"),
         }
     }
@@ -147,6 +156,68 @@ impl Parser {
             Ok(content) => Ok(content),
             Err(err) => Err("byte_seq: decoding error"),
         };
+    }
+
+    fn parse_number(input: &mut Peekable<Chars>) -> Result<Num, &'static str> {
+        let (min_int, max_int) = (-999999999999999_i64, 999999999999999_i64);
+
+        let mut num_type = "int";
+        let mut sign = 1;
+        let mut input_number = String::from("");
+
+        match input.next() {
+            Some('-') => {
+                sign = -1;
+            }
+            Some(c) if c.is_ascii_digit() => {
+                input_number.push(c);
+            }
+            _ => {
+                return Err("some error");
+            }
+        }
+
+        while let Some(curr_char) = input.next() {
+            if curr_char.is_ascii_digit() {
+                input_number.push(curr_char)
+            } else if num_type == "int" && curr_char == '.' && input_number.len() > 12 {
+                return Err("parse_number: input_number length > 12");
+            } else if num_type == "int" && curr_char == '.' {
+                input_number.push(curr_char);
+                num_type = "decimal";
+            } else {
+                input_number.insert(0, curr_char);
+                break;
+            }
+
+            if num_type == "int" && input_number.len() > 15 {
+                return Err("parse_number: int - input_number length > 15 characters");
+            }
+
+            if num_type == "decimal" && input_number.len() > 16 {
+                return Err("parse_number: decimal - input_number length > 15 characters");
+            }
+        }
+
+        if num_type == "int" {
+            let output_number = input_number.parse::<i64>().unwrap() * sign;
+            if output_number >= max_int || output_number <= min_int {
+                return Err("parse_number: int - input_number is out of range");
+            } else {
+                return Ok(Num::Integer(output_number));
+            }
+        } else if num_type == "decimal" {
+            let chars_after_dot = input_number.len() - input_number.find('.').unwrap() - 1;
+            match chars_after_dot {
+                1 | 2 => {
+                    let output_number = input_number.parse::<f64>().unwrap() * sign as f64;
+                    return Ok(Num::Decimal(output_number));
+                }
+                _ => Err("parse_number: invalid decimal fraction length"),
+            }
+        } else {
+            return Err("parse_number: unknown error");
+        }
     }
 
     fn parse_parameters() -> Result<(), ()> {
@@ -356,5 +427,59 @@ mod tests {
             Err("byte_seq: no closing ':'"),
             Parser::parse_byte_sequence(&mut ":aGVsbG8=".chars().peekable())
         );
+    }
+
+    #[test]
+    // TODO: Tests failing !!!
+    fn parse_number() {
+        assert_eq!(
+            Num::Integer(42),
+            Parser::parse_number(&mut "42".chars().peekable()).unwrap()
+        );
+        assert_eq!(
+            Num::Integer(-42),
+            Parser::parse_number(&mut "-42".chars().peekable()).unwrap()
+        );
+        assert_eq!(
+            Num::Integer(-42),
+            Parser::parse_number(&mut "-042".chars().peekable()).unwrap()
+        );
+        assert_eq!(
+            Num::Integer(0),
+            Parser::parse_number(&mut "0".chars().peekable()).unwrap()
+        );
+        assert_eq!(
+            Num::Integer(0),
+            Parser::parse_number(&mut "00".chars().peekable()).unwrap()
+        );
+        assert_eq!(
+            Num::Integer(123456789012345),
+            Parser::parse_number(&mut "123456789012345".chars().peekable()).unwrap()
+        );
+        assert_eq!(
+            Num::Integer(-123456789012345),
+            Parser::parse_number(&mut "-123456789012345".chars().peekable()).unwrap()
+        );
+        // assert_eq!(Err("some_err"), Parser::parse_number(&mut "- 42".chars().peekable()));
+        // assert_eq!(Err("some_err"), Parser::parse_number(&mut "--0".chars().peekable()));
+        // assert_eq!(Err("some_err"), Parser::parse_number(&mut "2,3".chars().peekable()));
+        // assert_eq!(Err("some_err"), Parser::parse_number(&mut "4-2".chars().peekable()));
+        // assert_eq!(Err("some_err"), Parser::parse_number(&mut "- 42".chars().peekable()));
+        //
+        // // for decimals
+        assert_eq!(
+            Num::Decimal(3.14),
+            Parser::parse_number(&mut "3.14".chars().peekable()).unwrap()
+        );
+        assert_eq!(
+            Num::Decimal(-3.14),
+            Parser::parse_number(&mut "-3.14".chars().peekable()).unwrap()
+        );
+        assert_eq!(
+            Num::Decimal(123456789012.1),
+            Parser::parse_number(&mut "123456789012.1".chars().peekable()).unwrap()
+        );
+        // assert_eq!(Err("some_err"), Parser::parse_number(&mut "-5. 14".chars().peekable()));
+        // assert_eq!(Err("some_err"), Parser::parse_number(&mut "7. 1".chars().peekable()));
     }
 }
