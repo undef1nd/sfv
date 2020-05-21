@@ -194,7 +194,6 @@ impl Parser {
 
             input.next();
             if num_type == "int" && input_number.len() > 15 {
-                println!("VALUE: {}", input_number);
                 return Err("parse_number: int - input_number length > 15 characters");
             }
 
@@ -505,8 +504,24 @@ mod tests {
             Parser::parse_number(&mut "4-2".chars().peekable()).unwrap()
         );
         assert_eq!(
+            Num::Decimal(1.5),
+            Parser::parse_number(&mut "1.5.4.".chars().peekable()).unwrap()
+        );
+        assert_eq!(
+            Num::Decimal(1.8),
+            Parser::parse_number(&mut "1.8.".chars().peekable()).unwrap()
+        );
+        assert_eq!(
+            Num::Decimal(1.7),
+            Parser::parse_number(&mut "1.7.0".chars().peekable()).unwrap()
+        );
+        assert_eq!(
             Err("parse_error: number does not start with digit"),
             Parser::parse_number(&mut "- 42".chars().peekable())
+        );
+        assert_eq!(
+            Err("parse_number: invalid decimal fraction length"),
+            Parser::parse_number(&mut "1..4".chars().peekable())
         );
 
         // for decimals
