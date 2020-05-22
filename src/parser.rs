@@ -13,7 +13,7 @@ struct Item {
 
 #[derive(Debug, PartialEq)]
 enum Num {
-    Decimal(f64), // Need to change it later to smth more precise
+    Decimal(f64), // TODO: Need to change it later to smth more precise
     Integer(i64),
 }
 
@@ -259,14 +259,20 @@ impl Parser {
                 _ => (),
             }
 
-            let param_name = Self::parse_key(input);
-
-            // let param_value = true;
-            //
-            // match input.peek() {
-            //     Some('=') => { input.next(); }
-            // }
+            let param_name = Self::parse_key(input)?;
+            let param_value = match input.peek() {
+                Some('=') => {
+                    input.next();
+                    Self::parse_bare_item(input)?
+                }
+                _ => BareItem::Boolean(true),
+            };
+            params.insert(param_name, param_value);
         }
+
+        // Append key param_name with value param_value to parameters.
+        // If parameters already contains a name param_name (comparing character-for-character), overwrite its value.
+        // Note that when duplicate Parameter keys are encountered, this has the effect of ignoring all but the last instance.
         Ok(params)
     }
 
@@ -646,11 +652,76 @@ mod tests {
 
     #[test]
     fn parse_parameters() {
-        let mut expected = IndexMap::new();
-        expected.insert("str".to_owned(), BareItem::String("param_val".to_owned()));
+        let mut expected = Parameters::new();
+        expected.insert("b".to_owned(), BareItem::String("param_val".to_owned()));
         assert_eq!(
             expected,
             Parser::parse_parameters(&mut ";b=\"param_val\"".chars().peekable()).unwrap()
+        );
+
+        let mut expected = Parameters::new();
+        expected.insert("b".to_owned(), BareItem::Boolean(true));
+        expected.insert("a".to_owned(), BareItem::Boolean(true));
+        assert_eq!(
+            expected,
+            Parser::parse_parameters(&mut ";b;a".chars().peekable()).unwrap()
+        );
+
+        let mut expected = Parameters::new();
+        expected.insert("key1".to_owned(), BareItem::Boolean(false));
+        expected.insert("key2".to_owned(), BareItem::Number(Num::Decimal(746.15)));
+        assert_eq!(
+            expected,
+            Parser::parse_parameters(&mut ";key1=?0;key2=746.15".chars().peekable()).unwrap()
+        );
+
+        let mut expected = Parameters::new();
+        expected.insert("key1".to_owned(), BareItem::Boolean(false));
+        expected.insert("key2".to_owned(), BareItem::Number(Num::Integer(11111)));
+        assert_eq!(
+            expected,
+            Parser::parse_parameters(&mut "; key1=?0; key2=11111".chars().peekable()).unwrap()
+        );
+
+        assert_eq!(
+            Parameters::new(),
+            Parser::parse_parameters(&mut " key1=?0; key2=11111".chars().peekable()).unwrap()
+        );
+        assert_eq!(
+            Parameters::new(),
+            Parser::parse_parameters(&mut "".chars().peekable()).unwrap()
+        );
+        assert_eq!(
+            Parameters::new(),
+            Parser::parse_parameters(&mut "[;a=1".chars().peekable()).unwrap()
+        );
+        assert_eq!(
+            Parameters::new(),
+            Parser::parse_parameters(&mut String::new().chars().peekable()).unwrap()
+        );
+    }
+
+    #[test]
+    fn parse_key() {
+        assert_eq!(
+            "a".to_owned(),
+            Parser::parse_key(&mut "a=1".chars().peekable()).unwrap()
+        );
+        assert_eq!(
+            "a1".to_owned(),
+            Parser::parse_key(&mut "a1=10".chars().peekable()).unwrap()
+        );
+        assert_eq!(
+            "*1".to_owned(),
+            Parser::parse_key(&mut "*1=10".chars().peekable()).unwrap()
+        );
+        assert_eq!(
+            "f".to_owned(),
+            Parser::parse_key(&mut "f[f=10".chars().peekable()).unwrap()
+        );
+        assert_eq!(
+            Err("parse_key: first char is not lcalpha or *"),
+            Parser::parse_key(&mut "[*f=10".chars().peekable())
         );
     }
 }
