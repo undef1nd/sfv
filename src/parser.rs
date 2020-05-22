@@ -5,10 +5,10 @@ use std::str::Chars;
 
 type Parameters = IndexMap<String, BareItem>;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 struct Item {
     bare_item: BareItem,
-    parameters: Option<Parameters>,
+    parameters: Parameters,
 }
 
 #[derive(Debug, PartialEq)]
@@ -51,13 +51,12 @@ impl Parser {
     fn parse_item(input_chars: &mut Peekable<Chars>) -> Result<Item, &'static str> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-item
 
-        //
         let bare_item = Self::parse_bare_item(input_chars)?;
         let parameters = Self::parse_parameters(input_chars)?;
 
         Ok(Item {
             bare_item,
-            parameters: None,
+            parameters,
         })
     }
 
@@ -74,7 +73,7 @@ impl Parser {
             Some(&c) if c == '-' || c.is_ascii_digit() => {
                 Ok(BareItem::Number(Self::parse_number(&mut input)?))
             }
-            _ => Err("parse_bare_item: item type is unrecognized"),
+            _ => Err("parse_bare_item: item type can't be identified"),
         }
     }
 
@@ -303,6 +302,43 @@ mod tests {
     use super::*;
 
     #[test]
+    fn parse_item() {
+        assert_eq!(
+            Item {
+                bare_item: BareItem::Number(Num::Integer(12)),
+                parameters: Parameters::new()
+            },
+            Parser::parse_item(&mut "12 ".chars().peekable()).unwrap()
+        );
+
+        let mut param = Parameters::new();
+        param.insert("a".to_owned(), BareItem::Boolean(true));
+
+        assert_eq!(
+            Item {
+                bare_item: BareItem::Number(Num::Decimal(12.35)),
+                parameters: param
+            },
+            Parser::parse_item(&mut "12.35;a ".chars().peekable()).unwrap()
+        );
+
+        let mut param = Parameters::new();
+        param.insert("a1".to_owned(), BareItem::Token("*".to_owned()));
+        assert_eq!(
+            Item {
+                bare_item: BareItem::String("12.35".to_owned()),
+                parameters: param
+            },
+            Parser::parse_item(&mut "\"12.35\";a1=*".chars().peekable()).unwrap()
+        );
+
+        assert_eq!(
+            Err("parse_bare_item: item type can't be identified"),
+            Parser::parse_item(&mut "".chars().peekable())
+        );
+    }
+
+    #[test]
     fn parse_bare_item() {
         assert_eq!(
             Ok(BareItem::Boolean(false)),
@@ -328,15 +364,15 @@ mod tests {
         );
 
         assert_eq!(
-            Err("parse_bare_item: item type is unrecognized"),
+            Err("parse_bare_item: item type can't be identified"),
             Parser::parse_bare_item(&mut "!?0".chars().peekable())
         );
         assert_eq!(
-            Err("parse_bare_item: item type is unrecognized"),
+            Err("parse_bare_item: item type can't be identified"),
             Parser::parse_bare_item(&mut "_11abc".chars().peekable())
         );
         assert_eq!(
-            Err("parse_bare_item: item type is unrecognized"),
+            Err("parse_bare_item: item type can't be identified"),
             Parser::parse_bare_item(&mut "   ".chars().peekable())
         );
     }
