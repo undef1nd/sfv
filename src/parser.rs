@@ -3,7 +3,15 @@ use indexmap::IndexMap;
 use std::iter::Peekable;
 use std::str::Chars;
 
+type InnerList = Vec<Item>;
+type Dictionary = IndexMap<String, DictionaryValue>;
 type Parameters = IndexMap<String, BareItem>;
+
+#[derive(Debug, PartialEq)]
+enum DictionaryValue {
+    Item(Item),
+    InnerList(InnerList),
+}
 
 #[derive(Debug, PartialEq)]
 struct Item {
@@ -336,6 +344,11 @@ mod tests {
             Err("parse_bare_item: item type can't be identified"),
             Parser::parse_item(&mut "".chars().peekable())
         );
+    }
+
+    #[test]
+    fn parse_dict() {
+        assert_eq!(1, 1);
     }
 
     #[test]
