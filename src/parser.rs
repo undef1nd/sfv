@@ -37,19 +37,29 @@ impl Parser {
     //         input_str: input_string,
     //     }
     // }
-
-    // fn parse_item(self) -> Result<Item, ()> {
-    // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-item
-    //     // parse item
-    //     // parse parameters
-    //     // return Item { ... }
-    //     let chars_iter = self.input_str.chars().peekable();
-    //     let bare_item = Self::parse_bare_item(chars_iter)?;
-    //     Ok(Item {
-    //         bare_item,
-    //         parameters: None,
-    //     })
+    //
+    // fn parse(self, header_type: &str) -> Result<Header, &str> {
+    //     // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#text-parse
+    //     let mut input = self.input_str.chars().peekable();
+    //     match header_type {
+    //         "list" => Ok(Header(Self::parse_list(&mut input)?),
+    //         "dict" => Ok(Header(Self::parse_dict(&mut input)?),
+    //         "item" => Ok(Header(Self::parse_item(&mut input)?),
+    //     }
     // }
+
+    fn parse_item(input_chars: &mut Peekable<Chars>) -> Result<Item, &'static str> {
+        // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-item
+
+        //
+        let bare_item = Self::parse_bare_item(input_chars)?;
+        let parameters = Self::parse_parameters(input_chars)?;
+
+        Ok(Item {
+            bare_item,
+            parameters: None,
+        })
+    }
 
     fn parse_bare_item(mut input: &mut Peekable<Chars>) -> Result<BareItem, &'static str> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-bare-item
@@ -228,10 +238,57 @@ impl Parser {
         }
     }
 
-    fn parse_parameters() -> Result<(), ()> {
+    fn parse_parameters(input: &mut Peekable<Chars>) -> Result<Parameters, &'static str> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-param
 
-        unimplemented!()
+        let mut params = Parameters::new();
+        // expected.insert("str".to_owned(), BareItem::String("param_val".to_owned()));
+        // Ok(expected)
+
+        while let Some(curr_char) = input.peek() {
+            if curr_char == &';' {
+                input.next();
+            } else {
+                break;
+            }
+
+            match input.peek() {
+                Some(c) if c.is_whitespace() => {
+                    input.next();
+                }
+                _ => (),
+            }
+
+            let param_name = Self::parse_key(input);
+
+            // let param_value = true;
+            //
+            // match input.peek() {
+            //     Some('=') => { input.next(); }
+            // }
+        }
+        Ok(params)
+    }
+
+    fn parse_key(input: &mut Peekable<Chars>) -> Result<String, &'static str> {
+        match input.peek() {
+            Some(c) if c == &'*' || c.is_ascii_lowercase() => (),
+            _ => return Err("parse_key: first char is not lcalpha or *"),
+        }
+
+        let mut output = String::new();
+        while let Some(curr_char) = input.peek() {
+            if !curr_char.is_ascii_lowercase()
+                && !curr_char.is_ascii_digit()
+                && !"_-*.".contains(*curr_char)
+            {
+                return Ok(output);
+            }
+
+            output.push(*curr_char);
+            input.next();
+        }
+        Ok(output)
     }
 }
 
@@ -584,6 +641,16 @@ mod tests {
         assert_eq!(
             Err("parse_number: invalid decimal fraction length"),
             Parser::parse_number(&mut "-733333333332.124".chars().peekable())
+        );
+    }
+
+    #[test]
+    fn parse_parameters() {
+        let mut expected = IndexMap::new();
+        expected.insert("str".to_owned(), BareItem::String("param_val".to_owned()));
+        assert_eq!(
+            expected,
+            Parser::parse_parameters(&mut ";b=\"param_val\"".chars().peekable()).unwrap()
         );
     }
 }
