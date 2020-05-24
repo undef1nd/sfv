@@ -89,13 +89,13 @@ impl Parser {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-boolean
 
         if input.next() != Some('?') {
-            return Err("bool: first char is not '?'");
+            return Err("parse_bool: first char is not '?'");
         }
 
         match input.next() {
             Some('0') => Ok(false),
             Some('1') => Ok(true),
-            _ => Err("bool: invalid variant"),
+            _ => Err("parse_bool: invalid variant"),
         }
     }
 
@@ -103,27 +103,28 @@ impl Parser {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-string
 
         if input.next() != Some('\"') {
-            return Err("string: first char is not '\"'");
+            return Err("parse_string: first char is not '\"'");
         }
 
         let mut output_string = String::from("");
         while let Some(curr_char) = input.next() {
-            if curr_char == '\\' {
-                match input.next() {
-                    Some('\\') => output_string.push(curr_char),
-                    Some('\"') => output_string.push(curr_char),
-                    None => return Err("string: no chars after '\\'"),
-                    _ => return Err("string: invalid char after '\\'"),
-                }
-            } else if (curr_char >= '\x00' && curr_char <= '\x1f') || curr_char == '\x7f' {
-                return Err("string: not a visible char");
-            } else if curr_char == '\"' {
-                return Ok(output_string);
-            } else {
-                output_string.push(curr_char);
+            match curr_char {
+                '\"' => return Ok(output_string),
+                '\x7f' | '\x00'..='\x1f' => return Err("parse_string: not a visible char"),
+                '\\' => match input.next() {
+                    Some('\\') => {
+                        output_string.push(curr_char);
+                    }
+                    Some('\"') => {
+                        output_string.push(curr_char);
+                    }
+                    None => return Err("parse_string: no chars after '\\'"),
+                    _ => return Err("parse_string: invalid char after '\\'"),
+                },
+                _ => output_string.push(curr_char),
             }
         }
-        Err("string: no closing '\"'")
+        Err("parse_string: no closing '\"'")
     }
 
     fn parse_token(input: &mut Peekable<Chars>) -> Result<String, &'static str> {
@@ -131,11 +132,12 @@ impl Parser {
 
         if let Some(first_char) = input.peek() {
             if !first_char.is_ascii_alphabetic() && first_char != &'*' {
-                return Err("token: first char is not ALPHA or '*'");
+                return Err("parse_token: first char is not ALPHA or '*'");
             }
         } else {
-            return Err("token: empty input string");
+            return Err("parse_token: empty input string");
         }
+
         let mut output_string = String::from("");
         while let Some(curr_char) = input.peek() {
             if !utils::is_tchar(*curr_char) && curr_char != &':' && curr_char != &'/' {
@@ -144,7 +146,7 @@ impl Parser {
 
             match input.next() {
                 Some(c) => output_string.push(c),
-                None => return Err("token: end of the string"),
+                None => return Err("parse_token: end of the string"),
             }
         }
         Ok(output_string)
@@ -154,22 +156,22 @@ impl Parser {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-binary
 
         if input.next() != Some(':') {
-            return Err("byte_seq: first char is not ':'");
+            return Err("parse_byte_seq: first char is not ':'");
         }
 
         if !input.clone().any(|c| c == ':') {
-            return Err("byte_seq: no closing ':'");
+            return Err("parse_byte_seq: no closing ':'");
         }
         let b64_content = input.take_while(|c| c != &':').collect::<String>();
         if !b64_content
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '=' || c == '/')
         {
-            return Err("byte_seq: invalid char in byte sequence");
+            return Err("parse_byte_seq: invalid char in byte sequence");
         }
         match base64::decode(b64_content) {
             Ok(content) => Ok(content),
-            Err(_) => Err("byte_seq: decoding error"),
+            Err(_) => Err("parse_byte_seq: decoding error"),
         }
     }
 
@@ -223,24 +225,29 @@ impl Parser {
             }
         }
 
-        match is_integer {
-            true => {
-                let output_number = input_number.parse::<i64>().unwrap() * sign;
-                if output_number >= min_int && output_number <= max_int {
-                    Ok(Num::Integer(output_number))
-                } else {
-                    Err("parse_number: integer number is out of range")
-                }
+        if is_integer {
+            let output_number = input_number
+                .parse::<i64>()
+                .map_err(|_err| "parse_number: parsing i64 failed")?
+                * sign;
+            if output_number >= min_int && output_number <= max_int {
+                Ok(Num::Integer(output_number))
+            } else {
+                Err("parse_number: integer number is out of range")
             }
-            false => {
-                let chars_after_dot = input_number.len() - input_number.find('.').unwrap() - 1;
-                match chars_after_dot {
-                    1 | 2 => {
-                        let output_number = input_number.parse::<f64>().unwrap() * sign as f64;
-                        Ok(Num::Decimal(output_number))
-                    }
-                    _ => Err("parse_number: invalid decimal fraction length"),
+        } else {
+            let chars_after_dot = input_number
+                .find('.')
+                .map(|dot_pos| input_number.len() - dot_pos - 1);
+            match chars_after_dot {
+                Some(1) | Some(2) => {
+                    let output_number = input_number
+                        .parse::<f64>()
+                        .map_err(|_err| "parse_number: parsing f64 failed")?
+                        * sign as f64;
+                    Ok(Num::Decimal(output_number))
                 }
+                _ => Err("parse_number: invalid decimal fraction length"),
             }
         }
     }
@@ -277,7 +284,6 @@ impl Parser {
             params.insert(param_name, param_value);
         }
 
-        // Append key param_name with value param_value to parameters.
         // If parameters already contains a name param_name (comparing character-for-character), overwrite its value.
         // Note that when duplicate Parameter keys are encountered, this has the effect of ignoring all but the last instance.
         Ok(params)
@@ -308,15 +314,16 @@ impl Parser {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::error::Error;
 
     #[test]
-    fn parse_item() {
+    fn parse_item() -> Result<(), Box<dyn Error>> {
         assert_eq!(
             Item {
                 bare_item: BareItem::Number(Num::Integer(12)),
                 parameters: Parameters::new()
             },
-            Parser::parse_item(&mut "12 ".chars().peekable()).unwrap()
+            Parser::parse_item(&mut "12 ".chars().peekable())?
         );
 
         let mut param = Parameters::new();
@@ -327,7 +334,7 @@ mod tests {
                 bare_item: BareItem::Number(Num::Decimal(12.35)),
                 parameters: param
             },
-            Parser::parse_item(&mut "12.35;a ".chars().peekable()).unwrap()
+            Parser::parse_item(&mut "12.35;a ".chars().peekable())?
         );
 
         let mut param = Parameters::new();
@@ -337,43 +344,44 @@ mod tests {
                 bare_item: BareItem::String("12.35".to_owned()),
                 parameters: param
             },
-            Parser::parse_item(&mut "\"12.35\";a1=*".chars().peekable()).unwrap()
+            Parser::parse_item(&mut "\"12.35\";a1=*".chars().peekable())?
         );
 
         assert_eq!(
             Err("parse_bare_item: item type can't be identified"),
             Parser::parse_item(&mut "".chars().peekable())
         );
+
+        Ok(())
     }
 
     #[test]
-    fn parse_dict() {
+    fn parse_dict() -> Result<(), Box<dyn Error>> {
         assert_eq!(1, 1);
+        Ok(())
     }
 
     #[test]
-    fn parse_bare_item() {
+    fn parse_bare_item() -> Result<(), Box<dyn Error>> {
         assert_eq!(
-            Ok(BareItem::Boolean(false)),
-            Parser::parse_bare_item(&mut "?0".chars().peekable())
+            BareItem::Boolean(false),
+            Parser::parse_bare_item(&mut "?0".chars().peekable())?
         );
         assert_eq!(
-            Ok(BareItem::String("test string".to_owned())),
-            Parser::parse_bare_item(&mut "\"test string\"".chars().peekable())
+            BareItem::String("test string".to_owned()),
+            Parser::parse_bare_item(&mut "\"test string\"".chars().peekable())?
         );
         assert_eq!(
-            Ok(BareItem::Token("*token".to_owned())),
-            Parser::parse_bare_item(&mut "*token".chars().peekable())
+            BareItem::Token("*token".to_owned()),
+            Parser::parse_bare_item(&mut "*token".chars().peekable())?
         );
         assert_eq!(
-            Ok(BareItem::ByteSeq(
-                "base_64 encoding test".to_owned().into_bytes()
-            )),
-            Parser::parse_bare_item(&mut ":YmFzZV82NCBlbmNvZGluZyB0ZXN0:".chars().peekable())
+            BareItem::ByteSeq("base_64 encoding test".to_owned().into_bytes()),
+            Parser::parse_bare_item(&mut ":YmFzZV82NCBlbmNvZGluZyB0ZXN0:".chars().peekable())?
         );
         assert_eq!(
-            Ok(BareItem::Number(Num::Decimal(-3.55))),
-            Parser::parse_bare_item(&mut "-3.55".chars().peekable())
+            BareItem::Number(Num::Decimal(-3.55)),
+            Parser::parse_bare_item(&mut "-3.55".chars().peekable())?
         );
 
         assert_eq!(
@@ -388,185 +396,172 @@ mod tests {
             Err("parse_bare_item: item type can't be identified"),
             Parser::parse_bare_item(&mut "   ".chars().peekable())
         );
+        Ok(())
     }
 
     #[test]
-    fn parse_bool() {
+    fn parse_bool() -> Result<(), Box<dyn Error>> {
         let mut input = "?0gk".chars().peekable();
-        assert_eq!(false, Parser::parse_bool(&mut input).unwrap());
+        assert_eq!(false, Parser::parse_bool(&mut input)?);
         assert_eq!(input.collect::<String>(), "gk");
 
+        assert_eq!(false, Parser::parse_bool(&mut "?0".chars().peekable())?);
+        assert_eq!(true, Parser::parse_bool(&mut "?1".chars().peekable())?);
         assert_eq!(
-            false,
-            Parser::parse_bool(&mut "?0".chars().peekable()).unwrap()
-        );
-        assert_eq!(
-            true,
-            Parser::parse_bool(&mut "?1".chars().peekable()).unwrap()
-        );
-
-        assert_eq!(
-            Err("bool: first char is not '?'"),
+            Err("parse_bool: first char is not '?'"),
             Parser::parse_bool(&mut "".chars().peekable())
         );
         assert_eq!(
-            Err("bool: invalid variant"),
+            Err("parse_bool: invalid variant"),
             Parser::parse_bool(&mut "?".chars().peekable())
         );
+        Ok(())
     }
 
     #[test]
-    fn parse_string() {
+    fn parse_string() -> Result<(), Box<dyn Error>> {
         let mut input = "\"some string\" ;not string".chars().peekable();
-        assert_eq!(
-            "some string".to_owned(),
-            Parser::parse_string(&mut input).unwrap()
-        );
+        assert_eq!("some string".to_owned(), Parser::parse_string(&mut input)?);
         assert_eq!(input.collect::<String>(), " ;not string");
 
         assert_eq!(
             "test".to_owned(),
-            Parser::parse_string(&mut "\"test\"".chars().peekable()).unwrap()
+            Parser::parse_string(&mut "\"test\"".chars().peekable())?
         );
         assert_eq!(
             "".to_owned(),
-            Parser::parse_string(&mut "\"\"".chars().peekable()).unwrap()
+            Parser::parse_string(&mut "\"\"".chars().peekable())?
         );
         assert_eq!(
             "some string".to_owned(),
-            Parser::parse_string(&mut "\"some string\"".chars().peekable()).unwrap()
+            Parser::parse_string(&mut "\"some string\"".chars().peekable())?
         );
-
         assert_eq!(
-            Err("string: first char is not '\"'"),
+            Err("parse_string: first char is not '\"'"),
             Parser::parse_string(&mut "test".chars().peekable())
         );
         assert_eq!(
-            Err("string: no chars after '\\'"),
+            Err("parse_string: no chars after '\\'"),
             Parser::parse_string(&mut "\"\\".chars().peekable())
         );
         assert_eq!(
-            Err("string: invalid char after '\\'"),
+            Err("parse_string: invalid char after '\\'"),
             Parser::parse_string(&mut "\"\\l\"".chars().peekable())
         );
         assert_eq!(
-            Err("string: not a visible char"),
+            Err("parse_string: not a visible char"),
             Parser::parse_string(&mut "\"\u{1f}\"".chars().peekable())
         );
         assert_eq!(
-            Err("string: no closing '\"'"),
+            Err("parse_string: no closing '\"'"),
             Parser::parse_string(&mut "\"smth".chars().peekable())
         );
+        Ok(())
     }
 
     #[test]
-    fn parse_token() {
+    fn parse_token() -> Result<(), Box<dyn Error>> {
         let mut input = "*some:token}not token".chars().peekable();
-        assert_eq!(
-            "*some:token".to_owned(),
-            Parser::parse_token(&mut input).unwrap()
-        );
+        assert_eq!("*some:token".to_owned(), Parser::parse_token(&mut input)?);
         assert_eq!(input.collect::<String>(), "}not token");
 
         let mut input = "765token".chars().peekable();
         assert_eq!(
-            Err("token: first char is not ALPHA or '*'"),
+            Err("parse_token: first char is not ALPHA or '*'"),
             Parser::parse_token(&mut input)
         );
         assert_eq!(input.collect::<String>(), "765token");
 
         assert_eq!(
             "token".to_owned(),
-            Parser::parse_token(&mut "token".chars().peekable()).unwrap()
+            Parser::parse_token(&mut "token".chars().peekable())?
         );
-
         assert_eq!(
             "a_b-c.d3:f%00/*".to_owned(),
-            Parser::parse_token(&mut "a_b-c.d3:f%00/*".chars().peekable()).unwrap()
+            Parser::parse_token(&mut "a_b-c.d3:f%00/*".chars().peekable())?
         );
         assert_eq!(
             "TestToken".to_owned(),
-            Parser::parse_token(&mut "TestToken".chars().peekable()).unwrap()
+            Parser::parse_token(&mut "TestToken".chars().peekable())?
         );
         assert_eq!(
             "some".to_owned(),
-            Parser::parse_token(&mut "some@token".chars().peekable()).unwrap()
+            Parser::parse_token(&mut "some@token".chars().peekable())?
         );
         assert_eq!(
             "*TestToken*".to_owned(),
-            Parser::parse_token(&mut "*TestToken*".chars().peekable()).unwrap()
+            Parser::parse_token(&mut "*TestToken*".chars().peekable())?
         );
         assert_eq!(
             "*".to_owned(),
-            Parser::parse_token(&mut "*[@:token".chars().peekable()).unwrap()
+            Parser::parse_token(&mut "*[@:token".chars().peekable())?
         );
         assert_eq!(
             "test".to_owned(),
-            Parser::parse_token(&mut "test token".chars().peekable()).unwrap()
+            Parser::parse_token(&mut "test token".chars().peekable())?
         );
         assert_eq!(
-            Err("token: first char is not ALPHA or '*'"),
+            Err("parse_token: first char is not ALPHA or '*'"),
             Parser::parse_token(&mut "7token".chars().peekable())
         );
         assert_eq!(
-            Err("token: empty input string"),
+            Err("parse_token: empty input string"),
             Parser::parse_token(&mut "".chars().peekable())
         );
+        Ok(())
     }
 
     #[test]
-    fn parse_byte_sequence() {
+    fn parse_byte_sequence() -> Result<(), Box<dyn Error>> {
         let mut input = ":aGVsbG8:rest_of_str".chars().peekable();
         assert_eq!(
             "hello".to_owned().into_bytes(),
-            Parser::parse_byte_sequence(&mut input).unwrap()
+            Parser::parse_byte_sequence(&mut input)?
         );
         assert_eq!("rest_of_str", input.collect::<String>());
 
         assert_eq!(
             "hello".to_owned().into_bytes(),
-            Parser::parse_byte_sequence(&mut ":aGVsbG8:".chars().peekable()).unwrap()
+            Parser::parse_byte_sequence(&mut ":aGVsbG8:".chars().peekable())?
         );
         assert_eq!(
             "test_encode".to_owned().into_bytes(),
-            Parser::parse_byte_sequence(&mut ":dGVzdF9lbmNvZGU:".chars().peekable()).unwrap()
+            Parser::parse_byte_sequence(&mut ":dGVzdF9lbmNvZGU:".chars().peekable())?
         );
         assert_eq!(
             "new:year tree".to_owned().into_bytes(),
-            Parser::parse_byte_sequence(&mut ":bmV3OnllYXIgdHJlZQ==:".chars().peekable()).unwrap()
+            Parser::parse_byte_sequence(&mut ":bmV3OnllYXIgdHJlZQ==:".chars().peekable())?
         );
         assert_eq!(
             "".to_owned().into_bytes(),
-            Parser::parse_byte_sequence(&mut "::".chars().peekable()).unwrap()
+            Parser::parse_byte_sequence(&mut "::".chars().peekable())?
         );
         assert_eq!(
-            Err("byte_seq: first char is not ':'"),
+            Err("parse_byte_seq: first char is not ':'"),
             Parser::parse_byte_sequence(&mut "aGVsbG8".chars().peekable())
         );
         assert_eq!(
-            Err("byte_seq: invalid char in byte sequence"),
+            Err("parse_byte_seq: invalid char in byte sequence"),
             Parser::parse_byte_sequence(&mut ":aGVsb G8=:".chars().peekable())
         );
         assert_eq!(
-            Err("byte_seq: no closing ':'"),
+            Err("parse_byte_seq: no closing ':'"),
             Parser::parse_byte_sequence(&mut ":aGVsbG8=".chars().peekable())
         );
+        Ok(())
     }
 
     #[test]
-    fn parse_number() {
+    fn parse_number() -> Result<(), Box<dyn Error>> {
         let mut input = "-733333333332d.14".chars().peekable();
         assert_eq!(
             Num::Integer(-733333333332),
-            Parser::parse_number(&mut input).unwrap()
+            Parser::parse_number(&mut input)?
         );
         assert_eq!("d.14", input.collect::<String>());
 
         let mut input = "00.42 test string".chars().peekable();
-        assert_eq!(
-            Num::Decimal(0.42),
-            Parser::parse_number(&mut input).unwrap()
-        );
+        assert_eq!(Num::Decimal(0.42), Parser::parse_number(&mut input)?);
         assert_eq!(" test string", input.collect::<String>());
 
         let mut input = ":aGVsbG8:rest".chars().peekable();
@@ -585,74 +580,72 @@ mod tests {
 
         assert_eq!(
             Num::Integer(42),
-            Parser::parse_number(&mut "42".chars().peekable()).unwrap()
+            Parser::parse_number(&mut "42".chars().peekable())?
         );
         assert_eq!(
             Num::Integer(-42),
-            Parser::parse_number(&mut "-42".chars().peekable()).unwrap()
+            Parser::parse_number(&mut "-42".chars().peekable())?
         );
         assert_eq!(
             Num::Integer(-42),
-            Parser::parse_number(&mut "-042".chars().peekable()).unwrap()
+            Parser::parse_number(&mut "-042".chars().peekable())?
         );
         assert_eq!(
             Num::Integer(0),
-            Parser::parse_number(&mut "0".chars().peekable()).unwrap()
+            Parser::parse_number(&mut "0".chars().peekable())?
         );
         assert_eq!(
             Num::Integer(0),
-            Parser::parse_number(&mut "00".chars().peekable()).unwrap()
+            Parser::parse_number(&mut "00".chars().peekable())?
         );
         assert_eq!(
             Num::Integer(123456789012345),
-            Parser::parse_number(&mut "123456789012345".chars().peekable()).unwrap()
+            Parser::parse_number(&mut "123456789012345".chars().peekable())?
         );
         assert_eq!(
             Num::Integer(-123456789012345),
-            Parser::parse_number(&mut "-123456789012345".chars().peekable()).unwrap()
+            Parser::parse_number(&mut "-123456789012345".chars().peekable())?
         );
         assert_eq!(
             Num::Integer(2),
-            Parser::parse_number(&mut "2,3".chars().peekable()).unwrap()
+            Parser::parse_number(&mut "2,3".chars().peekable())?
         );
         assert_eq!(
             Num::Integer(4),
-            Parser::parse_number(&mut "4-2".chars().peekable()).unwrap()
+            Parser::parse_number(&mut "4-2".chars().peekable())?
         );
         assert_eq!(
             Num::Integer(-999999999999999),
-            Parser::parse_number(&mut "-999999999999999".chars().peekable()).unwrap()
+            Parser::parse_number(&mut "-999999999999999".chars().peekable())?
         );
         assert_eq!(
             Num::Integer(999999999999999),
-            Parser::parse_number(&mut "999999999999999".chars().peekable()).unwrap()
+            Parser::parse_number(&mut "999999999999999".chars().peekable())?
         );
-
         assert_eq!(
             Num::Decimal(1.5),
-            Parser::parse_number(&mut "1.5.4.".chars().peekable()).unwrap()
+            Parser::parse_number(&mut "1.5.4.".chars().peekable())?
         );
         assert_eq!(
             Num::Decimal(1.8),
-            Parser::parse_number(&mut "1.8.".chars().peekable()).unwrap()
+            Parser::parse_number(&mut "1.8.".chars().peekable())?
         );
         assert_eq!(
             Num::Decimal(1.7),
-            Parser::parse_number(&mut "1.7.0".chars().peekable()).unwrap()
+            Parser::parse_number(&mut "1.7.0".chars().peekable())?
         );
         assert_eq!(
             Num::Decimal(3.14),
-            Parser::parse_number(&mut "3.14".chars().peekable()).unwrap()
+            Parser::parse_number(&mut "3.14".chars().peekable())?
         );
         assert_eq!(
             Num::Decimal(-3.14),
-            Parser::parse_number(&mut "-3.14".chars().peekable()).unwrap()
+            Parser::parse_number(&mut "-3.14".chars().peekable())?
         );
         assert_eq!(
             Num::Decimal(123456789012.1),
-            Parser::parse_number(&mut "123456789012.1".chars().peekable()).unwrap()
+            Parser::parse_number(&mut "123456789012.1".chars().peekable())?
         );
-
         assert_eq!(
             Err("parse_number: input number does not start with a digit"),
             Parser::parse_number(&mut "--0".chars().peekable())
@@ -697,15 +690,16 @@ mod tests {
             Err("parse_number: invalid decimal fraction length"),
             Parser::parse_number(&mut "-733333333332.124".chars().peekable())
         );
+        Ok(())
     }
 
     #[test]
-    fn parse_parameters() {
+    fn parse_parameters() -> Result<(), Box<dyn Error>> {
         let mut expected = Parameters::new();
         expected.insert("b".to_owned(), BareItem::String("param_val".to_owned()));
         assert_eq!(
             expected,
-            Parser::parse_parameters(&mut ";b=\"param_val\"".chars().peekable()).unwrap()
+            Parser::parse_parameters(&mut ";b=\"param_val\"".chars().peekable())?
         );
 
         let mut expected = Parameters::new();
@@ -713,7 +707,7 @@ mod tests {
         expected.insert("a".to_owned(), BareItem::Boolean(true));
         assert_eq!(
             expected,
-            Parser::parse_parameters(&mut ";b;a".chars().peekable()).unwrap()
+            Parser::parse_parameters(&mut ";b;a".chars().peekable())?
         );
 
         let mut expected = Parameters::new();
@@ -721,7 +715,7 @@ mod tests {
         expected.insert("key2".to_owned(), BareItem::Number(Num::Decimal(746.15)));
         assert_eq!(
             expected,
-            Parser::parse_parameters(&mut ";key1=?0;key2=746.15".chars().peekable()).unwrap()
+            Parser::parse_parameters(&mut ";key1=?0;key2=746.15".chars().peekable())?
         );
 
         let mut expected = Parameters::new();
@@ -729,48 +723,50 @@ mod tests {
         expected.insert("key2".to_owned(), BareItem::Number(Num::Integer(11111)));
         assert_eq!(
             expected,
-            Parser::parse_parameters(&mut "; key1=?0; key2=11111".chars().peekable()).unwrap()
+            Parser::parse_parameters(&mut "; key1=?0; key2=11111".chars().peekable())?
         );
 
         assert_eq!(
             Parameters::new(),
-            Parser::parse_parameters(&mut " key1=?0; key2=11111".chars().peekable()).unwrap()
+            Parser::parse_parameters(&mut " key1=?0; key2=11111".chars().peekable())?
         );
         assert_eq!(
             Parameters::new(),
-            Parser::parse_parameters(&mut "".chars().peekable()).unwrap()
+            Parser::parse_parameters(&mut "".chars().peekable())?
         );
         assert_eq!(
             Parameters::new(),
-            Parser::parse_parameters(&mut "[;a=1".chars().peekable()).unwrap()
+            Parser::parse_parameters(&mut "[;a=1".chars().peekable())?
         );
         assert_eq!(
             Parameters::new(),
-            Parser::parse_parameters(&mut String::new().chars().peekable()).unwrap()
+            Parser::parse_parameters(&mut String::new().chars().peekable())?
         );
+        Ok(())
     }
 
     #[test]
-    fn parse_key() {
+    fn parse_key() -> Result<(), Box<dyn Error>> {
         assert_eq!(
             "a".to_owned(),
-            Parser::parse_key(&mut "a=1".chars().peekable()).unwrap()
+            Parser::parse_key(&mut "a=1".chars().peekable())?
         );
         assert_eq!(
             "a1".to_owned(),
-            Parser::parse_key(&mut "a1=10".chars().peekable()).unwrap()
+            Parser::parse_key(&mut "a1=10".chars().peekable())?
         );
         assert_eq!(
             "*1".to_owned(),
-            Parser::parse_key(&mut "*1=10".chars().peekable()).unwrap()
+            Parser::parse_key(&mut "*1=10".chars().peekable())?
         );
         assert_eq!(
             "f".to_owned(),
-            Parser::parse_key(&mut "f[f=10".chars().peekable()).unwrap()
+            Parser::parse_key(&mut "f[f=10".chars().peekable())?
         );
         assert_eq!(
             Err("parse_key: first char is not lcalpha or *"),
             Parser::parse_key(&mut "[*f=10".chars().peekable())
         );
+        Ok(())
     }
 }
