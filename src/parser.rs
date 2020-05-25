@@ -4,14 +4,24 @@ use rust_decimal::prelude::*;
 use std::iter::Peekable;
 use std::str::Chars;
 
-type InnerList = Vec<Item>;
-type Dictionary = IndexMap<String, DictionaryValue>;
+type Dictionary = IndexMap<String, ListEntry>;
 type Parameters = IndexMap<String, BareItem>;
 
 #[derive(Debug, PartialEq)]
-enum DictionaryValue {
+struct List {
+    items: Vec<ListEntry>,
+}
+
+#[derive(Debug, PartialEq)]
+enum ListEntry {
     Item(Item),
     InnerList(InnerList),
+}
+
+#[derive(Debug, PartialEq)]
+struct InnerList {
+    items: Vec<Item>,
+    parameters: Parameters,
 }
 
 #[derive(Debug, PartialEq)]
@@ -57,9 +67,85 @@ impl Parser {
     //     }
     // }
 
+    fn parse_list(input_chars: &mut Peekable<Chars>) -> Result<List, &'static str> {
+        // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-list
+        // List represents an array of (item_or_inner_list, parameters)
+
+        let mut members = vec![];
+
+        while let Some(curr_char) = input_chars.peek() {
+            match input_chars.peek() {
+                Some(c) if c.is_ascii_whitespace() => {
+                    input_chars.next();
+                    continue;
+                }
+                _ => {
+                    members.push(Self::parse_list_entry(input_chars)?);
+                    match input_chars.next() {
+                        Some(c) if c != ',' => return Err("Trailing text after item in list"),
+                        None => return Ok(List { items: members }),
+                        _ => {
+                            continue;
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(List { items: members })
+    }
+
+    fn parse_list_entry(input_chars: &mut Peekable<Chars>) -> Result<ListEntry, &'static str> {
+        // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-item-or-list
+        // ListEntry represents a tuple (item_or_inner_list, parameters)
+
+        match input_chars.peek() {
+            Some('(') => {
+                let parsed = Self::parse_inner_list(input_chars)?;
+                Ok(ListEntry::InnerList(parsed))
+            }
+            _ => {
+                let parsed = Self::parse_item(input_chars)?;
+                Ok(ListEntry::Item(parsed))
+            }
+        }
+    }
+
+    fn parse_inner_list(input_chars: &mut Peekable<Chars>) -> Result<InnerList, &'static str> {
+        if Some('(') != input_chars.next() {
+            return Err("parse_inner_list: input does not start with '('");
+        }
+
+        let mut inner_list = Vec::new();
+        while let Some(curr_char) = input_chars.peek() {
+            if curr_char.is_ascii_whitespace() {
+                input_chars.next();
+                continue;
+            }
+
+            if curr_char == &')' {
+                input_chars.next();
+                let params = Self::parse_parameters(input_chars)?;
+                return Ok(InnerList {
+                    items: inner_list,
+                    parameters: params,
+                });
+            }
+
+            let parsed_item = Self::parse_item(input_chars)?;
+            inner_list.push(parsed_item);
+
+            // match input_chars.peek() {
+            //     Some(c) if !c.is_ascii_whitespace() && c != &')' => { return Err("parse_inner_list: invalid character")},
+            //     _ => ()
+            // }
+        }
+
+        Err("parse_inner_list: the end of the inner list was not found")
+    }
+
     fn parse_item(input_chars: &mut Peekable<Chars>) -> Result<Item, &'static str> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-item
-
         let bare_item = Self::parse_bare_item(input_chars)?;
         let parameters = Self::parse_parameters(input_chars)?;
 
@@ -319,7 +405,101 @@ impl Parser {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parser::BareItem::{Number, Token};
     use std::error::Error;
+
+    #[test]
+    fn parse_list() -> Result<(), Box<dyn Error>> {
+        let mut input = "1,42".chars().peekable();
+        let item1 = Item {
+            bare_item: BareItem::Number(Num::Integer(1)),
+            parameters: Parameters::new(),
+        };
+        let item2 = Item {
+            bare_item: BareItem::Number(Num::Integer(42)),
+            parameters: Parameters::new(),
+        };
+        let expected_list = List {
+            items: vec![ListEntry::Item(item1), ListEntry::Item(item2)],
+        };
+        assert_eq!(expected_list, Parser::parse_list(&mut input)?);
+
+
+
+        let mut input = "(1 2), (42 43)".chars().peekable();
+        let item1 = Item {
+            bare_item: BareItem::Number(Num::Integer(1)),
+            parameters: Parameters::new(),
+        };
+        let item2 = Item {
+            bare_item: BareItem::Number(Num::Integer(2)),
+            parameters: Parameters::new(),
+        };
+        let item3 = Item {
+            bare_item: BareItem::Number(Num::Integer(42)),
+            parameters: Parameters::new(),
+        };
+        let item4 = Item {
+            bare_item: BareItem::Number(Num::Integer(43)),
+            parameters: Parameters::new(),
+        };
+        let inner_list_1 = InnerList {
+            items: vec![item1, item2],
+            parameters: Parameters::new(),
+        };
+        let inner_list_2 = InnerList {
+            items: vec![item3, item4],
+            parameters: Parameters::new(),
+        };
+        let expected_list = List {
+            items: vec![
+                ListEntry::InnerList(inner_list_1),
+                ListEntry::InnerList(inner_list_2),
+            ],
+        };
+        assert_eq!(expected_list, Parser::parse_list(&mut input)?);
+
+
+        let mut input = "(  1  42  ); k=*".chars().peekable();
+        let item1 = Item {
+            bare_item: BareItem::Number(Num::Integer(1)),
+            parameters: Parameters::new(),
+        };
+        let item2 = Item {
+            bare_item: BareItem::Number(Num::Integer(42)),
+            parameters: Parameters::new(),
+        };
+        let mut inner_list_param = Parameters::new();
+        inner_list_param.insert("k".to_owned(), BareItem::Token("*".to_owned()));
+        let inner_list = InnerList { items: vec![item1, item2], parameters: inner_list_param};
+        let expected_list = List { items: vec![ListEntry::InnerList(inner_list)] };
+        assert_eq!(expected_list, Parser::parse_list(&mut input)?);
+
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_inner_list() -> Result<(), Box<dyn Error>> {
+        let mut input = "(c b); a=1".chars().peekable();
+        let mut inner_list_param = Parameters::new();
+        inner_list_param.insert("a".to_owned(), BareItem::Number(Num::Integer(1)));
+
+        let item1 = Item {
+            bare_item: BareItem::Token("c".to_owned()),
+            parameters: Parameters::new(),
+        };
+        let item2 = Item {
+            bare_item: BareItem::Token("b".to_owned()),
+            parameters: Parameters::new(),
+        };
+        let expected = InnerList {
+            items: vec![item1, item2],
+            parameters: inner_list_param,
+        };
+        assert_eq!(expected, Parser::parse_inner_list(&mut input)?);
+        Ok(())
+    }
 
     #[test]
     fn parse_item() -> Result<(), Box<dyn Error>> {
