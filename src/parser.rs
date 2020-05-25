@@ -424,8 +424,6 @@ mod tests {
         };
         assert_eq!(expected_list, Parser::parse_list(&mut input)?);
 
-
-
         let mut input = "(1 2), (42 43)".chars().peekable();
         let item1 = Item {
             bare_item: BareItem::Number(Num::Integer(1)),
@@ -459,7 +457,6 @@ mod tests {
         };
         assert_eq!(expected_list, Parser::parse_list(&mut input)?);
 
-
         let mut input = "(  1  42  ); k=*".chars().peekable();
         let item1 = Item {
             bare_item: BareItem::Number(Num::Integer(1)),
@@ -471,10 +468,14 @@ mod tests {
         };
         let mut inner_list_param = Parameters::new();
         inner_list_param.insert("k".to_owned(), BareItem::Token("*".to_owned()));
-        let inner_list = InnerList { items: vec![item1, item2], parameters: inner_list_param};
-        let expected_list = List { items: vec![ListEntry::InnerList(inner_list)] };
+        let inner_list = InnerList {
+            items: vec![item1, item2],
+            parameters: inner_list_param,
+        };
+        let expected_list = List {
+            items: vec![ListEntry::InnerList(inner_list)],
+        };
         assert_eq!(expected_list, Parser::parse_list(&mut input)?);
-
 
         Ok(())
     }
