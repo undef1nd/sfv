@@ -1,5 +1,6 @@
 use crate::utils;
 use indexmap::IndexMap;
+use rust_decimal::prelude::*;
 use std::iter::Peekable;
 use std::str::Chars;
 
@@ -21,7 +22,7 @@ struct Item {
 
 #[derive(Debug, PartialEq)]
 enum Num {
-    Decimal(f64), // TODO: Need to change it later to smth more precise
+    Decimal(Decimal),
     Integer(i64),
 }
 
@@ -230,25 +231,29 @@ impl Parser {
                 .parse::<i64>()
                 .map_err(|_err| "parse_number: parsing i64 failed")?
                 * sign;
-            if output_number >= min_int && output_number <= max_int {
-                Ok(Num::Integer(output_number))
-            } else {
-                Err("parse_number: integer number is out of range")
+
+            if output_number < min_int || max_int < output_number {
+                return Err("parse_number: integer number is out of range");
             }
-        } else {
-            let chars_after_dot = input_number
-                .find('.')
-                .map(|dot_pos| input_number.len() - dot_pos - 1);
-            match chars_after_dot {
-                Some(1) | Some(2) => {
-                    let output_number = input_number
-                        .parse::<f64>()
-                        .map_err(|_err| "parse_number: parsing f64 failed")?
-                        * sign as f64;
-                    Ok(Num::Decimal(output_number))
+
+            return Ok(Num::Integer(output_number));
+        }
+
+        let chars_after_dot = input_number
+            .find('.')
+            .map(|dot_pos| input_number.len() - dot_pos - 1);
+        match chars_after_dot {
+            Some(1) | Some(2) => {
+                let mut output_number = Decimal::from_str(&input_number)
+                    .map_err(|_err| "parse_number: parsing f64 failed")?;
+
+                if sign == -1 {
+                    output_number.set_sign_negative(true)
                 }
-                _ => Err("parse_number: invalid decimal fraction length"),
+
+                Ok(Num::Decimal(output_number))
             }
+            _ => Err("parse_number: invalid decimal fraction length"),
         }
     }
 
@@ -331,7 +336,7 @@ mod tests {
 
         assert_eq!(
             Item {
-                bare_item: BareItem::Number(Num::Decimal(12.35)),
+                bare_item: BareItem::Number(Num::Decimal(Decimal::from_str("12.35")?)),
                 parameters: param
             },
             Parser::parse_item(&mut "12.35;a ".chars().peekable())?
@@ -380,7 +385,7 @@ mod tests {
             Parser::parse_bare_item(&mut ":YmFzZV82NCBlbmNvZGluZyB0ZXN0:".chars().peekable())?
         );
         assert_eq!(
-            BareItem::Number(Num::Decimal(-3.55)),
+            BareItem::Number(Num::Decimal(Decimal::from_str("-3.55")?)),
             Parser::parse_bare_item(&mut "-3.55".chars().peekable())?
         );
 
@@ -561,7 +566,10 @@ mod tests {
         assert_eq!("d.14", input.collect::<String>());
 
         let mut input = "00.42 test string".chars().peekable();
-        assert_eq!(Num::Decimal(0.42), Parser::parse_number(&mut input)?);
+        assert_eq!(
+            Num::Decimal(Decimal::from_str("0.42")?),
+            Parser::parse_number(&mut input)?
+        );
         assert_eq!(" test string", input.collect::<String>());
 
         let mut input = ":aGVsbG8:rest".chars().peekable();
@@ -623,27 +631,27 @@ mod tests {
             Parser::parse_number(&mut "999999999999999".chars().peekable())?
         );
         assert_eq!(
-            Num::Decimal(1.5),
+            Num::Decimal(Decimal::from_str("1.5")?),
             Parser::parse_number(&mut "1.5.4.".chars().peekable())?
         );
         assert_eq!(
-            Num::Decimal(1.8),
+            Num::Decimal(Decimal::from_str("1.8")?),
             Parser::parse_number(&mut "1.8.".chars().peekable())?
         );
         assert_eq!(
-            Num::Decimal(1.7),
+            Num::Decimal(Decimal::from_str("1.7")?),
             Parser::parse_number(&mut "1.7.0".chars().peekable())?
         );
         assert_eq!(
-            Num::Decimal(3.14),
+            Num::Decimal(Decimal::from_str("3.14")?),
             Parser::parse_number(&mut "3.14".chars().peekable())?
         );
         assert_eq!(
-            Num::Decimal(-3.14),
+            Num::Decimal(Decimal::from_str("-3.14")?),
             Parser::parse_number(&mut "-3.14".chars().peekable())?
         );
         assert_eq!(
-            Num::Decimal(123456789012.1),
+            Num::Decimal(Decimal::from_str("123456789012.1")?),
             Parser::parse_number(&mut "123456789012.1".chars().peekable())?
         );
         assert_eq!(
@@ -712,7 +720,10 @@ mod tests {
 
         let mut expected = Parameters::new();
         expected.insert("key1".to_owned(), BareItem::Boolean(false));
-        expected.insert("key2".to_owned(), BareItem::Number(Num::Decimal(746.15)));
+        expected.insert(
+            "key2".to_owned(),
+            BareItem::Number(Num::Decimal(Decimal::from_str("746.15")?)),
+        );
         assert_eq!(
             expected,
             Parser::parse_parameters(&mut ";key1=?0;key2=746.15".chars().peekable())?
