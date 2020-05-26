@@ -74,21 +74,32 @@ impl Parser {
         let mut members = vec![];
 
         while let Some(curr_char) = input_chars.peek() {
-            match input_chars.peek() {
-                Some(c) if c.is_ascii_whitespace() => {
+            members.push(Self::parse_list_entry(input_chars)?);
+
+            if let Some(c) = input_chars.peek() {
+                if c == &' ' || c == &'\t' {
                     input_chars.next();
-                    continue;
                 }
-                _ => {
-                    members.push(Self::parse_list_entry(input_chars)?);
-                    match input_chars.next() {
-                        Some(c) if c != ',' => return Err("Trailing text after item in list"),
-                        None => return Ok(List { items: members }),
-                        _ => {
-                            continue;
-                        }
-                    }
+            }
+
+            if let None = input_chars.peek() {
+                return Ok(List { items: members });
+            }
+
+            if let Some(c) = input_chars.next() {
+                if c != ',' {
+                    return Err("parse_list: trailing text after item in list");
                 }
+            }
+
+            if let Some(c) = input_chars.peek() {
+                if c == &' ' || c == &'\t' {
+                    input_chars.next();
+                }
+            }
+
+            if let None = input_chars.peek() {
+                return Err("parse_list: trailing comma at the end of the list");
             }
         }
 
@@ -477,17 +488,19 @@ mod tests {
         };
         assert_eq!(expected_list, Parser::parse_list(&mut input)?);
 
-
         let mut input = "()".chars().peekable();
-        let inner_list = InnerList {items: vec![], parameters: Parameters::new()};
-        let expected_list = List { items: vec![ListEntry::InnerList(inner_list)]};
+        let inner_list = InnerList {
+            items: vec![],
+            parameters: Parameters::new(),
+        };
+        let expected_list = List {
+            items: vec![ListEntry::InnerList(inner_list)],
+        };
         assert_eq!(expected_list, Parser::parse_list(&mut input)?);
-
 
         let mut input = "".chars().peekable();
-        let expected_list = List { items: vec![]};
+        let expected_list = List { items: vec![] };
         assert_eq!(expected_list, Parser::parse_list(&mut input)?);
-
 
         let mut input = ",".chars().peekable();
         assert_eq!(
@@ -495,17 +508,23 @@ mod tests {
             Parser::parse_list(&mut input)
         );
 
-        // let mut input = "a,".chars().peekable();
-        // assert_eq!(
-        //     Err("parse_list: trailing comma at the end of the list"),
-        //     Parser::parse_list(&mut input)
-        // );
-        //
-        // let mut input = "(a b),".chars().peekable();
-        // assert_eq!(
-        //     Err("parse_list: trailing comma at the end of the list"),
-        //     Parser::parse_list(&mut input)
-        // );
+        let mut input = "a, b c".chars().peekable();
+        assert_eq!(
+            Err("parse_list: trailing text after item in list"),
+            Parser::parse_list(&mut input)
+        );
+
+        let mut input = "a,".chars().peekable();
+        assert_eq!(
+            Err("parse_list: trailing comma at the end of the list"),
+            Parser::parse_list(&mut input)
+        );
+
+        let mut input = "(a b),".chars().peekable();
+        assert_eq!(
+            Err("parse_list: trailing comma at the end of the list"),
+            Parser::parse_list(&mut input)
+        );
 
         Ok(())
     }
