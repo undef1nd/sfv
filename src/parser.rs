@@ -78,7 +78,7 @@ impl Parser {
 
             utils::consume_ows_chars(input_chars);
 
-            if let None = input_chars.peek() {
+            if input_chars.peek().is_none() {
                 return Ok(List { items: members });
             }
 
@@ -90,7 +90,7 @@ impl Parser {
 
             utils::consume_ows_chars(input_chars);
 
-            if let None = input_chars.peek() {
+            if input_chars.peek().is_none() {
                 return Err("parse_list: trailing comma at the end of the list");
             }
         }
@@ -395,7 +395,6 @@ impl Parser {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::BareItem::{Number, Token};
     use std::error::Error;
 
     #[test]
