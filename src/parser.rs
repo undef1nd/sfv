@@ -67,6 +67,50 @@ impl Parser {
     //     }
     // }
 
+    fn parse_dict(input_chars: &mut Peekable<Chars>) -> Result<Dictionary, &'static str> {
+        // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-dictionary
+
+        let mut dict = Dictionary::new();
+
+        while let Some(curr_char) = input_chars.peek() {
+            let this_key = Self::parse_key(input_chars)?;
+
+            if let Some('=') = input_chars.peek() {
+                input_chars.next();
+                let member = Self::parse_list_entry(input_chars)?;
+                dict.insert(this_key, member);
+            } else {
+                let value = true;
+                let params = Self::parse_parameters(input_chars)?;
+                let member = Item {
+                    bare_item: BareItem::Boolean(value),
+                    parameters: params,
+                };
+                let member = ListEntry::Item(member);
+                dict.insert(this_key, member);
+            }
+
+            utils::consume_ows_chars(input_chars);
+
+            if input_chars.peek().is_none() {
+                return Ok(dict);
+            }
+
+            if let Some(c) = input_chars.next() {
+                if c != ',' {
+                    return Err("parse_dict: trailing text after member in dict");
+                }
+            }
+
+            utils::consume_ows_chars(input_chars);
+
+            if input_chars.peek().is_none() {
+                return Err("parse_dict: trailing comma at the end of the list");
+            }
+        }
+        Ok(dict)
+    }
+
     fn parse_list(input_chars: &mut Peekable<Chars>) -> Result<List, &'static str> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-list
         // List represents an array of (item_or_inner_list, parameters)
@@ -661,7 +705,34 @@ mod tests {
 
     #[test]
     fn parse_dict() -> Result<(), Box<dyn Error>> {
-        assert_eq!(1, 1);
+        let mut input = "abc=123;a=1;b=2, def=456, ghi=789;q=9;r=\"+w\""
+            .chars()
+            .peekable();
+        let mut item1_params = Parameters::new();
+        item1_params.insert("a".to_owned(), BareItem::Number(Num::Integer(1)));
+        item1_params.insert("b".to_owned(), BareItem::Number(Num::Integer(2)));
+        let mut item3_params = Parameters::new();
+        item3_params.insert("q".to_owned(), BareItem::Number(Num::Integer(9)));
+        item3_params.insert("r".to_owned(), BareItem::String("+w".to_owned()));
+        let item1 = Item {
+            bare_item: BareItem::Number(Num::Integer(123)),
+            parameters: item1_params,
+        };
+        let item2 = Item {
+            bare_item: BareItem::Number(Num::Integer(456)),
+            parameters: Parameters::new(),
+        };
+        let item3 = Item {
+            bare_item: BareItem::Number(Num::Integer(789)),
+            parameters: item3_params,
+        };
+
+        let mut expected_dict = Dictionary::new();
+        expected_dict.insert("abc".to_owned(), ListEntry::Item(item1));
+        expected_dict.insert("def".to_owned(), ListEntry::Item(item2));
+        expected_dict.insert("ghi".to_owned(), ListEntry::Item(item3));
+
+        assert_eq!(expected_dict, Parser::parse_dict(&mut input)?);
         Ok(())
     }
 
