@@ -477,6 +477,36 @@ mod tests {
         };
         assert_eq!(expected_list, Parser::parse_list(&mut input)?);
 
+
+        let mut input = "()".chars().peekable();
+        let inner_list = InnerList {items: vec![], parameters: Parameters::new()};
+        let expected_list = List { items: vec![ListEntry::InnerList(inner_list)]};
+        assert_eq!(expected_list, Parser::parse_list(&mut input)?);
+
+
+        let mut input = "".chars().peekable();
+        let expected_list = List { items: vec![]};
+        assert_eq!(expected_list, Parser::parse_list(&mut input)?);
+
+
+        let mut input = ",".chars().peekable();
+        assert_eq!(
+            Err("parse_bare_item: item type can't be identified"),
+            Parser::parse_list(&mut input)
+        );
+
+        // let mut input = "a,".chars().peekable();
+        // assert_eq!(
+        //     Err("parse_list: trailing comma at the end of the list"),
+        //     Parser::parse_list(&mut input)
+        // );
+        //
+        // let mut input = "(a b),".chars().peekable();
+        // assert_eq!(
+        //     Err("parse_list: trailing comma at the end of the list"),
+        //     Parser::parse_list(&mut input)
+        // );
+
         Ok(())
     }
 
