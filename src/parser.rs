@@ -512,6 +512,24 @@ mod tests {
             Parser::parse_list(&mut input)
         );
 
+        let mut input = "a     ,    ".chars().peekable();
+        assert_eq!(
+            Err("parse_list: trailing comma at the end of the list"),
+            Parser::parse_list(&mut input)
+        );
+
+        let mut input = "a\t \t ,\t ".chars().peekable();
+        assert_eq!(
+            Err("parse_list: trailing comma at the end of the list"),
+            Parser::parse_list(&mut input)
+        );
+
+        let mut input = "a\t\t,\t\t\t".chars().peekable();
+        assert_eq!(
+            Err("parse_list: trailing comma at the end of the list"),
+            Parser::parse_list(&mut input)
+        );
+
         let mut input = "(a b),".chars().peekable();
         assert_eq!(
             Err("parse_list: trailing comma at the end of the list"),
