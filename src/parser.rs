@@ -141,8 +141,6 @@ impl Parser {
                 if c != &' ' && c != &')' {
                     return Err("parse_inner_list: bad delimitation");
                 }
-            } else {
-                return Err("parse_inner_list: bad delimitation");
             }
         }
 
