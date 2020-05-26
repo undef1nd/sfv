@@ -144,7 +144,6 @@ impl Parser {
             } else {
                 return Err("parse_inner_list: bad delimitation");
             }
-
         }
 
         Err("parse_inner_list: the end of the inner list was not found")
