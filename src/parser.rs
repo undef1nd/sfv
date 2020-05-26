@@ -76,11 +76,7 @@ impl Parser {
         while let Some(curr_char) = input_chars.peek() {
             members.push(Self::parse_list_entry(input_chars)?);
 
-            if let Some(c) = input_chars.peek() {
-                if c == &' ' || c == &'\t' {
-                    input_chars.next();
-                }
-            }
+            utils::consume_ows_chars(input_chars);
 
             if let None = input_chars.peek() {
                 return Ok(List { items: members });
@@ -92,11 +88,7 @@ impl Parser {
                 }
             }
 
-            if let Some(c) = input_chars.peek() {
-                if c == &' ' || c == &'\t' {
-                    input_chars.next();
-                }
-            }
+            utils::consume_ows_chars(input_chars);
 
             if let None = input_chars.peek() {
                 return Err("parse_list: trailing comma at the end of the list");
@@ -129,12 +121,9 @@ impl Parser {
 
         let mut inner_list = Vec::new();
         while let Some(curr_char) = input_chars.peek() {
-            if curr_char.is_ascii_whitespace() {
-                input_chars.next();
-                continue;
-            }
+            utils::consume_sp_chars(input_chars);
 
-            if curr_char == &')' {
+            if Some(&')') == input_chars.peek() {
                 input_chars.next();
                 let params = Self::parse_parameters(input_chars)?;
                 return Ok(InnerList {
@@ -145,11 +134,6 @@ impl Parser {
 
             let parsed_item = Self::parse_item(input_chars)?;
             inner_list.push(parsed_item);
-
-            // match input_chars.peek() {
-            //     Some(c) if !c.is_ascii_whitespace() && c != &')' => { return Err("parse_inner_list: invalid character")},
-            //     _ => ()
-            // }
         }
 
         Err("parse_inner_list: the end of the inner list was not found")
@@ -368,12 +352,7 @@ impl Parser {
                 break;
             }
 
-            match input.peek() {
-                Some(c) if c.is_whitespace() => {
-                    input.next();
-                }
-                _ => (),
-            }
+            utils::consume_sp_chars(input);
 
             let param_name = Self::parse_key(input)?;
             let param_value = match input.peek() {
@@ -422,6 +401,20 @@ mod tests {
     #[test]
     fn parse_list() -> Result<(), Box<dyn Error>> {
         let mut input = "1,42".chars().peekable();
+        let item1 = Item {
+            bare_item: BareItem::Number(Num::Integer(1)),
+            parameters: Parameters::new(),
+        };
+        let item2 = Item {
+            bare_item: BareItem::Number(Num::Integer(42)),
+            parameters: Parameters::new(),
+        };
+        let expected_list = List {
+            items: vec![ListEntry::Item(item1), ListEntry::Item(item2)],
+        };
+        assert_eq!(expected_list, Parser::parse_list(&mut input)?);
+
+        let mut input = "1  ,  42".chars().peekable();
         let item1 = Item {
             bare_item: BareItem::Number(Num::Integer(1)),
             parameters: Parameters::new(),
