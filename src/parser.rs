@@ -115,6 +115,8 @@ impl Parser {
     }
 
     fn parse_inner_list(input_chars: &mut Peekable<Chars>) -> Result<InnerList, &'static str> {
+        // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-innerlist
+
         if Some('(') != input_chars.next() {
             return Err("parse_inner_list: input does not start with '('");
         }
@@ -134,6 +136,15 @@ impl Parser {
 
             let parsed_item = Self::parse_item(input_chars)?;
             inner_list.push(parsed_item);
+
+            if let Some(c) = input_chars.peek() {
+                if c != &' ' && c != &')' {
+                    return Err("parse_inner_list: bad delimitation");
+                }
+            } else {
+                return Err("parse_inner_list: bad delimitation");
+            }
+
         }
 
         Err("parse_inner_list: the end of the inner list was not found")
@@ -578,6 +589,12 @@ mod tests {
         let mut input = "(a b),".chars().peekable();
         assert_eq!(
             Err("parse_list: trailing comma at the end of the list"),
+            Parser::parse_list(&mut input)
+        );
+
+        let mut input = "(1, 2, (a b)".chars().peekable();
+        assert_eq!(
+            Err("parse_inner_list: bad delimitation"),
             Parser::parse_list(&mut input)
         );
 
