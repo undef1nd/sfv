@@ -490,6 +490,51 @@ mod tests {
         };
         assert_eq!(expected_list, Parser::parse_list(&mut input)?);
 
+        let mut input = "12, 14, (a  b); param=\"param_value_1\"".chars().peekable();
+        let item1 = Item {
+            bare_item: BareItem::Number(Num::Integer(12)),
+            parameters: Parameters::new(),
+        };
+        let item2 = Item {
+            bare_item: BareItem::Number(Num::Integer(14)),
+            parameters: Parameters::new(),
+        };
+        let item3 = Item {
+            bare_item: BareItem::Token("a".to_owned()),
+            parameters: Parameters::new(),
+        };
+        let item4 = Item {
+            bare_item: BareItem::Token("b".to_owned()),
+            parameters: Parameters::new(),
+        };
+        let mut inner_list_param = Parameters::new();
+        inner_list_param.insert(
+            "param".to_owned(),
+            BareItem::String("param_value_1".to_owned()),
+        );
+        let inner_list = InnerList {
+            items: vec![item3, item4],
+            parameters: inner_list_param,
+        };
+        let expected_list = List {
+            items: vec![
+                ListEntry::Item(item1),
+                ListEntry::Item(item2),
+                ListEntry::InnerList(inner_list),
+            ],
+        };
+        assert_eq!(expected_list, Parser::parse_list(&mut input)?);
+
+        let mut input = "()".chars().peekable();
+        let inner_list = InnerList {
+            items: vec![],
+            parameters: Parameters::new(),
+        };
+        let expected_list = List {
+            items: vec![ListEntry::InnerList(inner_list)],
+        };
+        assert_eq!(expected_list, Parser::parse_list(&mut input)?);
+
         let mut input = "".chars().peekable();
         let expected_list = List { items: vec![] };
         assert_eq!(expected_list, Parser::parse_list(&mut input)?);
