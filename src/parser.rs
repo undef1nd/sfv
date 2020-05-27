@@ -219,6 +219,9 @@ impl Parser {
 
     fn parse_bare_item(mut input_chars: &mut Peekable<Chars>) -> Result<BareItem, &'static str> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-bare-item
+        if input_chars.peek().is_none() {
+            return Err("parse_bare_item: empty item");
+        }
 
         match input_chars.peek() {
             Some(&'?') => Ok(BareItem::Boolean(Self::parse_bool(&mut input_chars)?)),
@@ -467,6 +470,32 @@ mod tests {
     use std::error::Error;
 
     #[test]
+    fn parse() -> Result<(), Box<dyn Error>> {
+        let input = "\"some_value\"".as_bytes();
+        let expected = Header::Item(Item {
+            bare_item: BareItem::String("some_value".to_owned()),
+            parameters: Parameters::new(),
+        });
+        assert_eq!(expected, Parser::parse(input, "item")?);
+
+        let input = "\"some_value\" trailing_text".as_bytes();
+        assert_eq!(
+            Err("parse: trailing text after parsed value"),
+            Parser::parse(input, "item")
+        );
+        assert_eq!(
+            Err("parse: unrecognized header type"),
+            Parser::parse(input, "invalid_type")
+        );
+        assert_eq!(
+            Err("parse_bare_item: empty item"),
+            Parser::parse("".as_bytes(), "item")
+        );
+
+        Ok(())
+    }
+
+    #[test]
     fn parse_list() -> Result<(), Box<dyn Error>> {
         let mut input = "1,42".chars().peekable();
         let item1 = Item {
@@ -713,7 +742,7 @@ mod tests {
         );
 
         assert_eq!(
-            Err("parse_bare_item: item type can't be identified"),
+            Err("parse_bare_item: empty item"),
             Parser::parse_item(&mut "".chars().peekable())
         );
 
