@@ -117,7 +117,7 @@ impl Parser {
 
         let mut members = vec![];
 
-        while let Some(curr_char) = input_chars.peek() {
+        while input_chars.peek().is_some() {
             members.push(Self::parse_list_entry(input_chars)?);
 
             utils::consume_ows_chars(input_chars);
@@ -166,7 +166,7 @@ impl Parser {
         }
 
         let mut inner_list = Vec::new();
-        while let Some(curr_char) = input_chars.peek() {
+        while input_chars.peek().is_some() {
             utils::consume_sp_chars(input_chars);
 
             if Some(&')') == input_chars.peek() {
@@ -705,6 +705,11 @@ mod tests {
 
     #[test]
     fn parse_dict() -> Result<(), Box<dyn Error>> {
+        assert_eq!(
+            Dictionary::new(),
+            Parser::parse_dict(&mut "".chars().peekable())?
+        );
+
         let mut input = "abc=123;a=1;b=2, def=456, ghi=789;q=9;r=\"+w\""
             .chars()
             .peekable();
@@ -731,8 +736,58 @@ mod tests {
         expected_dict.insert("abc".to_owned(), ListEntry::Item(item1));
         expected_dict.insert("def".to_owned(), ListEntry::Item(item2));
         expected_dict.insert("ghi".to_owned(), ListEntry::Item(item3));
-
         assert_eq!(expected_dict, Parser::parse_dict(&mut input)?);
+
+        let mut input = "a=()".chars().peekable();
+        let inner_list = InnerList {
+            items: vec![],
+            parameters: Parameters::new(),
+        };
+        let mut expected_dict = Dictionary::new();
+        expected_dict.insert("a".to_owned(), ListEntry::InnerList(inner_list));
+        assert_eq!(expected_dict, Parser::parse_dict(&mut input)?);
+
+        let mut input = "a=1, b;foo=*, c=3".chars().peekable();
+        let mut item2_params = Parameters::new();
+        item2_params.insert("foo".to_owned(), BareItem::Token("*".to_owned()));
+        let item1 = Item {
+            bare_item: BareItem::Number(Num::Integer(1)),
+            parameters: Parameters::new(),
+        };
+        let item2 = Item {
+            bare_item: BareItem::Boolean(true),
+            parameters: item2_params,
+        };
+        let item3 = Item {
+            bare_item: BareItem::Number(Num::Integer(3)),
+            parameters: Parameters::new(),
+        };
+        let mut expected_dict = Dictionary::new();
+        expected_dict.insert("a".to_owned(), ListEntry::Item(item1));
+        expected_dict.insert("b".to_owned(), ListEntry::Item(item2));
+        expected_dict.insert("c".to_owned(), ListEntry::Item(item3));
+        assert_eq!(expected_dict, Parser::parse_dict(&mut input)?);
+
+        // input1, input2, input3 must be parsed into the same structure
+        let item1 = Item {
+            bare_item: BareItem::Number(Num::Integer(1)),
+            parameters: Parameters::new(),
+        };
+        let item2 = Item {
+            bare_item: BareItem::Number(Num::Integer(2)),
+            parameters: Parameters::new(),
+        };
+        let mut expected_dict = Dictionary::new();
+        expected_dict.insert("a".to_owned(), ListEntry::Item(item1));
+        expected_dict.insert("b".to_owned(), ListEntry::Item(item2));
+
+        let mut input1 = "a=1 ,  b=2".chars().peekable();
+        let mut input2 = "a=1\t,\tb=2".chars().peekable();
+        let mut input3 = "a=1, b=2".chars().peekable();
+        assert_eq!(expected_dict, Parser::parse_dict(&mut input1)?);
+        assert_eq!(expected_dict, Parser::parse_dict(&mut input2)?);
+        assert_eq!(expected_dict, Parser::parse_dict(&mut input3)?);
+
         Ok(())
     }
 
