@@ -1,8 +1,9 @@
 use crate::utils;
 use indexmap::IndexMap;
 use rust_decimal::prelude::*;
+use std::fmt::Debug;
 use std::iter::Peekable;
-use std::str::Chars;
+use std::str::{from_utf8, Chars};
 
 type Dictionary = IndexMap<String, ListEntry>;
 type Parameters = IndexMap<String, BareItem>;
@@ -45,27 +46,41 @@ enum BareItem {
     Token(String),
 }
 
-#[derive(Debug)]
-struct Parser {
-    input_str: String,
+#[derive(Debug, PartialEq)]
+enum Header {
+    List(List),
+    Dictionary(Dictionary),
+    Item(Item),
 }
 
+#[derive(Debug)]
+struct Parser;
+
 impl Parser {
-    // fn new(input_string: String) -> Self {
-    //     Parser {
-    //         input_str: input_string,
-    //     }
-    // }
-    //
-    // fn parse(self, header_type: &str) -> Result<Header, &str> {
-    //     // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#text-parse
-    //     let mut input = self.input_str.chars().peekable();
-    //     match header_type {
-    //         "list" => Ok(Header(Self::parse_list(&mut input)?),
-    //         "dict" => Ok(Header(Self::parse_dict(&mut input)?),
-    //         "item" => Ok(Header(Self::parse_item(&mut input)?),
-    //     }
-    // }
+    fn parse(input_bytes: &[u8], header_type: &str) -> Result<Header, &'static str> {
+        // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#text-parse
+        if !input_bytes.is_ascii() {
+            return Err("parse: non-ASCII characters in input");
+        }
+
+        let mut input_chars = from_utf8(input_bytes)
+            .map_err(|_| "parse: conversion from bytes to str failed")?
+            .chars()
+            .peekable();
+        utils::consume_sp_chars(&mut input_chars);
+
+        let output = match header_type {
+            "list" => Header::List(Self::parse_list(&mut input_chars)?),
+            "dict" => Header::Dictionary(Self::parse_dict(&mut input_chars)?),
+            "item" => Header::Item(Self::parse_item(&mut input_chars)?),
+            _ => return Err("parse: unrecognized header type"),
+        };
+
+        if input_chars.next().is_some() {
+            return Err("parse: trailing text after parsed value");
+        };
+        Ok(output)
+    }
 
     fn parse_dict(input_chars: &mut Peekable<Chars>) -> Result<Dictionary, &'static str> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-dictionary
@@ -202,50 +217,52 @@ impl Parser {
         })
     }
 
-    fn parse_bare_item(mut input: &mut Peekable<Chars>) -> Result<BareItem, &'static str> {
+    fn parse_bare_item(mut input_chars: &mut Peekable<Chars>) -> Result<BareItem, &'static str> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-bare-item
 
-        match input.peek() {
-            Some(&'?') => Ok(BareItem::Boolean(Self::parse_bool(&mut input)?)),
-            Some(&'"') => Ok(BareItem::String(Self::parse_string(&mut input)?)),
-            Some(&':') => Ok(BareItem::ByteSeq(Self::parse_byte_sequence(&mut input)?)),
+        match input_chars.peek() {
+            Some(&'?') => Ok(BareItem::Boolean(Self::parse_bool(&mut input_chars)?)),
+            Some(&'"') => Ok(BareItem::String(Self::parse_string(&mut input_chars)?)),
+            Some(&':') => Ok(BareItem::ByteSeq(Self::parse_byte_sequence(
+                &mut input_chars,
+            )?)),
             Some(&c) if c == '*' || c.is_ascii_alphabetic() => {
-                Ok(BareItem::Token(Self::parse_token(&mut input)?))
+                Ok(BareItem::Token(Self::parse_token(&mut input_chars)?))
             }
             Some(&c) if c == '-' || c.is_ascii_digit() => {
-                Ok(BareItem::Number(Self::parse_number(&mut input)?))
+                Ok(BareItem::Number(Self::parse_number(&mut input_chars)?))
             }
             _ => Err("parse_bare_item: item type can't be identified"),
         }
     }
 
-    fn parse_bool(input: &mut Peekable<Chars>) -> Result<bool, &'static str> {
+    fn parse_bool(input_chars: &mut Peekable<Chars>) -> Result<bool, &'static str> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-boolean
 
-        if input.next() != Some('?') {
+        if input_chars.next() != Some('?') {
             return Err("parse_bool: first char is not '?'");
         }
 
-        match input.next() {
+        match input_chars.next() {
             Some('0') => Ok(false),
             Some('1') => Ok(true),
             _ => Err("parse_bool: invalid variant"),
         }
     }
 
-    fn parse_string(input: &mut Peekable<Chars>) -> Result<String, &'static str> {
+    fn parse_string(input_chars: &mut Peekable<Chars>) -> Result<String, &'static str> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-string
 
-        if input.next() != Some('\"') {
+        if input_chars.next() != Some('\"') {
             return Err("parse_string: first char is not '\"'");
         }
 
         let mut output_string = String::from("");
-        while let Some(curr_char) = input.next() {
+        while let Some(curr_char) = input_chars.next() {
             match curr_char {
                 '\"' => return Ok(output_string),
                 '\x7f' | '\x00'..='\x1f' => return Err("parse_string: not a visible char"),
-                '\\' => match input.next() {
+                '\\' => match input_chars.next() {
                     Some('\\') => {
                         output_string.push(curr_char);
                     }
@@ -261,10 +278,10 @@ impl Parser {
         Err("parse_string: no closing '\"'")
     }
 
-    fn parse_token(input: &mut Peekable<Chars>) -> Result<String, &'static str> {
+    fn parse_token(input_chars: &mut Peekable<Chars>) -> Result<String, &'static str> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-token
 
-        if let Some(first_char) = input.peek() {
+        if let Some(first_char) = input_chars.peek() {
             if !first_char.is_ascii_alphabetic() && first_char != &'*' {
                 return Err("parse_token: first char is not ALPHA or '*'");
             }
@@ -273,12 +290,12 @@ impl Parser {
         }
 
         let mut output_string = String::from("");
-        while let Some(curr_char) = input.peek() {
+        while let Some(curr_char) = input_chars.peek() {
             if !utils::is_tchar(*curr_char) && curr_char != &':' && curr_char != &'/' {
                 return Ok(output_string);
             }
 
-            match input.next() {
+            match input_chars.next() {
                 Some(c) => output_string.push(c),
                 None => return Err("parse_token: end of the string"),
             }
@@ -286,17 +303,17 @@ impl Parser {
         Ok(output_string)
     }
 
-    fn parse_byte_sequence(input: &mut Peekable<Chars>) -> Result<Vec<u8>, &'static str> {
+    fn parse_byte_sequence(input_chars: &mut Peekable<Chars>) -> Result<Vec<u8>, &'static str> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-binary
 
-        if input.next() != Some(':') {
+        if input_chars.next() != Some(':') {
             return Err("parse_byte_seq: first char is not ':'");
         }
 
-        if !input.clone().any(|c| c == ':') {
+        if !input_chars.clone().any(|c| c == ':') {
             return Err("parse_byte_seq: no closing ':'");
         }
-        let b64_content = input.take_while(|c| c != &':').collect::<String>();
+        let b64_content = input_chars.take_while(|c| c != &':').collect::<String>();
         if !b64_content
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '=' || c == '/')
@@ -309,7 +326,7 @@ impl Parser {
         }
     }
 
-    fn parse_number(input: &mut Peekable<Chars>) -> Result<Num, &'static str> {
+    fn parse_number(input_chars: &mut Peekable<Chars>) -> Result<Num, &'static str> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-number
 
         let (min_int, max_int) = (-999_999_999_999_999_i64, 999_999_999_999_999_i64);
@@ -318,12 +335,12 @@ impl Parser {
         let mut sign = 1;
         let mut input_number = String::from("");
 
-        if let Some('-') = input.peek() {
+        if let Some('-') = input_chars.peek() {
             sign = -1;
-            input.next();
+            input_chars.next();
         }
 
-        match input.peek() {
+        match input_chars.peek() {
             Some(c) if !c.is_ascii_digit() => {
                 return Err("parse_number: input number does not start with a digit")
             }
@@ -331,11 +348,11 @@ impl Parser {
             _ => (),
         }
 
-        while let Some(curr_char) = input.peek() {
+        while let Some(curr_char) = input_chars.peek() {
             match curr_char {
                 c if c.is_ascii_digit() => {
                     input_number.push(*curr_char);
-                    input.next();
+                    input_chars.next();
                 }
                 c if c == &'.' && is_integer => {
                     if input_number.len() > 12 {
@@ -345,7 +362,7 @@ impl Parser {
                     }
                     input_number.push(*curr_char);
                     is_integer = false;
-                    input.next();
+                    input_chars.next();
                 }
                 _ => break,
             }
@@ -390,27 +407,27 @@ impl Parser {
         }
     }
 
-    fn parse_parameters(input: &mut Peekable<Chars>) -> Result<Parameters, &'static str> {
+    fn parse_parameters(input_chars: &mut Peekable<Chars>) -> Result<Parameters, &'static str> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-param
 
         let mut params = Parameters::new();
         // expected.insert("str".to_owned(), BareItem::String("param_val".to_owned()));
         // Ok(expected)
 
-        while let Some(curr_char) = input.peek() {
+        while let Some(curr_char) = input_chars.peek() {
             if curr_char == &';' {
-                input.next();
+                input_chars.next();
             } else {
                 break;
             }
 
-            utils::consume_sp_chars(input);
+            utils::consume_sp_chars(input_chars);
 
-            let param_name = Self::parse_key(input)?;
-            let param_value = match input.peek() {
+            let param_name = Self::parse_key(input_chars)?;
+            let param_value = match input_chars.peek() {
                 Some('=') => {
-                    input.next();
-                    Self::parse_bare_item(input)?
+                    input_chars.next();
+                    Self::parse_bare_item(input_chars)?
                 }
                 _ => BareItem::Boolean(true),
             };
@@ -422,14 +439,14 @@ impl Parser {
         Ok(params)
     }
 
-    fn parse_key(input: &mut Peekable<Chars>) -> Result<String, &'static str> {
-        match input.peek() {
+    fn parse_key(input_chars: &mut Peekable<Chars>) -> Result<String, &'static str> {
+        match input_chars.peek() {
             Some(c) if c == &'*' || c.is_ascii_lowercase() => (),
             _ => return Err("parse_key: first char is not lcalpha or *"),
         }
 
         let mut output = String::new();
-        while let Some(curr_char) = input.peek() {
+        while let Some(curr_char) = input_chars.peek() {
             if !curr_char.is_ascii_lowercase()
                 && !curr_char.is_ascii_digit()
                 && !"_-*.".contains(*curr_char)
@@ -438,7 +455,7 @@ impl Parser {
             }
 
             output.push(*curr_char);
-            input.next();
+            input_chars.next();
         }
         Ok(output)
     }
