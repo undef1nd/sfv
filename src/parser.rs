@@ -65,6 +65,19 @@ impl From<Num> for BareItem {
         BareItem::Number(item)
     }
 }
+//
+//
+// impl From<i64> for BareItem {
+//     fn from(item: i64) -> Self {
+//         BareItem::Number(Num::Integer(item))
+//     }
+// }
+//
+// impl From<Decimal> for BareItem {
+//     fn from(item: Decimal) -> Self {
+//         BareItem::Number(Num::Decimal(item))
+//     }
+// }
 
 #[derive(Debug, PartialEq)]
 enum Header {
@@ -492,10 +505,11 @@ mod tests {
     #[test]
     fn parse() -> Result<(), Box<dyn Error>> {
         let input = "\"some_value\"".as_bytes();
-        let expected = Header::Item(Item {
+        let parsed_item = Item {
             bare_item: BareItem::String("some_value".to_owned()),
             parameters: Parameters::new(),
-        });
+        };
+        let expected = Header::Item(parsed_item);
         assert_eq!(expected, Parser::parse(input, "item")?);
         Ok(())
     }
@@ -522,11 +536,11 @@ mod tests {
     fn parse_list_of_numbers() -> Result<(), Box<dyn Error>> {
         let mut input = "1,42".chars().peekable();
         let item1 = Item {
-            bare_item: BareItem::Number(Num::Integer(1)),
+            bare_item: Num::Integer(1).into(),
             parameters: Parameters::new(),
         };
         let item2 = Item {
-            bare_item: BareItem::Number(Num::Integer(42)),
+            bare_item: Num::Integer(42).into(),
             parameters: Parameters::new(),
         };
         let expected_list = List {
@@ -540,11 +554,11 @@ mod tests {
     fn parse_list_with_multiple_spaces() -> Result<(), Box<dyn Error>> {
         let mut input = "1  ,  42".chars().peekable();
         let item1 = Item {
-            bare_item: BareItem::Number(Num::Integer(1)),
+            bare_item: Num::Integer(1).into(),
             parameters: Parameters::new(),
         };
         let item2 = Item {
-            bare_item: BareItem::Number(Num::Integer(42)),
+            bare_item: Num::Integer(42).into(),
             parameters: Parameters::new(),
         };
         let expected_list = List {
@@ -621,8 +635,9 @@ mod tests {
             bare_item: Num::Integer(42).into(),
             parameters: Parameters::new(),
         };
-        let mut inner_list_param = Parameters::new();
-        inner_list_param.insert("k".to_owned(), BareItem::Token("*".to_owned()));
+        let inner_list_param: Parameters = vec![("k".to_owned(), BareItem::Token("*".to_owned()))]
+            .into_iter()
+            .collect();
         let inner_list = InnerList {
             items: vec![item1, item2],
             parameters: inner_list_param,
@@ -653,11 +668,12 @@ mod tests {
             bare_item: BareItem::Token("b".to_owned()),
             parameters: Parameters::new(),
         };
-        let mut inner_list_param = Parameters::new();
-        inner_list_param.insert(
+        let inner_list_param: Parameters = vec![(
             "param".to_owned(),
             BareItem::String("param_value_1".to_owned()),
-        );
+        )]
+        .into_iter()
+        .collect();
         let inner_list = InnerList {
             items: vec![item3, item4],
             parameters: inner_list_param,
@@ -725,8 +741,9 @@ mod tests {
     #[test]
     fn parse_inner_list_with_param_and_spaces() -> Result<(), Box<dyn Error>> {
         let mut input = "(c b); a=1".chars().peekable();
-        let mut inner_list_param = Parameters::new();
-        inner_list_param.insert("a".to_owned(), Num::Integer(1).into());
+        let inner_list_param: Parameters = vec![("a".to_owned(), Num::Integer(1).into())]
+            .into_iter()
+            .collect();
 
         let item1 = Item {
             bare_item: BareItem::Token("c".to_owned()),
@@ -760,8 +777,9 @@ mod tests {
     #[test]
     fn parse_item_decimal_with_bool_param_and_space() -> Result<(), Box<dyn Error>> {
         let mut input = "12.35;a ".chars().peekable();
-        let mut param = Parameters::new();
-        param.insert("a".to_owned(), BareItem::Boolean(true));
+        let param: Parameters = vec![("a".to_owned(), BareItem::Boolean(true))]
+            .into_iter()
+            .collect();
         assert_eq!(
             Item {
                 bare_item: Num::Decimal(Decimal::from_str("12.35")?).into(),
@@ -774,8 +792,9 @@ mod tests {
 
     #[test]
     fn parse_item_number_with_param() -> Result<(), Box<dyn Error>> {
-        let mut param = Parameters::new();
-        param.insert("a1".to_owned(), BareItem::Token("*".to_owned()));
+        let param: Parameters = vec![("a1".to_owned(), BareItem::Token("*".to_owned()))]
+            .into_iter()
+            .collect();
         assert_eq!(
             Item {
                 bare_item: BareItem::String("12.35".to_owned()),
@@ -809,12 +828,21 @@ mod tests {
         let mut input = "abc=123;a=1;b=2, def=456, ghi=789;q=9;r=\"+w\""
             .chars()
             .peekable();
-        let mut item1_params = Parameters::new();
-        item1_params.insert("a".to_owned(), Num::Integer(1).into());
-        item1_params.insert("b".to_owned(), Num::Integer(2).into());
-        let mut item3_params = Parameters::new();
-        item3_params.insert("q".to_owned(), Num::Integer(9).into());
-        item3_params.insert("r".to_owned(), BareItem::String("+w".to_owned()));
+
+        let item1_params: Parameters = vec![
+            ("a".to_owned(), Num::Integer(1).into()),
+            ("b".to_owned(), Num::Integer(2).into()),
+        ]
+        .into_iter()
+        .collect();
+
+        let item3_params: Parameters = vec![
+            ("q".to_owned(), Num::Integer(9).into()),
+            ("r".to_owned(), BareItem::String("+w".to_owned())),
+        ]
+        .into_iter()
+        .collect();
+
         let item1 = Item {
             bare_item: Num::Integer(123).into(),
             parameters: item1_params,
@@ -828,10 +856,13 @@ mod tests {
             parameters: item3_params,
         };
 
-        let mut expected_dict = Dictionary::new();
-        expected_dict.insert("abc".to_owned(), item1.into());
-        expected_dict.insert("def".to_owned(), item2.into());
-        expected_dict.insert("ghi".to_owned(), item3.into());
+        let expected_dict: Dictionary = vec![
+            ("abc".to_owned(), item1.into()),
+            ("def".to_owned(), item2.into()),
+            ("ghi".to_owned(), item3.into()),
+        ]
+        .into_iter()
+        .collect();
         assert_eq!(expected_dict, Parser::parse_dict(&mut input)?);
 
         Ok(())
@@ -844,8 +875,9 @@ mod tests {
             items: vec![],
             parameters: Parameters::new(),
         };
-        let mut expected_dict = Dictionary::new();
-        expected_dict.insert("a".to_owned(), inner_list.into());
+        let expected_dict: Dictionary = vec![("a".to_owned(), inner_list.into())]
+            .into_iter()
+            .collect();
         assert_eq!(expected_dict, Parser::parse_dict(&mut input)?);
         Ok(())
     }
@@ -853,10 +885,11 @@ mod tests {
     #[test]
     fn parse_dict_with_token_param() -> Result<(), Box<dyn Error>> {
         let mut input = "a=1, b;foo=*, c=3".chars().peekable();
-        let mut item2_params = Parameters::new();
-        item2_params.insert("foo".to_owned(), BareItem::Token("*".to_owned()));
+        let item2_params = vec![("foo".to_owned(), BareItem::Token("*".to_owned()))]
+            .into_iter()
+            .collect();
         let item1 = Item {
-            bare_item: BareItem::Number(Num::Integer(1)),
+            bare_item: Num::Integer(1).into(),
             parameters: Parameters::new(),
         };
         let item2 = Item {
@@ -864,13 +897,16 @@ mod tests {
             parameters: item2_params,
         };
         let item3 = Item {
-            bare_item: BareItem::Number(Num::Integer(3)),
+            bare_item: Num::Integer(3).into(),
             parameters: Parameters::new(),
         };
-        let mut expected_dict = Dictionary::new();
-        expected_dict.insert("a".to_owned(), item1.into());
-        expected_dict.insert("b".to_owned(), item2.into());
-        expected_dict.insert("c".to_owned(), item3.into());
+        let expected_dict: Dictionary = vec![
+            ("a".to_owned(), item1.into()),
+            ("b".to_owned(), item2.into()),
+            ("c".to_owned(), item3.into()),
+        ]
+        .into_iter()
+        .collect();
         assert_eq!(expected_dict, Parser::parse_dict(&mut input)?);
         Ok(())
     }
@@ -886,9 +922,12 @@ mod tests {
             bare_item: Num::Integer(2).into(),
             parameters: Parameters::new(),
         };
-        let mut expected_dict = Dictionary::new();
-        expected_dict.insert("a".to_owned(), item1.into());
-        expected_dict.insert("b".to_owned(), item2.into());
+        let expected_dict: Dictionary = vec![
+            ("a".to_owned(), item1.into()),
+            ("b".to_owned(), item2.into()),
+        ]
+        .into_iter()
+        .collect();
 
         let mut input1 = "a=1 ,  b=2".chars().peekable();
         let mut input2 = "a=1\t,\tb=2".chars().peekable();
@@ -1276,8 +1315,9 @@ mod tests {
     #[test]
     fn parse_parameters_string() -> Result<(), Box<dyn Error>> {
         let mut input = ";b=\"param_val\"".chars().peekable();
-        let mut expected = Parameters::new();
-        expected.insert("b".to_owned(), BareItem::String("param_val".to_owned()));
+        let expected: Parameters = vec![("b".to_owned(), BareItem::String("param_val".to_owned()))]
+            .into_iter()
+            .collect();
         assert_eq!(expected, Parser::parse_parameters(&mut input)?);
         Ok(())
     }
@@ -1285,9 +1325,12 @@ mod tests {
     #[test]
     fn parse_parameters_bool() -> Result<(), Box<dyn Error>> {
         let mut input = ";b;a".chars().peekable();
-        let mut expected = Parameters::new();
-        expected.insert("b".to_owned(), BareItem::Boolean(true));
-        expected.insert("a".to_owned(), BareItem::Boolean(true));
+        let expected: Parameters = vec![
+            ("b".to_owned(), BareItem::Boolean(true)),
+            ("a".to_owned(), BareItem::Boolean(true)),
+        ]
+        .into_iter()
+        .collect();
         assert_eq!(expected, Parser::parse_parameters(&mut input)?);
         Ok(())
     }
@@ -1295,12 +1338,15 @@ mod tests {
     #[test]
     fn parse_parameters_mixed_types() -> Result<(), Box<dyn Error>> {
         let mut input = ";key1=?0;key2=746.15".chars().peekable();
-        let mut expected = Parameters::new();
-        expected.insert("key1".to_owned(), BareItem::Boolean(false));
-        expected.insert(
-            "key2".to_owned(),
-            Num::Decimal(Decimal::from_str("746.15")?).into(),
-        );
+        let expected: Parameters = vec![
+            ("key1".to_owned(), BareItem::Boolean(false)),
+            (
+                "key2".to_owned(),
+                Num::Decimal(Decimal::from_str("746.15")?).into(),
+            ),
+        ]
+        .into_iter()
+        .collect();
         assert_eq!(expected, Parser::parse_parameters(&mut input)?);
         Ok(())
     }
@@ -1308,9 +1354,12 @@ mod tests {
     #[test]
     fn parse_parameters_with_spaces() -> Result<(), Box<dyn Error>> {
         let mut input = "; key1=?0; key2=11111".chars().peekable();
-        let mut expected = Parameters::new();
-        expected.insert("key1".to_owned(), BareItem::Boolean(false));
-        expected.insert("key2".to_owned(), Num::Integer(11111).into());
+        let expected: Parameters = vec![
+            ("key1".to_owned(), BareItem::Boolean(false)),
+            ("key2".to_owned(), Num::Integer(11111).into()),
+        ]
+        .into_iter()
+        .collect();
         assert_eq!(expected, Parser::parse_parameters(&mut input)?);
         Ok(())
     }
