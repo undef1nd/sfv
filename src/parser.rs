@@ -494,6 +494,7 @@ impl Parser {
 mod tests {
     use super::*;
     use std::error::Error;
+    use std::iter::FromIterator;
 
     #[test]
     fn parse() -> Result<(), Box<dyn Error>> {
@@ -628,9 +629,8 @@ mod tests {
             bare_item: 42.into(),
             parameters: Parameters::new(),
         };
-        let inner_list_param: Parameters = vec![("k".to_owned(), BareItem::Token("*".to_owned()))]
-            .into_iter()
-            .collect();
+        let inner_list_param =
+            Parameters::from_iter(vec![("k".to_owned(), BareItem::Token("*".to_owned()))]);
         let inner_list = InnerList {
             items: vec![item1, item2],
             parameters: inner_list_param,
@@ -661,12 +661,10 @@ mod tests {
             bare_item: BareItem::Token("b".to_owned()),
             parameters: Parameters::new(),
         };
-        let inner_list_param: Parameters = vec![(
+        let inner_list_param = Parameters::from_iter(vec![(
             "param".to_owned(),
             BareItem::String("param_value_1".to_owned()),
-        )]
-        .into_iter()
-        .collect();
+        )]);
         let inner_list = InnerList {
             items: vec![item3, item4],
             parameters: inner_list_param,
@@ -734,7 +732,7 @@ mod tests {
     #[test]
     fn parse_inner_list_with_param_and_spaces() -> Result<(), Box<dyn Error>> {
         let mut input = "(c b); a=1".chars().peekable();
-        let inner_list_param: Parameters = vec![("a".to_owned(), 1.into())].into_iter().collect();
+        let inner_list_param = Parameters::from_iter(vec![("a".to_owned(), 1.into())]);
 
         let item1 = Item {
             bare_item: BareItem::Token("c".to_owned()),
@@ -768,9 +766,7 @@ mod tests {
     #[test]
     fn parse_item_decimal_with_bool_param_and_space() -> Result<(), Box<dyn Error>> {
         let mut input = "12.35;a ".chars().peekable();
-        let param: Parameters = vec![("a".to_owned(), BareItem::Boolean(true))]
-            .into_iter()
-            .collect();
+        let param = Parameters::from_iter(vec![("a".to_owned(), BareItem::Boolean(true))]);
         assert_eq!(
             Item {
                 bare_item: Decimal::from_str("12.35")?.into(),
@@ -783,9 +779,7 @@ mod tests {
 
     #[test]
     fn parse_item_number_with_param() -> Result<(), Box<dyn Error>> {
-        let param: Parameters = vec![("a1".to_owned(), BareItem::Token("*".to_owned()))]
-            .into_iter()
-            .collect();
+        let param = Parameters::from_iter(vec![("a1".to_owned(), BareItem::Token("*".to_owned()))]);
         assert_eq!(
             Item {
                 bare_item: BareItem::String("12.35".to_owned()),
@@ -819,17 +813,12 @@ mod tests {
         let mut input = "abc=123;a=1;b=2, def=456, ghi=789;q=9;r=\"+w\""
             .chars()
             .peekable();
-
-        let item1_params: Parameters = vec![("a".to_owned(), 1.into()), ("b".to_owned(), 2.into())]
-            .into_iter()
-            .collect();
-
-        let item3_params: Parameters = vec![
+        let item1_params =
+            Parameters::from_iter(vec![("a".to_owned(), 1.into()), ("b".to_owned(), 2.into())]);
+        let item3_params = Parameters::from_iter(vec![
             ("q".to_owned(), 9.into()),
             ("r".to_owned(), BareItem::String("+w".to_owned())),
-        ]
-        .into_iter()
-        .collect();
+        ]);
 
         let item1 = Item {
             bare_item: 123.into(),
@@ -844,13 +833,11 @@ mod tests {
             parameters: item3_params,
         };
 
-        let expected_dict: Dictionary = vec![
+        let expected_dict = Dictionary::from_iter(vec![
             ("abc".to_owned(), item1.into()),
             ("def".to_owned(), item2.into()),
             ("ghi".to_owned(), item3.into()),
-        ]
-        .into_iter()
-        .collect();
+        ]);
         assert_eq!(expected_dict, Parser::parse_dict(&mut input)?);
 
         Ok(())
@@ -863,9 +850,7 @@ mod tests {
             items: vec![],
             parameters: Parameters::new(),
         };
-        let expected_dict: Dictionary = vec![("a".to_owned(), inner_list.into())]
-            .into_iter()
-            .collect();
+        let expected_dict = Dictionary::from_iter(vec![("a".to_owned(), inner_list.into())]);
         assert_eq!(expected_dict, Parser::parse_dict(&mut input)?);
         Ok(())
     }
@@ -873,9 +858,8 @@ mod tests {
     #[test]
     fn parse_dict_with_token_param() -> Result<(), Box<dyn Error>> {
         let mut input = "a=1, b;foo=*, c=3".chars().peekable();
-        let item2_params = vec![("foo".to_owned(), BareItem::Token("*".to_owned()))]
-            .into_iter()
-            .collect();
+        let item2_params =
+            Parameters::from_iter(vec![("foo".to_owned(), BareItem::Token("*".to_owned()))]);
         let item1 = Item {
             bare_item: 1.into(),
             parameters: Parameters::new(),
@@ -888,13 +872,11 @@ mod tests {
             bare_item: 3.into(),
             parameters: Parameters::new(),
         };
-        let expected_dict: Dictionary = vec![
+        let expected_dict = Dictionary::from_iter(vec![
             ("a".to_owned(), item1.into()),
             ("b".to_owned(), item2.into()),
             ("c".to_owned(), item3.into()),
-        ]
-        .into_iter()
-        .collect();
+        ]);
         assert_eq!(expected_dict, Parser::parse_dict(&mut input)?);
         Ok(())
     }
@@ -910,12 +892,10 @@ mod tests {
             bare_item: 2.into(),
             parameters: Parameters::new(),
         };
-        let expected_dict: Dictionary = vec![
+        let expected_dict = Dictionary::from_iter(vec![
             ("a".to_owned(), item1.into()),
             ("b".to_owned(), item2.into()),
-        ]
-        .into_iter()
-        .collect();
+        ]);
 
         let mut input1 = "a=1 ,  b=2".chars().peekable();
         let mut input2 = "a=1\t,\tb=2".chars().peekable();
@@ -1303,9 +1283,10 @@ mod tests {
     #[test]
     fn parse_parameters_string() -> Result<(), Box<dyn Error>> {
         let mut input = ";b=\"param_val\"".chars().peekable();
-        let expected: Parameters = vec![("b".to_owned(), BareItem::String("param_val".to_owned()))]
-            .into_iter()
-            .collect();
+        let expected = Parameters::from_iter(vec![(
+            "b".to_owned(),
+            BareItem::String("param_val".to_owned()),
+        )]);
         assert_eq!(expected, Parser::parse_parameters(&mut input)?);
         Ok(())
     }
@@ -1313,12 +1294,10 @@ mod tests {
     #[test]
     fn parse_parameters_bool() -> Result<(), Box<dyn Error>> {
         let mut input = ";b;a".chars().peekable();
-        let expected: Parameters = vec![
+        let expected = Parameters::from_iter(vec![
             ("b".to_owned(), BareItem::Boolean(true)),
             ("a".to_owned(), BareItem::Boolean(true)),
-        ]
-        .into_iter()
-        .collect();
+        ]);
         assert_eq!(expected, Parser::parse_parameters(&mut input)?);
         Ok(())
     }
@@ -1326,12 +1305,10 @@ mod tests {
     #[test]
     fn parse_parameters_mixed_types() -> Result<(), Box<dyn Error>> {
         let mut input = ";key1=?0;key2=746.15".chars().peekable();
-        let expected: Parameters = vec![
+        let expected = Parameters::from_iter(vec![
             ("key1".to_owned(), BareItem::Boolean(false)),
             ("key2".to_owned(), Decimal::from_str("746.15")?.into()),
-        ]
-        .into_iter()
-        .collect();
+        ]);
         assert_eq!(expected, Parser::parse_parameters(&mut input)?);
         Ok(())
     }
@@ -1339,12 +1316,10 @@ mod tests {
     #[test]
     fn parse_parameters_with_spaces() -> Result<(), Box<dyn Error>> {
         let mut input = "; key1=?0; key2=11111".chars().peekable();
-        let expected: Parameters = vec![
+        let expected = Parameters::from_iter(vec![
             ("key1".to_owned(), BareItem::Boolean(false)),
             ("key2".to_owned(), 11111.into()),
-        ]
-        .into_iter()
-        .collect();
+        ]);
         assert_eq!(expected, Parser::parse_parameters(&mut input)?);
         Ok(())
     }
