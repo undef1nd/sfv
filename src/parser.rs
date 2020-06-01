@@ -60,24 +60,17 @@ enum BareItem {
     Token(String),
 }
 
-impl From<Num> for BareItem {
-    fn from(item: Num) -> Self {
-        BareItem::Number(item)
+impl From<i64> for BareItem {
+    fn from(item: i64) -> Self {
+        BareItem::Number(Num::Integer(item))
     }
 }
-//
-//
-// impl From<i64> for BareItem {
-//     fn from(item: i64) -> Self {
-//         BareItem::Number(Num::Integer(item))
-//     }
-// }
-//
-// impl From<Decimal> for BareItem {
-//     fn from(item: Decimal) -> Self {
-//         BareItem::Number(Num::Decimal(item))
-//     }
-// }
+
+impl From<Decimal> for BareItem {
+    fn from(item: Decimal) -> Self {
+        BareItem::Number(Num::Decimal(item))
+    }
+}
 
 #[derive(Debug, PartialEq)]
 enum Header {
@@ -536,11 +529,11 @@ mod tests {
     fn parse_list_of_numbers() -> Result<(), Box<dyn Error>> {
         let mut input = "1,42".chars().peekable();
         let item1 = Item {
-            bare_item: Num::Integer(1).into(),
+            bare_item: 1.into(),
             parameters: Parameters::new(),
         };
         let item2 = Item {
-            bare_item: Num::Integer(42).into(),
+            bare_item: 42.into(),
             parameters: Parameters::new(),
         };
         let expected_list = List {
@@ -554,11 +547,11 @@ mod tests {
     fn parse_list_with_multiple_spaces() -> Result<(), Box<dyn Error>> {
         let mut input = "1  ,  42".chars().peekable();
         let item1 = Item {
-            bare_item: Num::Integer(1).into(),
+            bare_item: 1.into(),
             parameters: Parameters::new(),
         };
         let item2 = Item {
-            bare_item: Num::Integer(42).into(),
+            bare_item: 42.into(),
             parameters: Parameters::new(),
         };
         let expected_list = List {
@@ -572,19 +565,19 @@ mod tests {
     fn parse_list_of_lists() -> Result<(), Box<dyn Error>> {
         let mut input = "(1 2), (42 43)".chars().peekable();
         let item1 = Item {
-            bare_item: Num::Integer(1).into(),
+            bare_item: 1.into(),
             parameters: Parameters::new(),
         };
         let item2 = Item {
-            bare_item: Num::Integer(2).into(),
+            bare_item: 2.into(),
             parameters: Parameters::new(),
         };
         let item3 = Item {
-            bare_item: Num::Integer(42).into(),
+            bare_item: 42.into(),
             parameters: Parameters::new(),
         };
         let item4 = Item {
-            bare_item: Num::Integer(43).into(),
+            bare_item: 43.into(),
             parameters: Parameters::new(),
         };
         let inner_list_1 = InnerList {
@@ -628,11 +621,11 @@ mod tests {
     fn parse_list_of_lists_with_param_and_spaces() -> Result<(), Box<dyn Error>> {
         let mut input = "(  1  42  ); k=*".chars().peekable();
         let item1 = Item {
-            bare_item: Num::Integer(1).into(),
+            bare_item: 1.into(),
             parameters: Parameters::new(),
         };
         let item2 = Item {
-            bare_item: Num::Integer(42).into(),
+            bare_item: 42.into(),
             parameters: Parameters::new(),
         };
         let inner_list_param: Parameters = vec![("k".to_owned(), BareItem::Token("*".to_owned()))]
@@ -653,11 +646,11 @@ mod tests {
     fn parse_list_of_items_and_lists_with_param() -> Result<(), Box<dyn Error>> {
         let mut input = "12, 14, (a  b); param=\"param_value_1\"".chars().peekable();
         let item1 = Item {
-            bare_item: Num::Integer(12).into(),
+            bare_item: 12.into(),
             parameters: Parameters::new(),
         };
         let item2 = Item {
-            bare_item: Num::Integer(14).into(),
+            bare_item: 14.into(),
             parameters: Parameters::new(),
         };
         let item3 = Item {
@@ -741,9 +734,7 @@ mod tests {
     #[test]
     fn parse_inner_list_with_param_and_spaces() -> Result<(), Box<dyn Error>> {
         let mut input = "(c b); a=1".chars().peekable();
-        let inner_list_param: Parameters = vec![("a".to_owned(), Num::Integer(1).into())]
-            .into_iter()
-            .collect();
+        let inner_list_param: Parameters = vec![("a".to_owned(), 1.into())].into_iter().collect();
 
         let item1 = Item {
             bare_item: BareItem::Token("c".to_owned()),
@@ -766,7 +757,7 @@ mod tests {
         let mut input = "12 ".chars().peekable();
         assert_eq!(
             Item {
-                bare_item: Num::Integer(12).into(),
+                bare_item: 12.into(),
                 parameters: Parameters::new()
             },
             Parser::parse_item(&mut input)?
@@ -782,7 +773,7 @@ mod tests {
             .collect();
         assert_eq!(
             Item {
-                bare_item: Num::Decimal(Decimal::from_str("12.35")?).into(),
+                bare_item: Decimal::from_str("12.35")?.into(),
                 parameters: param
             },
             Parser::parse_item(&mut input)?
@@ -829,30 +820,27 @@ mod tests {
             .chars()
             .peekable();
 
-        let item1_params: Parameters = vec![
-            ("a".to_owned(), Num::Integer(1).into()),
-            ("b".to_owned(), Num::Integer(2).into()),
-        ]
-        .into_iter()
-        .collect();
+        let item1_params: Parameters = vec![("a".to_owned(), 1.into()), ("b".to_owned(), 2.into())]
+            .into_iter()
+            .collect();
 
         let item3_params: Parameters = vec![
-            ("q".to_owned(), Num::Integer(9).into()),
+            ("q".to_owned(), 9.into()),
             ("r".to_owned(), BareItem::String("+w".to_owned())),
         ]
         .into_iter()
         .collect();
 
         let item1 = Item {
-            bare_item: Num::Integer(123).into(),
+            bare_item: 123.into(),
             parameters: item1_params,
         };
         let item2 = Item {
-            bare_item: Num::Integer(456).into(),
+            bare_item: 456.into(),
             parameters: Parameters::new(),
         };
         let item3 = Item {
-            bare_item: Num::Integer(789).into(),
+            bare_item: 789.into(),
             parameters: item3_params,
         };
 
@@ -889,7 +877,7 @@ mod tests {
             .into_iter()
             .collect();
         let item1 = Item {
-            bare_item: Num::Integer(1).into(),
+            bare_item: 1.into(),
             parameters: Parameters::new(),
         };
         let item2 = Item {
@@ -897,7 +885,7 @@ mod tests {
             parameters: item2_params,
         };
         let item3 = Item {
-            bare_item: Num::Integer(3).into(),
+            bare_item: 3.into(),
             parameters: Parameters::new(),
         };
         let expected_dict: Dictionary = vec![
@@ -915,11 +903,11 @@ mod tests {
     fn parse_dict_multiple_spaces() -> Result<(), Box<dyn Error>> {
         // input1, input2, input3 must be parsed into the same structure
         let item1 = Item {
-            bare_item: Num::Integer(1).into(),
+            bare_item: 1.into(),
             parameters: Parameters::new(),
         };
         let item2 = Item {
-            bare_item: Num::Integer(2).into(),
+            bare_item: 2.into(),
             parameters: Parameters::new(),
         };
         let expected_dict: Dictionary = vec![
@@ -1340,10 +1328,7 @@ mod tests {
         let mut input = ";key1=?0;key2=746.15".chars().peekable();
         let expected: Parameters = vec![
             ("key1".to_owned(), BareItem::Boolean(false)),
-            (
-                "key2".to_owned(),
-                Num::Decimal(Decimal::from_str("746.15")?).into(),
-            ),
+            ("key2".to_owned(), Decimal::from_str("746.15")?.into()),
         ]
         .into_iter()
         .collect();
@@ -1356,7 +1341,7 @@ mod tests {
         let mut input = "; key1=?0; key2=11111".chars().peekable();
         let expected: Parameters = vec![
             ("key1".to_owned(), BareItem::Boolean(false)),
-            ("key2".to_owned(), Num::Integer(11111).into()),
+            ("key2".to_owned(), 11111.into()),
         ]
         .into_iter()
         .collect();
