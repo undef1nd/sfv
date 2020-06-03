@@ -102,6 +102,8 @@ impl Parser {
             _ => return Err("parse: unrecognized header type"),
         };
 
+        utils::consume_sp_chars(&mut input_chars);
+
         if input_chars.next().is_some() {
             return Err("parse: trailing text after parsed value");
         };
@@ -504,6 +506,15 @@ mod tests {
             parameters: Parameters::new(),
         };
         let expected = Header::Item(parsed_item);
+        assert_eq!(expected, Parser::parse(input, "item")?);
+
+        let input = "12.35;a ".as_bytes();
+        let param = Parameters::from_iter(vec![("a".to_owned(), BareItem::Boolean(true))]);
+        let expected = Header::Item(Item {
+            bare_item: Decimal::from_str("12.35")?.into(),
+            parameters: param,
+        });
+
         assert_eq!(expected, Parser::parse(input, "item")?);
         Ok(())
     }
