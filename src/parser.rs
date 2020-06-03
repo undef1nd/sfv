@@ -7,16 +7,16 @@ use std::str::{from_utf8, Chars};
 
 type ParseResult<T> = Result<T, &'static str>;
 
-type Dictionary = IndexMap<String, ListEntry>;
-type Parameters = IndexMap<String, BareItem>;
+pub type Dictionary = IndexMap<String, ListEntry>;
+pub type Parameters = IndexMap<String, BareItem>;
 
 #[derive(Debug, PartialEq)]
-struct List {
+pub struct List {
     items: Vec<ListEntry>,
 }
 
 #[derive(Debug, PartialEq)]
-enum ListEntry {
+pub enum ListEntry {
     Item(Item),
     InnerList(InnerList),
 }
@@ -34,25 +34,25 @@ impl From<InnerList> for ListEntry {
 }
 
 #[derive(Debug, PartialEq)]
-struct InnerList {
+pub struct InnerList {
     items: Vec<Item>,
     parameters: Parameters,
 }
 
 #[derive(Debug, PartialEq)]
-struct Item {
-    bare_item: BareItem,
-    parameters: Parameters,
+pub struct Item {
+    pub bare_item: BareItem,
+    pub parameters: Parameters,
 }
 
 #[derive(Debug, PartialEq)]
-enum Num {
+pub enum Num {
     Decimal(Decimal),
     Integer(i64),
 }
 
 #[derive(Debug, PartialEq)]
-enum BareItem {
+pub enum BareItem {
     Number(Num),
     String(String),
     ByteSeq(Vec<u8>),
@@ -73,17 +73,17 @@ impl From<Decimal> for BareItem {
 }
 
 #[derive(Debug, PartialEq)]
-enum Header {
+pub enum Header {
     List(List),
     Dictionary(Dictionary),
     Item(Item),
 }
 
 #[derive(Debug)]
-struct Parser;
+pub struct Parser;
 
 impl Parser {
-    fn parse(input_bytes: &[u8], header_type: &str) -> ParseResult<Header> {
+    pub fn parse(input_bytes: &[u8], header_type: &str) -> ParseResult<Header> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#text-parse
         if !input_bytes.is_ascii() {
             return Err("parse: non-ASCII characters in input");
