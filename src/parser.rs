@@ -351,6 +351,7 @@ impl Parser {
         {
             return Err("parse_byte_seq: invalid char in byte sequence");
         }
+        // TODO: Maybe use data-encoding crate instead base64
         match base64::decode(b64_content) {
             Ok(content) => Ok(content),
             Err(_) => Err("parse_byte_seq: decoding error"),

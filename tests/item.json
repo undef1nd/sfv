@@ -14,9 +14,9 @@
   },
   {
     "name": "trailing space",
-    "raw": ["1.25;q=9  "],
+    "raw": ["1  "],
     "header_type": "item",
-    "expected": [1.25, {"q": 9}],
+    "expected": [1, {}],
     "canonical": ["1"]
   },
   {

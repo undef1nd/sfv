@@ -1,8 +1,11 @@
+use data_encoding::BASE32;
 use rust_decimal::prelude::FromStr;
 use rust_decimal::Decimal;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::Value;
+use std::env::join_paths;
 use std::error::Error;
+use std::fs::File;
 use structured_headers::parser::*;
 
 #[derive(Debug, PartialEq, Deserialize)]
@@ -11,11 +14,13 @@ struct TestData {
     raw: Vec<String>,
     header_type: String,
     expected: Option<Value>,
+    can_fail: Option<bool>,
     must_fail: Option<bool>,
     canonical: Option<Vec<String>>,
 }
 
 fn handle_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
+    // TODO: need to handle can fail
     let input = test_case.raw.join(", ");
     let input_bytes = input.as_bytes();
 
@@ -60,20 +65,13 @@ fn get_item_struct(expected_struct_value: &Value) -> Result<Item, Box<dyn Error>
         parameters.insert(key.clone(), itm);
     }
 
-    let strct = Item {
+    Ok(Item {
         bare_item,
         parameters,
-    };
-    println!("{:?}", &strct);
-    println!("___________________");
-    Ok(strct)
+    })
 }
 
 fn get_bare_item(bare_item: &Value) -> Result<BareItem, Box<dyn Error>> {
-    // try to parse bare item with token or byteseq
-    // BareItem::Token(bare_item.as_str().unwrap().clone().to_owned()),
-    // ootherwise
-
     match bare_item {
         bare_item if bare_item.is_i64() => {
             Ok(BareItem::Number(Num::Integer(bare_item.as_i64().unwrap())))
@@ -87,16 +85,35 @@ fn get_bare_item(bare_item: &Value) -> Result<BareItem, Box<dyn Error>> {
         bare_item if bare_item.is_string() => Ok(BareItem::String(
             bare_item.as_str().unwrap().clone().to_owned(),
         )),
+        bare_item if (bare_item.is_object() && bare_item["__type"] == "token") => Ok(
+            BareItem::Token(bare_item["value"].as_str().unwrap().clone().to_owned()),
+        ),
+        bare_item if (bare_item.is_object() && bare_item["__type"] == "binary") => {
+            let str_val = bare_item["value"].as_str().unwrap().clone();
+            Ok(BareItem::ByteSeq(BASE32.decode(str_val.as_bytes())?))
+        }
         _ => return Err("Unknown bare_item value".into()),
     }
 }
 
 #[test]
 fn test_item() -> Result<(), Box<dyn Error>> {
-    let test_cases: Vec<TestData> = serde_json::from_str(include_str!("item.json"))?;
+    // let test_files = vec!["item.json", "token.json", "binary.json"];
+    //
+    // for file_name in test_files.into_iter() {
+    //     let file_path = std::env::current_dir()?.join("tests").join(file_name);
+    //     let test_cases: Vec<TestData> = serde_json::from_reader(File::open(file_path)?)?;
+    //
+    //     for case in test_cases.iter() {
+    //         handle_test_case(case)?
+    //     }
+    // }
+
+    let test_cases: Vec<TestData> = serde_json::from_str(include_str!("binary.json"))?;
 
     for case in test_cases.iter() {
         handle_test_case(case)?
     }
+
     Ok(())
 }
