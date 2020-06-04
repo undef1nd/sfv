@@ -425,7 +425,7 @@ impl Parser {
             .find('.')
             .map(|dot_pos| input_number.len() - dot_pos - 1);
         match chars_after_dot {
-            Some(1) | Some(2) => {
+            Some(1..=3) => {
                 let mut output_number = Decimal::from_str(&input_number)
                     .map_err(|_err| "parse_number: parsing f64 failed")?;
 
@@ -1224,6 +1224,10 @@ mod tests {
             Num::Decimal(Decimal::from_str("123456789012.1")?),
             Parser::parse_number(&mut "123456789012.1".chars().peekable())?
         );
+        assert_eq!(
+            Num::Decimal(Decimal::from_str("1234567890.112")?),
+            Parser::parse_number(&mut "1234567890.112".chars().peekable())?
+        );
 
         Ok(())
     }
@@ -1283,10 +1287,6 @@ mod tests {
         assert_eq!(
             Err("parse_number: decimal too long, illegal position for decimal point"),
             Parser::parse_number(&mut "-7333333333323.12".chars().peekable())
-        );
-        assert_eq!(
-            Err("parse_number: invalid decimal fraction length"),
-            Parser::parse_number(&mut "-733333333332.124".chars().peekable())
         );
 
         Ok(())

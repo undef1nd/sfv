@@ -1,0 +1,59 @@
+[
+  {
+    "name": "Foo-Example",
+    "raw": ["2; foourl=\"https://foo.example.com/\""],
+    "header_type": "item",
+    "expected": [2, {"foourl": "https://foo.example.com/"}],
+    "canonical": ["2;foourl=\"https://foo.example.com/\""]
+  },
+  {
+      "name": "Example-IntHeader",
+      "raw": ["1; a; b=?0"],
+      "header_type": "item",
+      "expected": [1, {"a": true, "b": false}],
+      "canonical": ["1;a;b=?0"]
+  },
+  {
+    "name": "Example-IntItemHeader",
+    "raw": ["5"],
+    "header_type": "item",
+    "expected": [5, {}]
+  },
+  {
+    "name": "Example-IntItemHeader (params)",
+    "raw": ["5; foo=bar"],
+    "header_type": "item",
+    "expected": [5, {"foo": {"__type": "token", "value": "bar"}}],
+    "canonical": ["5;foo=bar"]
+  },
+  {
+    "name": "Example-IntegerHeader",
+    "raw": ["42"],
+    "header_type": "item",
+    "expected": [42, {}]
+  },
+  {
+    "name": "Example-FloatHeader",
+    "raw": ["4.5"],
+    "header_type": "item",
+    "expected": [4.5, {}]
+  },
+  {
+    "name": "Example-StringHeader",
+    "raw": ["\"hello world\""],
+    "header_type": "item",
+    "expected": ["hello world", {}]
+  },
+  {
+    "name": "Example-BinaryHdr",
+    "raw": [":cHJldGVuZCB0aGlzIGlzIGJpbmFyeSBjb250ZW50Lg==:"],
+    "header_type": "item",
+    "expected": [{"__type": "binary", "value": "OBZGK5DFNZSCA5DINFZSA2LTEBRGS3TBOJ4SAY3PNZ2GK3TUFY======"}, {}]
+  },
+  {
+    "name": "Example-BoolHdr",
+    "raw": ["?1"],
+    "header_type": "item",
+    "expected": [true, {}]
+  }
+]
