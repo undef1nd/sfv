@@ -16,6 +16,16 @@
       {}]
   },
   {
+    "name": "bad paddding",
+    "raw": [":aGVsbG8:"],
+    "header_type": "item",
+    "expected": [
+      {"__type": "binary", "value": "NBSWY3DP"},
+      {}],
+    "can_fail": true,
+    "canonical": [":aGVsbG8=:"]
+  },
+  {
     "name": "bad end delimiter",
     "raw": [":aGVsbG8="],
     "header_type": "item",
@@ -62,15 +72,5 @@
     "raw": [":_-Ah:"],
     "header_type": "item",
     "must_fail": true
-  },
-  {
-    "name": "bad paddding",
-    "raw": [":aGVsbG8:"],
-    "header_type": "item",
-    "expected": [
-      {"__type": "binary", "value": "NBSWY3DP"},
-      {}],
-    "can_fail": true,
-    "canonical": [":aGVsbG8=:"]
   }
 ]

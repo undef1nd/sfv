@@ -1,11 +1,10 @@
 use data_encoding::BASE32;
-use rust_decimal::prelude::FromStr;
-use rust_decimal::Decimal;
+use rust_decimal::prelude::*;
 use serde::Deserialize;
 use serde_json::Value;
-use std::env::join_paths;
 use std::error::Error;
-use std::fs::File;
+use std::path::PathBuf;
+use std::{env, fs};
 use structured_headers::parser::*;
 
 #[derive(Debug, PartialEq, Deserialize)]
@@ -97,23 +96,25 @@ fn get_bare_item(bare_item: &Value) -> Result<BareItem, Box<dyn Error>> {
 }
 
 #[test]
-fn test_item() -> Result<(), Box<dyn Error>> {
-    // let test_files = vec!["item.json", "token.json", "binary.json"];
-    //
-    // for file_name in test_files.into_iter() {
-    //     let file_path = std::env::current_dir()?.join("tests").join(file_name);
-    //     let test_cases: Vec<TestData> = serde_json::from_reader(File::open(file_path)?)?;
-    //
-    //     for case in test_cases.iter() {
-    //         handle_test_case(case)?
-    //     }
-    // }
-
-    let test_cases: Vec<TestData> = serde_json::from_str(include_str!("binary.json"))?;
-
-    for case in test_cases.iter() {
-        handle_test_case(case)?
+fn run_specification_tests() -> Result<(), Box<dyn Error>> {
+    let test_suites_dir: PathBuf = env::current_dir()?.join("tests").join("test_suites");
+    for file in fs::read_dir(test_suites_dir)? {
+        run_test_suite(file?.path())?
     }
 
+    // let test_cases: Vec<TestData> = serde_json::from_str(include_str!("test_suites/binary.json"))?;
+    //
+    // for case in test_cases.iter() {
+    //     handle_test_case(case)?
+    // }
+
+    Ok(())
+}
+
+fn run_test_suite(tests_file: PathBuf) -> Result<(), Box<dyn Error>> {
+    let test_cases: Vec<TestData> = serde_json::from_reader(fs::File::open(tests_file)?)?;
+    for test_data in test_cases.iter() {
+        handle_test_case(test_data)?;
+    }
     Ok(())
 }
