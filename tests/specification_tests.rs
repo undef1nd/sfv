@@ -32,7 +32,7 @@ fn handle_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
     // Some tests are allowed to fail
     if actual_result.is_err() {
         if let Some(true) = test_case.can_fail {
-            return Ok(())
+            return Ok(());
         }
     }
 
@@ -47,10 +47,7 @@ fn handle_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
         "dictionary" => unimplemented!(),
         _ => return Err("Unknown header_type value".into()),
     };
-    assert_eq!(
-        expected_header,
-        actual_result?
-    );
+    assert_eq!(expected_header, actual_result?);
     Ok(())
 }
 
