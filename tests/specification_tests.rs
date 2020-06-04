@@ -19,11 +19,10 @@ struct TestData {
 }
 
 fn handle_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
-    // TODO: need to handle can fail
     let input = test_case.raw.join(", ");
     let actual_result = Parser::parse(input.as_bytes(), &test_case.header_type);
 
-    // If test must fail, verify it and exit
+    // Check test that must fail actually fails
     if let Some(true) = test_case.must_fail {
         assert!(actual_result.is_err());
         return Ok(());
@@ -36,8 +35,11 @@ fn handle_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
         }
     }
 
-    // Otherwise test must have expected value
-    let expected_value = test_case.expected.as_ref().unwrap();
+    // Rest of the tests, including allowed to fail, must have expected value
+    let expected_value = test_case
+        .expected
+        .as_ref()
+        .ok_or("expected value is not specified")?;
     let expected_header = match test_case.header_type.as_str() {
         "item" => {
             let item = get_item_struct(expected_value)?;
@@ -45,7 +47,7 @@ fn handle_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
         }
         "list" => unimplemented!(),
         "dictionary" => unimplemented!(),
-        _ => return Err("Unknown header_type value".into()),
+        _ => return Err("unknown header_type value".into()),
     };
     assert_eq!(expected_header, actual_result?);
     Ok(())
@@ -53,16 +55,19 @@ fn handle_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
 
 // fn get_item_struct(expected_struct_value: &Value) -> Result<Header, Box<dyn Error>>{
 fn get_item_struct(expected_struct_value: &Value) -> Result<Item, Box<dyn Error>> {
-    let expected_array = expected_struct_value.as_array().unwrap();
+    let expected_array = expected_struct_value
+        .as_array()
+        .ok_or("expected value is not array")?;
     if expected_array.len() != 2 {
         return Err("Not an item".into());
     }
 
-    let (bare_item_val, params_val) = (&expected_array[0], &expected_array[1]);
+    let bare_item_val = &expected_array[0];
+    let params_val = &expected_array[1];
     let bare_item = get_bare_item(bare_item_val)?;
 
     let mut parameters = Parameters::new();
-    for (key, val) in params_val.as_object().unwrap() {
+    for (key, val) in params_val.as_object().ok_or("params value is not object")? {
         let itm = get_bare_item(val)?;
         parameters.insert(key.clone(), itm);
     }
@@ -75,26 +80,39 @@ fn get_item_struct(expected_struct_value: &Value) -> Result<Item, Box<dyn Error>
 
 fn get_bare_item(bare_item: &Value) -> Result<BareItem, Box<dyn Error>> {
     match bare_item {
-        bare_item if bare_item.is_i64() => {
-            Ok(BareItem::Number(Num::Integer(bare_item.as_i64().unwrap())))
-        }
+        bare_item if bare_item.is_i64() => Ok(BareItem::Number(Num::Integer(
+            bare_item.as_i64().ok_or("bare_item value is not i64")?,
+        ))),
         bare_item if bare_item.is_f64() => {
-            Ok(Decimal::from_str(&serde_json::to_string(bare_item)?)
-                .unwrap()
-                .into())
+            Ok(Decimal::from_str(&serde_json::to_string(bare_item)?)?.into())
         }
-        bare_item if bare_item.is_boolean() => Ok(BareItem::Boolean(bare_item.as_bool().unwrap())),
-        bare_item if bare_item.is_string() => Ok(BareItem::String(
-            bare_item.as_str().unwrap().clone().to_owned(),
+        bare_item if bare_item.is_boolean() => Ok(BareItem::Boolean(
+            bare_item.as_bool().ok_or("bare_item value is not bool")?,
         )),
-        bare_item if (bare_item.is_object() && bare_item["__type"] == "token") => Ok(
-            BareItem::Token(bare_item["value"].as_str().unwrap().clone().to_owned()),
-        ),
+        bare_item if bare_item.is_string() => Ok(BareItem::String(
+            bare_item
+                .as_str()
+                .ok_or("bare_item value is not str")?
+                .clone()
+                .to_owned(),
+        )),
+        bare_item if (bare_item.is_object() && bare_item["__type"] == "token") => {
+            Ok(BareItem::Token(
+                bare_item["value"]
+                    .as_str()
+                    .ok_or("bare_item value is not str")?
+                    .clone()
+                    .to_owned(),
+            ))
+        }
         bare_item if (bare_item.is_object() && bare_item["__type"] == "binary") => {
-            let str_val = bare_item["value"].as_str().unwrap().clone();
+            let str_val = bare_item["value"]
+                .as_str()
+                .ok_or("bare_item value is not str")?
+                .clone();
             Ok(BareItem::ByteSeq(BASE32.decode(str_val.as_bytes())?))
         }
-        _ => return Err("Unknown bare_item value".into()),
+        _ => return Err("unknown bare_item value".into()),
     }
 }
 
