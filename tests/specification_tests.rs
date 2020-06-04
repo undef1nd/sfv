@@ -21,13 +21,19 @@ struct TestData {
 fn handle_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
     // TODO: need to handle can fail
     let input = test_case.raw.join(", ");
-    let input_bytes = input.as_bytes();
+    let actual_result = Parser::parse(input.as_bytes(), &test_case.header_type);
 
     // If test must fail, verify it and exit
     if let Some(true) = test_case.must_fail {
-        let actual = Parser::parse(input_bytes, &test_case.header_type);
-        assert!(actual.is_err());
+        assert!(actual_result.is_err());
         return Ok(());
+    }
+
+    // Some tests are allowed to fail
+    if actual_result.is_err() {
+        if let Some(true) = test_case.can_fail {
+            return Ok(())
+        }
     }
 
     // Otherwise test must have expected value
@@ -43,7 +49,7 @@ fn handle_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
     };
     assert_eq!(
         expected_header,
-        Parser::parse(input_bytes, &test_case.header_type)?
+        actual_result?
     );
     Ok(())
 }
