@@ -50,7 +50,7 @@ fn handle_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
         }
         "list" => {
             let list = get_list_struct(expected_value)?;
-            return Ok(());
+            Header::List(list)
         }
         "dictionary" => unimplemented!(),
         _ => return Err("unknown header_type value".into()),
