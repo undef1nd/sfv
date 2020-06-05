@@ -48,13 +48,60 @@ fn handle_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
             let item = get_item_struct(expected_value)?;
             Header::Item(item)
         }
-        "list" => unimplemented!(),
+        "list" => {
+            let list = get_list_struct(expected_value)?;
+            return Ok(());
+        }
         "dictionary" => unimplemented!(),
         _ => return Err("unknown header_type value".into()),
     };
 
     assert_eq!(expected_header, actual_result?);
     Ok(())
+}
+
+fn get_list_struct(expected_value: &Value) -> Result<List, Box<dyn Error>> {
+    let expected_array = expected_value
+        .as_array()
+        .ok_or("expected value is not array")?;
+
+    let mut list_items: Vec<ListEntry> = vec![];
+    for member in expected_array.iter() {
+        // if first item in member is array, then member must be parsed into InnerList
+        // otherwise - into Item
+        if member.as_array().unwrap()[0].is_array() {
+            let list_entry = get_inner_list(member)?;
+            list_items.push(list_entry.into());
+        } else {
+            let item = get_item_struct(member)?;
+            list_items.push(item.into());
+        }
+    }
+    Ok(List { items: list_items })
+}
+
+fn get_inner_list(inner_list_value: &Value) -> Result<InnerList, Box<dyn Error>> {
+    // inner list contains array of items and indexmap of parameters: inner_list = [[item1, item2], {params}]
+    // each item is an array itself: item = [bare_item, {params}]
+    let inner_list = inner_list_value
+        .as_array()
+        .ok_or("inner list is not array")?;
+
+    let inner_list_items = &inner_list[0];
+    let inner_list_params = &inner_list[1];
+
+    let mut items = vec![];
+    for item_value in inner_list_items
+        .as_array()
+        .ok_or("inner list items value is not array")?
+        .iter()
+    {
+        items.push(get_item_struct(item_value)?);
+    }
+
+    let parameters = get_parameters(inner_list_params)?;
+
+    Ok(InnerList { items, parameters })
 }
 
 fn get_item_struct(expected_value: &Value) -> Result<Item, Box<dyn Error>> {
@@ -70,11 +117,7 @@ fn get_item_struct(expected_value: &Value) -> Result<Item, Box<dyn Error>> {
     let bare_item_val = &expected_array[0];
     let params_val = &expected_array[1];
     let bare_item = get_bare_item(bare_item_val)?;
-    let mut parameters = Parameters::new();
-    for (key, val) in params_val.as_object().ok_or("params value is not object")? {
-        let itm = get_bare_item(val)?;
-        parameters.insert(key.clone(), itm);
-    }
+    let parameters = get_parameters(params_val)?;
 
     Ok(Item {
         bare_item,
@@ -82,9 +125,9 @@ fn get_item_struct(expected_value: &Value) -> Result<Item, Box<dyn Error>> {
     })
 }
 
-fn get_bare_item(bare_item: &Value) -> Result<BareItem, Box<dyn Error>> {
+fn get_bare_item(bare_item_value: &Value) -> Result<BareItem, Box<dyn Error>> {
     // Guess kind of BareItem represented by serde Value
-    match bare_item {
+    match bare_item_value {
         bare_item if bare_item.is_i64() => Ok(BareItem::Number(Num::Integer(
             bare_item.as_i64().ok_or("bare_item value is not i64")?,
         ))),
@@ -119,6 +162,18 @@ fn get_bare_item(bare_item: &Value) -> Result<BareItem, Box<dyn Error>> {
         }
         _ => Err("unknown bare_item value".into()),
     }
+}
+
+fn get_parameters(params_value: &Value) -> Result<Parameters, Box<dyn Error>> {
+    let mut parameters = Parameters::new();
+    for (key, val) in params_value
+        .as_object()
+        .ok_or("params value is not object")?
+    {
+        let itm = get_bare_item(val)?;
+        parameters.insert(key.clone(), itm);
+    }
+    Ok(parameters)
 }
 
 #[test]
