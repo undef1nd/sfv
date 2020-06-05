@@ -12,7 +12,7 @@ pub type Parameters = IndexMap<String, BareItem>;
 
 #[derive(Debug, PartialEq)]
 pub struct List {
-    items: Vec<ListEntry>,
+    pub items: Vec<ListEntry>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -35,8 +35,8 @@ impl From<InnerList> for ListEntry {
 
 #[derive(Debug, PartialEq)]
 pub struct InnerList {
-    items: Vec<Item>,
-    parameters: Parameters,
+    pub items: Vec<Item>,
+    pub parameters: Parameters,
 }
 
 #[derive(Debug, PartialEq)]
