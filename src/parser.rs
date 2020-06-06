@@ -97,7 +97,7 @@ impl Parser {
 
         let output = match header_type {
             "list" => Header::List(Self::parse_list(&mut input_chars)?),
-            "dict" => Header::Dictionary(Self::parse_dict(&mut input_chars)?),
+            "dictionary" => Header::Dictionary(Self::parse_dict(&mut input_chars)?),
             "item" => Header::Item(Self::parse_item(&mut input_chars)?),
             _ => return Err("parse: unrecognized header type"),
         };
