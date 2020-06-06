@@ -1,0 +1,8 @@
+[
+  {
+    "name": "single item list of lists",
+    "raw": ["15, (42)"],
+    "header_type": "list",
+    "expected": [[15, {}], [[[42,{}]], {}]]
+  }
+]
