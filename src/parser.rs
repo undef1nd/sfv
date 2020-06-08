@@ -116,8 +116,7 @@ impl Parser {
                 let value = true;
                 let params = Self::parse_parameters(input_chars)?;
                 let member = Item(BareItem::Boolean(value), params);
-                let member = ListEntry::Item(member);
-                dict.insert(this_key, member);
+                dict.insert(this_key, member.into());
             }
 
             utils::consume_ows_chars(input_chars);
@@ -322,10 +321,11 @@ impl Parser {
         if !input_chars.clone().any(|c| c == ':') {
             return Err("parse_byte_seq: no closing ':'");
         }
+
         let b64_content = input_chars.take_while(|c| c != &':').collect::<String>();
         if !b64_content
             .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '=' || c == '/')
+            .all(|c| utils::is_allowed_b64_content(c))
         {
             return Err("parse_byte_seq: invalid char in byte sequence");
         }
