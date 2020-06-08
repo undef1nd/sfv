@@ -1,6 +1,9 @@
+name: Rust checks
+
 on: [push]
 
-name: structured-headers-checks
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
   check:
