@@ -205,7 +205,7 @@ fn run_test_suite(tests_file: PathBuf) -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn run_specification_tests() -> Result<(), Box<dyn Error>> {
-    let test_suites_dir: PathBuf = env::current_dir()?.join("tests").join("test_suites");
+    let test_suites_dir: PathBuf = env::current_dir()?.join("tests").join("spec_tests");
     let json_files = fs::read_dir(test_suites_dir)?
         .filter_map(Result::ok)
         .filter(|fp| fp.path().extension().unwrap_or_default() == "json");
