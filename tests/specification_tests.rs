@@ -3,7 +3,6 @@ use rust_decimal::prelude::*;
 use serde::Deserialize;
 use serde_json::Value;
 use std::error::Error;
-use std::ffi::OsStr;
 use std::path::PathBuf;
 use std::{env, fs};
 use structured_headers::parser::*;
@@ -212,13 +211,7 @@ fn run_specification_tests() -> Result<(), Box<dyn Error>> {
     let test_suites_dir: PathBuf = env::current_dir()?.join("tests").join("test_suites");
     let json_files = fs::read_dir(test_suites_dir)?
         .filter_map(Result::ok)
-        .filter(|fp| {
-            if let Some(ext) = fp.path().extension() {
-                ext == "json"
-            } else {
-                false
-            }
-        });
+        .filter(|fp| fp.path().extension().unwrap_or_default() == "json");
     for file_path in json_files {
         println!("\n## Test suite file: {:?}\n", &file_path.file_name());
         run_test_suite(file_path.path())?
