@@ -9,11 +9,7 @@ type ParseResult<T> = Result<T, &'static str>;
 
 pub type Dictionary = IndexMap<String, ListEntry>;
 pub type Parameters = IndexMap<String, BareItem>;
-
-#[derive(Debug, PartialEq)]
-pub struct List {
-    pub items: Vec<ListEntry>,
-}
+pub type List = Vec<ListEntry>;
 
 #[derive(Debug, PartialEq)]
 pub enum ListEntry {
@@ -34,16 +30,10 @@ impl From<InnerList> for ListEntry {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct InnerList {
-    pub items: Vec<Item>,
-    pub parameters: Parameters,
-}
+pub struct InnerList(pub Vec<Item>, pub Parameters);
 
 #[derive(Debug, PartialEq)]
-pub struct Item {
-    pub bare_item: BareItem,
-    pub parameters: Parameters,
-}
+pub struct Item(pub BareItem, pub Parameters);
 
 #[derive(Debug, PartialEq)]
 pub enum Num {
@@ -125,10 +115,7 @@ impl Parser {
             } else {
                 let value = true;
                 let params = Self::parse_parameters(input_chars)?;
-                let member = Item {
-                    bare_item: BareItem::Boolean(value),
-                    parameters: params,
-                };
+                let member = Item(BareItem::Boolean(value), params);
                 let member = ListEntry::Item(member);
                 dict.insert(this_key, member);
             }
@@ -166,7 +153,7 @@ impl Parser {
             utils::consume_ows_chars(input_chars);
 
             if input_chars.peek().is_none() {
-                return Ok(List { items: members });
+                return Ok(members);
             }
 
             if let Some(c) = input_chars.next() {
@@ -182,7 +169,7 @@ impl Parser {
             }
         }
 
-        Ok(List { items: members })
+        Ok(members)
     }
 
     fn parse_list_entry(input_chars: &mut Peekable<Chars>) -> ParseResult<ListEntry> {
@@ -215,10 +202,7 @@ impl Parser {
             if Some(&')') == input_chars.peek() {
                 input_chars.next();
                 let params = Self::parse_parameters(input_chars)?;
-                return Ok(InnerList {
-                    items: inner_list,
-                    parameters: params,
-                });
+                return Ok(InnerList(inner_list, params));
             }
 
             let parsed_item = Self::parse_item(input_chars)?;
@@ -239,10 +223,7 @@ impl Parser {
         let bare_item = Self::parse_bare_item(input_chars)?;
         let parameters = Self::parse_parameters(input_chars)?;
 
-        Ok(Item {
-            bare_item,
-            parameters,
-        })
+        Ok(Item(bare_item, parameters))
     }
 
     fn parse_bare_item(mut input_chars: &mut Peekable<Chars>) -> ParseResult<BareItem> {
@@ -498,19 +479,13 @@ mod tests {
     #[test]
     fn parse() -> Result<(), Box<dyn Error>> {
         let input = "\"some_value\"".as_bytes();
-        let parsed_item = Item {
-            bare_item: BareItem::String("some_value".to_owned()),
-            parameters: Parameters::new(),
-        };
+        let parsed_item = Item(BareItem::String("some_value".to_owned()), Parameters::new());
         let expected = Header::Item(parsed_item);
         assert_eq!(expected, Parser::parse(input, "item")?);
 
         let input = "12.35;a ".as_bytes();
         let param = Parameters::from_iter(vec![("a".to_owned(), BareItem::Boolean(true))]);
-        let expected = Header::Item(Item {
-            bare_item: Decimal::from_str("12.35")?.into(),
-            parameters: param,
-        });
+        let expected = Header::Item(Item(Decimal::from_str("12.35")?.into(), param));
 
         assert_eq!(expected, Parser::parse(input, "item")?);
         Ok(())
@@ -537,17 +512,9 @@ mod tests {
     #[test]
     fn parse_list_of_numbers() -> Result<(), Box<dyn Error>> {
         let mut input = "1,42".chars().peekable();
-        let item1 = Item {
-            bare_item: 1.into(),
-            parameters: Parameters::new(),
-        };
-        let item2 = Item {
-            bare_item: 42.into(),
-            parameters: Parameters::new(),
-        };
-        let expected_list = List {
-            items: vec![item1.into(), item2.into()],
-        };
+        let item1 = Item(1.into(), Parameters::new());
+        let item2 = Item(42.into(), Parameters::new());
+        let expected_list: List = vec![item1.into(), item2.into()];
         assert_eq!(expected_list, Parser::parse_list(&mut input)?);
         Ok(())
     }
@@ -555,17 +522,9 @@ mod tests {
     #[test]
     fn parse_list_with_multiple_spaces() -> Result<(), Box<dyn Error>> {
         let mut input = "1  ,  42".chars().peekable();
-        let item1 = Item {
-            bare_item: 1.into(),
-            parameters: Parameters::new(),
-        };
-        let item2 = Item {
-            bare_item: 42.into(),
-            parameters: Parameters::new(),
-        };
-        let expected_list = List {
-            items: vec![item1.into(), item2.into()],
-        };
+        let item1 = Item(1.into(), Parameters::new());
+        let item2 = Item(42.into(), Parameters::new());
+        let expected_list: List = vec![item1.into(), item2.into()];
         assert_eq!(expected_list, Parser::parse_list(&mut input)?);
         Ok(())
     }
@@ -573,33 +532,13 @@ mod tests {
     #[test]
     fn parse_list_of_lists() -> Result<(), Box<dyn Error>> {
         let mut input = "(1 2), (42 43)".chars().peekable();
-        let item1 = Item {
-            bare_item: 1.into(),
-            parameters: Parameters::new(),
-        };
-        let item2 = Item {
-            bare_item: 2.into(),
-            parameters: Parameters::new(),
-        };
-        let item3 = Item {
-            bare_item: 42.into(),
-            parameters: Parameters::new(),
-        };
-        let item4 = Item {
-            bare_item: 43.into(),
-            parameters: Parameters::new(),
-        };
-        let inner_list_1 = InnerList {
-            items: vec![item1, item2],
-            parameters: Parameters::new(),
-        };
-        let inner_list_2 = InnerList {
-            items: vec![item3, item4],
-            parameters: Parameters::new(),
-        };
-        let expected_list = List {
-            items: vec![inner_list_1.into(), inner_list_2.into()],
-        };
+        let item1 = Item(1.into(), Parameters::new());
+        let item2 = Item(2.into(), Parameters::new());
+        let item3 = Item(42.into(), Parameters::new());
+        let item4 = Item(43.into(), Parameters::new());
+        let inner_list_1 = InnerList(vec![item1, item2], Parameters::new());
+        let inner_list_2 = InnerList(vec![item3, item4], Parameters::new());
+        let expected_list: List = vec![inner_list_1.into(), inner_list_2.into()];
         assert_eq!(expected_list, Parser::parse_list(&mut input)?);
         Ok(())
     }
@@ -607,13 +546,8 @@ mod tests {
     #[test]
     fn parse_list_empty_inner_list() -> Result<(), Box<dyn Error>> {
         let mut input = "()".chars().peekable();
-        let inner_list = InnerList {
-            items: vec![],
-            parameters: Parameters::new(),
-        };
-        let expected_list = List {
-            items: vec![inner_list.into()],
-        };
+        let inner_list = InnerList(vec![], Parameters::new());
+        let expected_list: List = vec![inner_list.into()];
         assert_eq!(expected_list, Parser::parse_list(&mut input)?);
         Ok(())
     }
@@ -621,7 +555,7 @@ mod tests {
     #[test]
     fn parse_list_empty() -> Result<(), Box<dyn Error>> {
         let mut input = "".chars().peekable();
-        let expected_list = List { items: vec![] };
+        let expected_list: List = vec![];
         assert_eq!(expected_list, Parser::parse_list(&mut input)?);
         Ok(())
     }
@@ -629,23 +563,12 @@ mod tests {
     #[test]
     fn parse_list_of_lists_with_param_and_spaces() -> Result<(), Box<dyn Error>> {
         let mut input = "(  1  42  ); k=*".chars().peekable();
-        let item1 = Item {
-            bare_item: 1.into(),
-            parameters: Parameters::new(),
-        };
-        let item2 = Item {
-            bare_item: 42.into(),
-            parameters: Parameters::new(),
-        };
+        let item1 = Item(1.into(), Parameters::new());
+        let item2 = Item(42.into(), Parameters::new());
         let inner_list_param =
             Parameters::from_iter(vec![("k".to_owned(), BareItem::Token("*".to_owned()))]);
-        let inner_list = InnerList {
-            items: vec![item1, item2],
-            parameters: inner_list_param,
-        };
-        let expected_list = List {
-            items: vec![inner_list.into()],
-        };
+        let inner_list = InnerList(vec![item1, item2], inner_list_param);
+        let expected_list: List = vec![inner_list.into()];
         assert_eq!(expected_list, Parser::parse_list(&mut input)?);
         Ok(())
     }
@@ -653,33 +576,16 @@ mod tests {
     #[test]
     fn parse_list_of_items_and_lists_with_param() -> Result<(), Box<dyn Error>> {
         let mut input = "12, 14, (a  b); param=\"param_value_1\"".chars().peekable();
-        let item1 = Item {
-            bare_item: 12.into(),
-            parameters: Parameters::new(),
-        };
-        let item2 = Item {
-            bare_item: 14.into(),
-            parameters: Parameters::new(),
-        };
-        let item3 = Item {
-            bare_item: BareItem::Token("a".to_owned()),
-            parameters: Parameters::new(),
-        };
-        let item4 = Item {
-            bare_item: BareItem::Token("b".to_owned()),
-            parameters: Parameters::new(),
-        };
+        let item1 = Item(12.into(), Parameters::new());
+        let item2 = Item(14.into(), Parameters::new());
+        let item3 = Item(BareItem::Token("a".to_owned()), Parameters::new());
+        let item4 = Item(BareItem::Token("b".to_owned()), Parameters::new());
         let inner_list_param = Parameters::from_iter(vec![(
             "param".to_owned(),
             BareItem::String("param_value_1".to_owned()),
         )]);
-        let inner_list = InnerList {
-            items: vec![item3, item4],
-            parameters: inner_list_param,
-        };
-        let expected_list = List {
-            items: vec![item1.into(), item2.into(), inner_list.into()],
-        };
+        let inner_list = InnerList(vec![item3, item4], inner_list_param);
+        let expected_list: List = vec![item1.into(), item2.into(), inner_list.into()];
         assert_eq!(expected_list, Parser::parse_list(&mut input)?);
         Ok(())
     }
@@ -742,18 +648,9 @@ mod tests {
         let mut input = "(c b); a=1".chars().peekable();
         let inner_list_param = Parameters::from_iter(vec![("a".to_owned(), 1.into())]);
 
-        let item1 = Item {
-            bare_item: BareItem::Token("c".to_owned()),
-            parameters: Parameters::new(),
-        };
-        let item2 = Item {
-            bare_item: BareItem::Token("b".to_owned()),
-            parameters: Parameters::new(),
-        };
-        let expected = InnerList {
-            items: vec![item1, item2],
-            parameters: inner_list_param,
-        };
+        let item1 = Item(BareItem::Token("c".to_owned()), Parameters::new());
+        let item2 = Item(BareItem::Token("b".to_owned()), Parameters::new());
+        let expected = InnerList(vec![item1, item2], inner_list_param);
         assert_eq!(expected, Parser::parse_inner_list(&mut input)?);
         Ok(())
     }
@@ -762,10 +659,7 @@ mod tests {
     fn parse_item_int_with_space() -> Result<(), Box<dyn Error>> {
         let mut input = "12 ".chars().peekable();
         assert_eq!(
-            Item {
-                bare_item: 12.into(),
-                parameters: Parameters::new()
-            },
+            Item(12.into(), Parameters::new()),
             Parser::parse_item(&mut input)?
         );
         Ok(())
@@ -776,10 +670,7 @@ mod tests {
         let mut input = "12.35;a ".chars().peekable();
         let param = Parameters::from_iter(vec![("a".to_owned(), BareItem::Boolean(true))]);
         assert_eq!(
-            Item {
-                bare_item: Decimal::from_str("12.35")?.into(),
-                parameters: param
-            },
+            Item(Decimal::from_str("12.35")?.into(), param),
             Parser::parse_item(&mut input)?
         );
         Ok(())
@@ -789,10 +680,7 @@ mod tests {
     fn parse_item_number_with_param() -> Result<(), Box<dyn Error>> {
         let param = Parameters::from_iter(vec![("a1".to_owned(), BareItem::Token("*".to_owned()))]);
         assert_eq!(
-            Item {
-                bare_item: BareItem::String("12.35".to_owned()),
-                parameters: param
-            },
+            Item(BareItem::String("12.35".to_owned()), param),
             Parser::parse_item(&mut "\"12.35\";a1=*".chars().peekable())?
         );
         Ok(())
@@ -828,18 +716,9 @@ mod tests {
             ("r".to_owned(), BareItem::String("+w".to_owned())),
         ]);
 
-        let item1 = Item {
-            bare_item: 123.into(),
-            parameters: item1_params,
-        };
-        let item2 = Item {
-            bare_item: 456.into(),
-            parameters: Parameters::new(),
-        };
-        let item3 = Item {
-            bare_item: 789.into(),
-            parameters: item3_params,
-        };
+        let item1 = Item(123.into(), item1_params);
+        let item2 = Item(456.into(), Parameters::new());
+        let item3 = Item(789.into(), item3_params);
 
         let expected_dict = Dictionary::from_iter(vec![
             ("abc".to_owned(), item1.into()),
@@ -854,10 +733,7 @@ mod tests {
     #[test]
     fn parse_dict_empty_value() -> Result<(), Box<dyn Error>> {
         let mut input = "a=()".chars().peekable();
-        let inner_list = InnerList {
-            items: vec![],
-            parameters: Parameters::new(),
-        };
+        let inner_list = InnerList(vec![], Parameters::new());
         let expected_dict = Dictionary::from_iter(vec![("a".to_owned(), inner_list.into())]);
         assert_eq!(expected_dict, Parser::parse_dict(&mut input)?);
         Ok(())
@@ -868,18 +744,9 @@ mod tests {
         let mut input = "a=1, b;foo=*, c=3".chars().peekable();
         let item2_params =
             Parameters::from_iter(vec![("foo".to_owned(), BareItem::Token("*".to_owned()))]);
-        let item1 = Item {
-            bare_item: 1.into(),
-            parameters: Parameters::new(),
-        };
-        let item2 = Item {
-            bare_item: BareItem::Boolean(true),
-            parameters: item2_params,
-        };
-        let item3 = Item {
-            bare_item: 3.into(),
-            parameters: Parameters::new(),
-        };
+        let item1 = Item(1.into(), Parameters::new());
+        let item2 = Item(BareItem::Boolean(true), item2_params);
+        let item3 = Item(3.into(), Parameters::new());
         let expected_dict = Dictionary::from_iter(vec![
             ("a".to_owned(), item1.into()),
             ("b".to_owned(), item2.into()),
@@ -892,14 +759,8 @@ mod tests {
     #[test]
     fn parse_dict_multiple_spaces() -> Result<(), Box<dyn Error>> {
         // input1, input2, input3 must be parsed into the same structure
-        let item1 = Item {
-            bare_item: 1.into(),
-            parameters: Parameters::new(),
-        };
-        let item2 = Item {
-            bare_item: 2.into(),
-            parameters: Parameters::new(),
-        };
+        let item1 = Item(1.into(), Parameters::new());
+        let item2 = Item(2.into(), Parameters::new());
         let expected_dict = Dictionary::from_iter(vec![
             ("a".to_owned(), item1.into()),
             ("b".to_owned(), item2.into()),

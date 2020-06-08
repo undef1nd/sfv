@@ -98,7 +98,7 @@ fn build_list(expected_value: &Value) -> Result<List, Box<dyn Error>> {
         let item_or_inner_list: ListEntry = build_list_or_item(member)?;
         list_items.push(item_or_inner_list);
     }
-    Ok(List { items: list_items })
+    Ok(list_items)
 }
 
 fn build_inner_list(inner_list_value: &Value) -> Result<InnerList, Box<dyn Error>> {
@@ -123,7 +123,7 @@ fn build_inner_list(inner_list_value: &Value) -> Result<InnerList, Box<dyn Error
 
     let parameters = build_parameters(inner_list_params)?;
 
-    Ok(InnerList { items, parameters })
+    Ok(InnerList(items, parameters))
 }
 
 fn build_item(expected_value: &Value) -> Result<Item, Box<dyn Error>> {
@@ -142,10 +142,7 @@ fn build_item(expected_value: &Value) -> Result<Item, Box<dyn Error>> {
     let bare_item = build_bare_item(bare_item_val)?;
     let parameters = build_parameters(params_val)?;
 
-    Ok(Item {
-        bare_item,
-        parameters,
-    })
+    Ok(Item(bare_item, parameters))
 }
 
 fn build_bare_item(bare_item_value: &Value) -> Result<BareItem, Box<dyn Error>> {
