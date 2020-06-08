@@ -294,14 +294,11 @@ impl Parser {
                 '\"' => return Ok(output_string),
                 '\x7f' | '\x00'..='\x1f' => return Err("parse_string: not a visible char"),
                 '\\' => match input_chars.next() {
-                    Some('\\') => {
-                        output_string.push(curr_char);
+                    Some(c) if c == '\\' || c == '\"' => {
+                        output_string.push(c);
                     }
-                    Some('\"') => {
-                        output_string.push(curr_char);
-                    }
-                    None => return Err("parse_string: no chars after '\\'"),
-                    _ => return Err("parse_string: invalid char after '\\'"),
+                    None => return Err("parse_string: last input char is '\\'"),
+                    _ => return Err("parse_string: disallowed char after '\\'"),
                 },
                 _ => output_string.push(curr_char),
             }
@@ -351,7 +348,6 @@ impl Parser {
         {
             return Err("parse_byte_seq: invalid char in byte sequence");
         }
-        // TODO: Maybe use data-encoding crate instead base64
         match base64::decode(b64_content) {
             Ok(content) => Ok(content),
             Err(_) => Err("parse_byte_seq: decoding error"),
@@ -1013,11 +1009,11 @@ mod tests {
             Parser::parse_string(&mut "test".chars().peekable())
         );
         assert_eq!(
-            Err("parse_string: no chars after '\\'"),
+            Err("parse_string: last input char is '\\'"),
             Parser::parse_string(&mut "\"\\".chars().peekable())
         );
         assert_eq!(
-            Err("parse_string: invalid char after '\\'"),
+            Err("parse_string: disallowed char after '\\'"),
             Parser::parse_string(&mut "\"\\l\"".chars().peekable())
         );
         assert_eq!(
