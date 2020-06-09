@@ -30,13 +30,6 @@ fn execute_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
-    // Actual result for can_fail tests cases must be either Err, or match expected result
-    if actual_result.is_err() {
-        if let Some(true) = test_case.can_fail {
-            return Ok(());
-        }
-    }
-
     let expected_value = test_case
         .expected
         .as_ref()
