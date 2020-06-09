@@ -95,7 +95,7 @@ impl Parser {
         utils::consume_sp_chars(&mut input_chars);
 
         if input_chars.next().is_some() {
-            return Err("parse: trailing text after parsed value");
+            return Err("parse: trailing characters after parsed value");
         };
         Ok(output)
     }
@@ -127,14 +127,14 @@ impl Parser {
 
             if let Some(c) = input_chars.next() {
                 if c != ',' {
-                    return Err("parse_dict: trailing text after member in dict");
+                    return Err("parse_dict: trailing characters after dictionary member");
                 }
             }
 
             utils::consume_ows_chars(input_chars);
 
             if input_chars.peek().is_none() {
-                return Err("parse_dict: trailing comma at the end of the list");
+                return Err("parse_dict: trailing comma");
             }
         }
         Ok(dict)
@@ -157,14 +157,14 @@ impl Parser {
 
             if let Some(c) = input_chars.next() {
                 if c != ',' {
-                    return Err("parse_list: trailing text after item in list");
+                    return Err("parse_list: trailing characters after list member");
                 }
             }
 
             utils::consume_ows_chars(input_chars);
 
             if input_chars.peek().is_none() {
-                return Err("parse_list: trailing comma at the end of the list");
+                return Err("parse_list: trailing comma");
             }
         }
 
@@ -493,9 +493,14 @@ mod tests {
 
     #[test]
     fn parse_errors() -> Result<(), Box<dyn Error>> {
+        let input = "\"some_value¢\"".as_bytes();
+        assert_eq!(
+            Err("parse: non-ASCII characters in input"),
+            Parser::parse(input, "item")
+        );
         let input = "\"some_value\" trailing_text".as_bytes();
         assert_eq!(
-            Err("parse: trailing text after parsed value"),
+            Err("parse: trailing characters after parsed value"),
             Parser::parse(input, "item")
         );
         assert_eq!(
@@ -600,37 +605,37 @@ mod tests {
 
         let mut input = "a, b c".chars().peekable();
         assert_eq!(
-            Err("parse_list: trailing text after item in list"),
+            Err("parse_list: trailing characters after list member"),
             Parser::parse_list(&mut input)
         );
 
         let mut input = "a,".chars().peekable();
         assert_eq!(
-            Err("parse_list: trailing comma at the end of the list"),
+            Err("parse_list: trailing comma"),
             Parser::parse_list(&mut input)
         );
 
         let mut input = "a     ,    ".chars().peekable();
         assert_eq!(
-            Err("parse_list: trailing comma at the end of the list"),
+            Err("parse_list: trailing comma"),
             Parser::parse_list(&mut input)
         );
 
         let mut input = "a\t \t ,\t ".chars().peekable();
         assert_eq!(
-            Err("parse_list: trailing comma at the end of the list"),
+            Err("parse_list: trailing comma"),
             Parser::parse_list(&mut input)
         );
 
         let mut input = "a\t\t,\t\t\t".chars().peekable();
         assert_eq!(
-            Err("parse_list: trailing comma at the end of the list"),
+            Err("parse_list: trailing comma"),
             Parser::parse_list(&mut input)
         );
 
         let mut input = "(a b),".chars().peekable();
         assert_eq!(
-            Err("parse_list: trailing comma at the end of the list"),
+            Err("parse_list: trailing comma"),
             Parser::parse_list(&mut input)
         );
 
@@ -640,6 +645,16 @@ mod tests {
             Parser::parse_list(&mut input)
         );
 
+        Ok(())
+    }
+
+    #[test]
+    fn parse_inner_list_errors() -> Result<(), Box<dyn Error>> {
+        let mut input = "c b); a=1".chars().peekable();
+        assert_eq!(
+            Err("parse_inner_list: input does not start with '('"),
+            Parser::parse_inner_list(&mut input)
+        );
         Ok(())
     }
 
@@ -700,6 +715,21 @@ mod tests {
         assert_eq!(
             Dictionary::new(),
             Parser::parse_dict(&mut "".chars().peekable())?
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn parse_dict_errors() -> Result<(), Box<dyn Error>> {
+        let mut input = "abc=123;a=1;b=2 def".chars().peekable();
+        assert_eq!(
+            Err("parse_dict: trailing characters after dictionary member"),
+            Parser::parse_dict(&mut input)
+        );
+        let mut input = "abc=123;a=1,".chars().peekable();
+        assert_eq!(
+            Err("parse_dict: trailing comma"),
+            Parser::parse_dict(&mut input)
         );
         Ok(())
     }
@@ -851,6 +881,10 @@ mod tests {
         assert_eq!(
             "test".to_owned(),
             Parser::parse_string(&mut "\"test\"".chars().peekable())?
+        );
+        assert_eq!(
+            r#"te\st"#.to_owned(),
+            Parser::parse_string(&mut "\"te\\\\st\"".chars().peekable())?
         );
         assert_eq!(
             "".to_owned(),
@@ -1108,6 +1142,14 @@ mod tests {
         assert_eq!(
             Err("parse_number: input number does not start with a digit"),
             Parser::parse_number(&mut "--0".chars().peekable())
+        );
+        assert_eq!(
+            Err("parse_number: decimal too long, illegal position for decimal point"),
+            Parser::parse_number(&mut "1999999999999.1".chars().peekable())
+        );
+        assert_eq!(
+            Err("parse_number: invalid decimal fraction length"),
+            Parser::parse_number(&mut "19888899999.".chars().peekable())
         );
         assert_eq!(
             Err("parse_number: integer too long, length > 15"),
