@@ -1,5 +1,17 @@
+use data_encoding::{Encoding, Specification};
 use std::iter::Peekable;
 use std::str::Chars;
+
+pub(crate) fn base64() -> Result<Encoding, &'static str> {
+    let mut spec = Specification::new();
+    spec.check_trailing_bits = false;
+    spec.symbols
+        .push_str("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/");
+    spec.padding = None;
+    spec.ignore = "=".to_owned();
+    spec.encoding()
+        .map_err(|_err| "invalid base64 specification")
+}
 
 pub(crate) fn is_tchar(c: char) -> bool {
     // See tchar values list in https://tools.ietf.org/html/rfc7230#section-3.2.6
