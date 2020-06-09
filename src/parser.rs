@@ -402,6 +402,7 @@ impl Parser {
             .find('.')
             .map(|dot_pos| input_number.len() - dot_pos - 1);
         match chars_after_dot {
+            Some(0) => return Err("parse_number: decimal ends with '.'"),
             Some(1..=3) => {
                 let mut output_number = Decimal::from_str(&input_number)
                     .map_err(|_err| "parse_number: parsing f64 failed")?;
@@ -1148,7 +1149,7 @@ mod tests {
             Parser::parse_number(&mut "1999999999999.1".chars().peekable())
         );
         assert_eq!(
-            Err("parse_number: invalid decimal fraction length"),
+            Err("parse_number: decimal ends with '.'"),
             Parser::parse_number(&mut "19888899999.".chars().peekable())
         );
         assert_eq!(
@@ -1156,15 +1157,19 @@ mod tests {
             Parser::parse_number(&mut "1999999999999999".chars().peekable())
         );
         assert_eq!(
-            Err("parse_number: input number does not start with a digit"),
-            Parser::parse_number(&mut "- 42".chars().peekable())
+            Err("parse_number: decimal too long, length > 16"),
+            Parser::parse_number(&mut "19999999999.99991".chars().peekable())
         );
         assert_eq!(
             Err("parse_number: input number does not start with a digit"),
             Parser::parse_number(&mut "- 42".chars().peekable())
         );
         assert_eq!(
-            Err("parse_number: invalid decimal fraction length"),
+            Err("parse_number: input number does not start with a digit"),
+            Parser::parse_number(&mut "- 42".chars().peekable())
+        );
+        assert_eq!(
+            Err("parse_number: decimal ends with '.'"),
             Parser::parse_number(&mut "1..4".chars().peekable())
         );
         assert_eq!(
@@ -1172,11 +1177,11 @@ mod tests {
             Parser::parse_number(&mut "-".chars().peekable())
         );
         assert_eq!(
-            Err("parse_number: invalid decimal fraction length"),
+            Err("parse_number: decimal ends with '.'"),
             Parser::parse_number(&mut "-5. 14".chars().peekable())
         );
         assert_eq!(
-            Err("parse_number: invalid decimal fraction length"),
+            Err("parse_number: decimal ends with '.'"),
             Parser::parse_number(&mut "7. 1".chars().peekable())
         );
         assert_eq!(
