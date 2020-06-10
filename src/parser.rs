@@ -69,14 +69,13 @@ pub enum Header {
     Item(Item),
 }
 
-#[derive(Debug)]
 pub struct Parser;
 
 impl Parser {
     pub fn parse(input_bytes: &[u8], header_type: &str) -> ParseResult<Header> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#text-parse
         if !input_bytes.is_ascii() {
-            return Err("parse: non-ASCII characters in input");
+            return Err("parse: non-ascii characters in input");
         }
 
         let mut input_chars = from_utf8(input_bytes)
@@ -251,7 +250,7 @@ impl Parser {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-boolean
 
         if input_chars.next() != Some('?') {
-            return Err("parse_bool: first char is not '?'");
+            return Err("parse_bool: first character is not '?'");
         }
 
         match input_chars.next() {
@@ -265,20 +264,20 @@ impl Parser {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-string
 
         if input_chars.next() != Some('\"') {
-            return Err("parse_string: first char is not '\"'");
+            return Err("parse_string: first character is not '\"'");
         }
 
         let mut output_string = String::from("");
         while let Some(curr_char) = input_chars.next() {
             match curr_char {
                 '\"' => return Ok(output_string),
-                '\x7f' | '\x00'..='\x1f' => return Err("parse_string: not a visible char"),
+                '\x7f' | '\x00'..='\x1f' => return Err("parse_string: not a visible character"),
                 '\\' => match input_chars.next() {
                     Some(c) if c == '\\' || c == '\"' => {
                         output_string.push(c);
                     }
-                    None => return Err("parse_string: last input char is '\\'"),
-                    _ => return Err("parse_string: disallowed char after '\\'"),
+                    None => return Err("parse_string: last input character is '\\'"),
+                    _ => return Err("parse_string: disallowed character after '\\'"),
                 },
                 _ => output_string.push(curr_char),
             }
@@ -291,7 +290,7 @@ impl Parser {
 
         if let Some(first_char) = input_chars.peek() {
             if !first_char.is_ascii_alphabetic() && first_char != &'*' {
-                return Err("parse_token: first char is not ALPHA or '*'");
+                return Err("parse_token: first character is not ALPHA or '*'");
             }
         } else {
             return Err("parse_token: empty input string");
@@ -391,7 +390,7 @@ impl Parser {
                 .map_err(|_err| "parse_number: parsing i64 failed")?
                 * sign;
 
-            if output_number < min_int || max_int < output_number {
+            if !(min_int <= output_number && output_number <= max_int) {
                 return Err("parse_number: integer number is out of range");
             }
 
@@ -452,7 +451,7 @@ impl Parser {
     fn parse_key(input_chars: &mut Peekable<Chars>) -> ParseResult<String> {
         match input_chars.peek() {
             Some(c) if c == &'*' || c.is_ascii_lowercase() => (),
-            _ => return Err("parse_key: first char is not lcalpha or *"),
+            _ => return Err("parse_key: first character is not lcalpha or '*'"),
         }
 
         let mut output = String::new();
@@ -496,7 +495,7 @@ mod tests {
     fn parse_errors() -> Result<(), Box<dyn Error>> {
         let input = "\"some_value¢\"".as_bytes();
         assert_eq!(
-            Err("parse: non-ASCII characters in input"),
+            Err("parse: non-ascii characters in input"),
             Parser::parse(input, "item")
         );
         let input = "\"some_value\" trailing_text".as_bytes();
@@ -863,7 +862,7 @@ mod tests {
     #[test]
     fn parse_bool_errors() -> Result<(), Box<dyn Error>> {
         assert_eq!(
-            Err("parse_bool: first char is not '?'"),
+            Err("parse_bool: first character is not '?'"),
             Parser::parse_bool(&mut "".chars().peekable())
         );
         assert_eq!(
@@ -901,19 +900,19 @@ mod tests {
     #[test]
     fn parse_string_errors() -> Result<(), Box<dyn Error>> {
         assert_eq!(
-            Err("parse_string: first char is not '\"'"),
+            Err("parse_string: first character is not '\"'"),
             Parser::parse_string(&mut "test".chars().peekable())
         );
         assert_eq!(
-            Err("parse_string: last input char is '\\'"),
+            Err("parse_string: last input character is '\\'"),
             Parser::parse_string(&mut "\"\\".chars().peekable())
         );
         assert_eq!(
-            Err("parse_string: disallowed char after '\\'"),
+            Err("parse_string: disallowed character after '\\'"),
             Parser::parse_string(&mut "\"\\l\"".chars().peekable())
         );
         assert_eq!(
-            Err("parse_string: not a visible char"),
+            Err("parse_string: not a visible character"),
             Parser::parse_string(&mut "\"\u{1f}\"".chars().peekable())
         );
         assert_eq!(
@@ -965,13 +964,13 @@ mod tests {
     fn parse_token_errors() -> Result<(), Box<dyn Error>> {
         let mut input = "765token".chars().peekable();
         assert_eq!(
-            Err("parse_token: first char is not ALPHA or '*'"),
+            Err("parse_token: first character is not ALPHA or '*'"),
             Parser::parse_token(&mut input)
         );
         assert_eq!(input.collect::<String>(), "765token");
 
         assert_eq!(
-            Err("parse_token: first char is not ALPHA or '*'"),
+            Err("parse_token: first character is not ALPHA or '*'"),
             Parser::parse_token(&mut "7token".chars().peekable())
         );
         assert_eq!(
@@ -1197,7 +1196,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_parameters_string() -> Result<(), Box<dyn Error>> {
+    fn parse_params_string() -> Result<(), Box<dyn Error>> {
         let mut input = ";b=\"param_val\"".chars().peekable();
         let expected = Parameters::from_iter(vec![(
             "b".to_owned(),
@@ -1208,7 +1207,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_parameters_bool() -> Result<(), Box<dyn Error>> {
+    fn parse_params_bool() -> Result<(), Box<dyn Error>> {
         let mut input = ";b;a".chars().peekable();
         let expected = Parameters::from_iter(vec![
             ("b".to_owned(), BareItem::Boolean(true)),
@@ -1219,7 +1218,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_parameters_mixed_types() -> Result<(), Box<dyn Error>> {
+    fn parse_params_mixed_types() -> Result<(), Box<dyn Error>> {
         let mut input = ";key1=?0;key2=746.15".chars().peekable();
         let expected = Parameters::from_iter(vec![
             ("key1".to_owned(), BareItem::Boolean(false)),
@@ -1230,7 +1229,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_parameters_with_spaces() -> Result<(), Box<dyn Error>> {
+    fn parse_params_with_spaces() -> Result<(), Box<dyn Error>> {
         let mut input = "; key1=?0; key2=11111".chars().peekable();
         let expected = Parameters::from_iter(vec![
             ("key1".to_owned(), BareItem::Boolean(false)),
@@ -1241,7 +1240,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_parameters_empty() -> Result<(), Box<dyn Error>> {
+    fn parse_params_empty() -> Result<(), Box<dyn Error>> {
         assert_eq!(
             Parameters::new(),
             Parser::parse_parameters(&mut " key1=?0; key2=11111".chars().peekable())?
@@ -1285,7 +1284,7 @@ mod tests {
     #[test]
     fn parse_key_errors() -> Result<(), Box<dyn Error>> {
         assert_eq!(
-            Err("parse_key: first char is not lcalpha or *"),
+            Err("parse_key: first character is not lcalpha or '*'"),
             Parser::parse_key(&mut "[*f=10".chars().peekable())
         );
         Ok(())
