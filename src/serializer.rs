@@ -186,47 +186,6 @@ mod test {
     }
 
     #[test]
-    fn serialize_bare_item() -> Result<(), Box<dyn Error>> {
-        let bare_item = BareItem::Boolean(false);
-        assert_eq!("?0", Serializer::serialize_bare_item(bare_item)?);
-
-        let bare_item = BareItem::String("test string".into());
-        assert_eq!(
-            "\"test string\"",
-            Serializer::serialize_bare_item(bare_item)?
-        );
-
-        let bare_item = BareItem::Token("*token".to_owned());
-        assert_eq!("*token", Serializer::serialize_bare_item(bare_item)?);
-
-        let bare_item = BareItem::ByteSeq("base_64 encoding test".into());
-        assert_eq!(
-            ":YmFzZV82NCBlbmNvZGluZyB0ZXN0:",
-            Serializer::serialize_bare_item(bare_item)?
-        );
-
-        let bare_item = BareItem::Number(Num::Decimal(Decimal::from_str("-3.5567")?));
-        assert_eq!("-3.557", Serializer::serialize_bare_item(bare_item)?);
-        Ok(())
-    }
-
-    #[test]
-    fn serialize_bare_item_errors() -> Result<(), Box<dyn Error>> {
-        let bare_item = BareItem::String("test😳string".into());
-        assert_eq!(
-            Err("serialize_string: non-ascii character"),
-            Serializer::serialize_bare_item(bare_item)
-        );
-
-        let bare_item = BareItem::Token("_token".into());
-        assert_eq!(
-            Err("serialise_token: first character is not ALPHA or '*'"),
-            Serializer::serialize_bare_item(bare_item)
-        );
-        Ok(())
-    }
-
-    #[test]
     fn serialize_integer() -> Result<(), Box<dyn Error>> {
         assert_eq!("-12", &Serializer::serialize_integer(-12)?);
         assert_eq!("0", &Serializer::serialize_integer(0)?);
