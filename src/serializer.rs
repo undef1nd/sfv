@@ -7,36 +7,36 @@ type SerializeResult<T> = Result<T, &'static str>;
 struct Serializer;
 
 impl Serializer {
-    fn serialize(header: Header) -> SerializeResult<String> {
+    fn serialize(header: &Header) -> SerializeResult<String> {
         // match and call respective func
         Ok("1".to_owned())
     }
 
-    fn serialize_item(item: Item) -> SerializeResult<String> {
+    fn serialize_item(item: &Item) -> SerializeResult<String> {
         let mut output = String::new();
-        output.push_str(Self::serialize_bare_item(item.0)?.as_str());
-        output.push_str(Self::serialize_parameters(item.1)?.as_str());
+        output.push_str(Self::serialize_bare_item(&item.0)?.as_str());
+        output.push_str(Self::serialize_parameters(&item.1)?.as_str());
         Ok(output)
     }
 
-    fn serialize_bare_item(bare_item: BareItem) -> SerializeResult<String> {
+    fn serialize_bare_item(bare_item: &BareItem) -> SerializeResult<String> {
         match bare_item {
-            BareItem::Boolean(value) => Self::serialize_bool(value),
+            BareItem::Boolean(value) => Self::serialize_bool(*value),
             BareItem::String(value) => Self::serialize_string(value),
             BareItem::ByteSeq(value) => Self::serialize_byte_sequence(value),
             BareItem::Token(value) => Self::serialize_token(value),
-            BareItem::Number(Num::Integer(value)) => Self::serialize_integer(value),
-            BareItem::Number(Num::Decimal(value)) => Self::serialize_decimal(value),
+            BareItem::Number(Num::Integer(value)) => Self::serialize_integer(*value),
+            BareItem::Number(Num::Decimal(value)) => Self::serialize_decimal(*value),
         }
     }
 
-    fn serialize_parameters(value: Parameters) -> SerializeResult<String> {
+    fn serialize_parameters(value: &Parameters) -> SerializeResult<String> {
         let mut output = String::new();
-        for (param_name, param_value) in value.into_iter() {
+        for (param_name, param_value) in value.iter() {
             output.push(';');
             output.push_str(&Self::serialize_key(param_name)?);
 
-            if param_value != BareItem::Boolean(true) {
+            if param_value != &BareItem::Boolean(true) {
                 output.push('=');
                 output.push_str(&Self::serialize_bare_item(param_value)?);
             }
@@ -44,7 +44,7 @@ impl Serializer {
         Ok(output)
     }
 
-    fn serialize_key(value: String) -> SerializeResult<String> {
+    fn serialize_key(value: &str) -> SerializeResult<String> {
         let disallowed_chars =
             |c: char| !(c.is_ascii_lowercase() || c.is_ascii_digit() || "_-*.".contains(c));
 
@@ -57,7 +57,7 @@ impl Serializer {
                 return Err("serialize_key: first character is not lcalpha or '*'");
             }
         }
-        Ok(value)
+        Ok(value.to_owned())
     }
 
     fn serialize_integer(value: i64) -> SerializeResult<String> {
@@ -86,7 +86,7 @@ impl Serializer {
         Ok(decimal.to_string())
     }
 
-    fn serialize_string(value: String) -> SerializeResult<String> {
+    fn serialize_string(value: &str) -> SerializeResult<String> {
         if !value.is_ascii() {
             return Err("serialize_string: non-ascii character");
         }
@@ -109,7 +109,7 @@ impl Serializer {
         Ok(output)
     }
 
-    fn serialize_token(value: String) -> SerializeResult<String> {
+    fn serialize_token(value: &str) -> SerializeResult<String> {
         if !value.is_ascii() {
             return Err("serialize_string: non-ascii character");
         }
@@ -128,10 +128,10 @@ impl Serializer {
             return Err("serialise_token: disallowed character");
         }
 
-        Ok(value)
+        Ok(value.to_owned())
     }
 
-    fn serialize_byte_sequence(value: Vec<u8>) -> SerializeResult<String> {
+    fn serialize_byte_sequence(value: &[u8]) -> SerializeResult<String> {
         let mut output = String::new();
         output.push(':');
         let encoded = data_encoding::BASE64.encode(value.as_ref());
@@ -164,7 +164,7 @@ mod test {
     #[test]
     fn serialize_item_without_params() -> Result<(), Box<dyn Error>> {
         let item = Item(1.into(), Parameters::new());
-        assert_eq!("1", Serializer::serialize_item(item)?);
+        assert_eq!("1", Serializer::serialize_item(&item)?);
         Ok(())
     }
 
@@ -172,7 +172,7 @@ mod test {
     fn serialize_item_with_bool_true_param() -> Result<(), Box<dyn Error>> {
         let param = Parameters::from_iter(vec![("a".to_owned(), BareItem::Boolean(true))]);
         let item = Item(Decimal::from_str("12.35")?.into(), param);
-        assert_eq!("12.35;a", Serializer::serialize_item(item)?);
+        assert_eq!("12.35;a", Serializer::serialize_item(&item)?);
         Ok(())
     }
 
@@ -181,7 +181,7 @@ mod test {
         let param =
             Parameters::from_iter(vec![("a1".to_owned(), BareItem::Token("*tok".to_owned()))]);
         let item = Item(BareItem::String("12.35".to_owned()), param);
-        assert_eq!("\"12.35\";a1=*tok", Serializer::serialize_item(item)?);
+        assert_eq!("\"12.35\";a1=*tok", Serializer::serialize_item(&item)?);
         Ok(())
     }
 
@@ -258,21 +258,18 @@ mod test {
 
     #[test]
     fn serialize_string() -> Result<(), Box<dyn Error>> {
-        assert_eq!(
-            "\"1.1 text\"",
-            &Serializer::serialize_string("1.1 text".into())?
-        );
+        assert_eq!("\"1.1 text\"", &Serializer::serialize_string("1.1 text")?);
         assert_eq!(
             "\"hello \\\"name\\\"\"",
-            &Serializer::serialize_string("hello \"name\"".into())?
+            &Serializer::serialize_string("hello \"name\"")?
         );
         assert_eq!(
             "\"something\\\\nothing\"",
-            &Serializer::serialize_string("something\\nothing".into())?
+            &Serializer::serialize_string("something\\nothing")?
         );
-        assert_eq!("\"\"", &Serializer::serialize_string("".into())?);
-        assert_eq!("\" \"", &Serializer::serialize_string(" ".into())?);
-        assert_eq!("\"    \"", &Serializer::serialize_string("    ".into())?);
+        assert_eq!("\"\"", &Serializer::serialize_string("")?);
+        assert_eq!("\" \"", &Serializer::serialize_string(" ")?);
+        assert_eq!("\"    \"", &Serializer::serialize_string("    ")?);
         Ok(())
     }
 
@@ -280,32 +277,29 @@ mod test {
     fn serialize_string_errors() -> Result<(), Box<dyn Error>> {
         assert_eq!(
             Err("serialize_string: not a visible character"),
-            Serializer::serialize_string("text \x00".into())
+            Serializer::serialize_string("text \x00")
         );
         assert_eq!(
             Err("serialize_string: not a visible character"),
-            Serializer::serialize_string("text \x1f".into())
+            Serializer::serialize_string("text \x1f")
         );
         assert_eq!(
             Err("serialize_string: not a visible character"),
-            Serializer::serialize_string("text \x7f".into())
+            Serializer::serialize_string("text \x7f")
         );
         assert_eq!(
             Err("serialize_string: non-ascii character"),
-            Serializer::serialize_string("рядок".into())
+            Serializer::serialize_string("рядок")
         );
         Ok(())
     }
 
     #[test]
     fn serialize_token() -> Result<(), Box<dyn Error>> {
-        assert_eq!("*", Serializer::serialize_token("*".into())?);
-        assert_eq!("abc", Serializer::serialize_token("abc".into())?);
-        assert_eq!("abc:de", Serializer::serialize_token("abc:de".into())?);
-        assert_eq!(
-            "smth/#!else",
-            Serializer::serialize_token("smth/#!else".into())?
-        );
+        assert_eq!("*", Serializer::serialize_token("*")?);
+        assert_eq!("abc", Serializer::serialize_token("abc")?);
+        assert_eq!("abc:de", Serializer::serialize_token("abc:de")?);
+        assert_eq!("smth/#!else", Serializer::serialize_token("smth/#!else")?);
         Ok(())
     }
 
@@ -313,15 +307,15 @@ mod test {
     fn serialize_token_errors() -> Result<(), Box<dyn Error>> {
         assert_eq!(
             Err("serialise_token: first character is not ALPHA or '*'"),
-            Serializer::serialize_token("#some".into())
+            Serializer::serialize_token("#some")
         );
         assert_eq!(
             Err("serialise_token: disallowed character"),
-            Serializer::serialize_token("s ".into())
+            Serializer::serialize_token("s ")
         );
         assert_eq!(
             Err("serialise_token: disallowed character"),
-            Serializer::serialize_token("abc:de\t".into())
+            Serializer::serialize_token("abc:de\t")
         );
         Ok(())
     }
@@ -330,32 +324,32 @@ mod test {
     fn serialize_byte_sequence() -> Result<(), Box<dyn Error>> {
         assert_eq!(
             ":aGVsbG8=:",
-            Serializer::serialize_byte_sequence("hello".into())?
+            Serializer::serialize_byte_sequence("hello".as_bytes())?
         );
         assert_eq!(
             ":dGVzdF9lbmNvZGU=:",
-            Serializer::serialize_byte_sequence("test_encode".into())?
+            Serializer::serialize_byte_sequence("test_encode".as_bytes())?
         );
-        assert_eq!("::", Serializer::serialize_byte_sequence("".into())?);
+        assert_eq!("::", Serializer::serialize_byte_sequence("".as_bytes())?);
         assert_eq!(
             ":cGxlYXN1cmUu:",
-            Serializer::serialize_byte_sequence("pleasure.".into())?
+            Serializer::serialize_byte_sequence("pleasure.".as_bytes())?
         );
         assert_eq!(
             ":bGVhc3VyZS4=:",
-            Serializer::serialize_byte_sequence("leasure.".into())?
+            Serializer::serialize_byte_sequence("leasure.".as_bytes())?
         );
         assert_eq!(
             ":ZWFzdXJlLg==:",
-            Serializer::serialize_byte_sequence("easure.".into())?
+            Serializer::serialize_byte_sequence("easure.".as_bytes())?
         );
         assert_eq!(
             ":YXN1cmUu:",
-            Serializer::serialize_byte_sequence("asure.".into())?
+            Serializer::serialize_byte_sequence("asure.".as_bytes())?
         );
         assert_eq!(
             ":c3VyZS4=:",
-            Serializer::serialize_byte_sequence("sure.".into())?
+            Serializer::serialize_byte_sequence("sure.".as_bytes())?
         );
 
         Ok(())
@@ -374,7 +368,7 @@ mod test {
             ("*b".to_owned(), BareItem::Boolean(true)),
             ("a.a".to_owned(), BareItem::Boolean(true)),
         ]);
-        assert_eq!(";*b;a.a", Serializer::serialize_parameters(input)?);
+        assert_eq!(";*b;a.a", Serializer::serialize_parameters(&input)?);
         Ok(())
     }
 
@@ -386,7 +380,7 @@ mod test {
         )]);
         assert_eq!(
             ";b=\"param_val\"",
-            &Serializer::serialize_parameters(input)?
+            &Serializer::serialize_parameters(&input)?
         );
         Ok(())
     }
@@ -399,7 +393,7 @@ mod test {
         ]);
         assert_eq!(
             ";key1=746.15;key2=11111",
-            &Serializer::serialize_parameters(input)?
+            &Serializer::serialize_parameters(&input)?
         );
         Ok(())
     }
@@ -412,17 +406,17 @@ mod test {
         ]);
         assert_eq!(
             ";key1=?0;key2=1354.092",
-            &Serializer::serialize_parameters(input)?
+            &Serializer::serialize_parameters(&input)?
         );
         Ok(())
     }
 
     #[test]
     fn serialize_key() -> Result<(), Box<dyn Error>> {
-        assert_eq!("*a_fg", &Serializer::serialize_key("*a_fg".into())?);
-        assert_eq!("*a_fg*", &Serializer::serialize_key("*a_fg*".into())?);
-        assert_eq!("key1", &Serializer::serialize_key("key1".into())?);
-        assert_eq!("ke-y.1", &Serializer::serialize_key("ke-y.1".into())?);
+        assert_eq!("*a_fg", &Serializer::serialize_key("*a_fg")?);
+        assert_eq!("*a_fg*", &Serializer::serialize_key("*a_fg*")?);
+        assert_eq!("key1", &Serializer::serialize_key("key1")?);
+        assert_eq!("ke-y.1", &Serializer::serialize_key("ke-y.1")?);
         Ok(())
     }
 
@@ -430,15 +424,15 @@ mod test {
     fn serialize_key_erros() -> Result<(), Box<dyn Error>> {
         assert_eq!(
             Err("serialize_key: disallowed character in input"),
-            Serializer::serialize_key("AND".into())
+            Serializer::serialize_key("AND")
         );
         assert_eq!(
             Err("serialize_key: first character is not lcalpha or '*'"),
-            Serializer::serialize_key("_key".into())
+            Serializer::serialize_key("_key")
         );
         assert_eq!(
             Err("serialize_key: first character is not lcalpha or '*'"),
-            Serializer::serialize_key("7key".into())
+            Serializer::serialize_key("7key")
         );
         Ok(())
     }
