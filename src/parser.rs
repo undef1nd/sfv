@@ -5,7 +5,7 @@ use std::fmt::Debug;
 use std::iter::Peekable;
 use std::str::{from_utf8, Chars};
 
-type ParseResult<T> = Result<T, &'static str>;
+type ParserResult<T> = Result<T, &'static str>;
 
 pub type Dictionary = IndexMap<String, ListEntry>;
 pub type Parameters = IndexMap<String, BareItem>;
@@ -72,7 +72,7 @@ pub enum Header {
 pub struct Parser;
 
 impl Parser {
-    pub fn parse(input_bytes: &[u8], header_type: &str) -> ParseResult<Header> {
+    pub fn parse(input_bytes: &[u8], header_type: &str) -> ParserResult<Header> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#text-parse
         if !input_bytes.is_ascii() {
             return Err("parse: non-ascii characters in input");
@@ -99,7 +99,7 @@ impl Parser {
         Ok(output)
     }
 
-    fn parse_dict(input_chars: &mut Peekable<Chars>) -> ParseResult<Dictionary> {
+    fn parse_dict(input_chars: &mut Peekable<Chars>) -> ParserResult<Dictionary> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-dictionary
 
         let mut dict = Dictionary::new();
@@ -139,7 +139,7 @@ impl Parser {
         Ok(dict)
     }
 
-    fn parse_list(input_chars: &mut Peekable<Chars>) -> ParseResult<List> {
+    fn parse_list(input_chars: &mut Peekable<Chars>) -> ParserResult<List> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-list
         // List represents an array of (item_or_inner_list, parameters)
 
@@ -170,7 +170,7 @@ impl Parser {
         Ok(members)
     }
 
-    fn parse_list_entry(input_chars: &mut Peekable<Chars>) -> ParseResult<ListEntry> {
+    fn parse_list_entry(input_chars: &mut Peekable<Chars>) -> ParserResult<ListEntry> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-item-or-list
         // ListEntry represents a tuple (item_or_inner_list, parameters)
 
@@ -186,7 +186,7 @@ impl Parser {
         }
     }
 
-    fn parse_inner_list(input_chars: &mut Peekable<Chars>) -> ParseResult<InnerList> {
+    fn parse_inner_list(input_chars: &mut Peekable<Chars>) -> ParserResult<InnerList> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-innerlist
 
         if Some('(') != input_chars.next() {
@@ -216,7 +216,7 @@ impl Parser {
         Err("parse_inner_list: the end of the inner list was not found")
     }
 
-    fn parse_item(input_chars: &mut Peekable<Chars>) -> ParseResult<Item> {
+    fn parse_item(input_chars: &mut Peekable<Chars>) -> ParserResult<Item> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-item
         let bare_item = Self::parse_bare_item(input_chars)?;
         let parameters = Self::parse_parameters(input_chars)?;
@@ -224,7 +224,7 @@ impl Parser {
         Ok(Item(bare_item, parameters))
     }
 
-    fn parse_bare_item(mut input_chars: &mut Peekable<Chars>) -> ParseResult<BareItem> {
+    fn parse_bare_item(mut input_chars: &mut Peekable<Chars>) -> ParserResult<BareItem> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-bare-item
         if input_chars.peek().is_none() {
             return Err("parse_bare_item: empty item");
@@ -246,7 +246,7 @@ impl Parser {
         }
     }
 
-    fn parse_bool(input_chars: &mut Peekable<Chars>) -> ParseResult<bool> {
+    fn parse_bool(input_chars: &mut Peekable<Chars>) -> ParserResult<bool> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-boolean
 
         if input_chars.next() != Some('?') {
@@ -260,7 +260,7 @@ impl Parser {
         }
     }
 
-    fn parse_string(input_chars: &mut Peekable<Chars>) -> ParseResult<String> {
+    fn parse_string(input_chars: &mut Peekable<Chars>) -> ParserResult<String> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-string
 
         if input_chars.next() != Some('\"') {
@@ -285,7 +285,7 @@ impl Parser {
         Err("parse_string: no closing '\"'")
     }
 
-    fn parse_token(input_chars: &mut Peekable<Chars>) -> ParseResult<String> {
+    fn parse_token(input_chars: &mut Peekable<Chars>) -> ParserResult<String> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-token
 
         if let Some(first_char) = input_chars.peek() {
@@ -310,7 +310,7 @@ impl Parser {
         Ok(output_string)
     }
 
-    fn parse_byte_sequence(input_chars: &mut Peekable<Chars>) -> ParseResult<Vec<u8>> {
+    fn parse_byte_sequence(input_chars: &mut Peekable<Chars>) -> ParserResult<Vec<u8>> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-binary
 
         if input_chars.next() != Some(':') {
@@ -334,7 +334,7 @@ impl Parser {
         }
     }
 
-    fn parse_number(input_chars: &mut Peekable<Chars>) -> ParseResult<Num> {
+    fn parse_number(input_chars: &mut Peekable<Chars>) -> ParserResult<Num> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-number
 
         let (min_int, max_int) = (-999_999_999_999_999_i64, 999_999_999_999_999_i64);
@@ -416,7 +416,7 @@ impl Parser {
         }
     }
 
-    fn parse_parameters(input_chars: &mut Peekable<Chars>) -> ParseResult<Parameters> {
+    fn parse_parameters(input_chars: &mut Peekable<Chars>) -> ParserResult<Parameters> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-param
 
         let mut params = Parameters::new();
@@ -448,7 +448,7 @@ impl Parser {
         Ok(params)
     }
 
-    fn parse_key(input_chars: &mut Peekable<Chars>) -> ParseResult<String> {
+    fn parse_key(input_chars: &mut Peekable<Chars>) -> ParserResult<String> {
         match input_chars.peek() {
             Some(c) if c == &'*' || c.is_ascii_lowercase() => (),
             _ => return Err("parse_key: first character is not lcalpha or '*'"),
