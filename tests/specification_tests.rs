@@ -74,9 +74,9 @@ fn build_dict(expected_value: &Value) -> Result<Dictionary, Box<dyn Error>> {
         .ok_or("expected value is not object")?;
 
     let mut dict = Dictionary::new();
-    for (key, value) in expected_as_map.iter() {
-        let item_or_inner_list: ListEntry = build_list_or_item(value)?;
-        dict.insert(key.clone(), item_or_inner_list);
+    for (member_name, member_value) in expected_as_map.iter() {
+        let item_or_inner_list: ListEntry = build_list_or_item(member_value)?;
+        dict.insert(member_name.clone(), item_or_inner_list);
     }
     Ok(dict)
 }
