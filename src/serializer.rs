@@ -13,10 +13,39 @@ impl Serializer {
         Ok("1".to_owned())
     }
 
-    fn serialize_list(list: &List, output: &mut String) -> SerializerResult<()> {
+    fn serialize_dictionary(input_dict: &Dictionary, output: &mut String) -> SerializerResult<()> {
+        for (idx, (member_name, member_value)) in input_dict.iter().enumerate() {
+            Self::serialize_key(member_name, output)?;
+
+            match member_value {
+                ListEntry::Item(ref item) => {
+                    if item.0 == BareItem::Boolean(true) {
+                        Self::serialize_parameters(&item.1, output)?;
+                    } else {
+                        output.push('=');
+                        Self::serialize_item(&item, output)?;
+                    }
+                }
+                ListEntry::InnerList(inner_list) => {
+                    output.push('=');
+                    Self::serialize_inner_list(&inner_list, output)?;
+                }
+            }
+
+            // If more items remain in input_dictionary:
+            //      Append “,” to output.
+            //      Append a single SP to output.
+            if idx < input_dict.len() - 1 {
+                output.push_str(", ");
+            }
+        }
+        Ok(())
+    }
+
+    fn serialize_list(input_list: &List, output: &mut String) -> SerializerResult<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-list
 
-        for (idx, member) in list.iter().enumerate() {
+        for (idx, member) in input_list.iter().enumerate() {
             match member {
                 ListEntry::Item(item) => {
                     Self::serialize_item(item, output)?;
@@ -26,21 +55,24 @@ impl Serializer {
                 }
             };
 
-            // If more member_values remain in input_list:
+            // If more items remain in input_list:
             //      Append “,” to output.
             //      Append a single SP to output.
-            if idx < list.len() - 1 {
+            if idx < input_list.len() - 1 {
                 output.push_str(", ");
             }
         }
         Ok(())
     }
 
-    fn serialize_inner_list(inner_list: &InnerList, output: &mut String) -> SerializerResult<()> {
+    fn serialize_inner_list(
+        input_inner_list: &InnerList,
+        output: &mut String,
+    ) -> SerializerResult<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-innerlist
 
-        let items = &inner_list.0;
-        let inner_list_parameters = &inner_list.1;
+        let items = &input_inner_list.0;
+        let inner_list_parameters = &input_inner_list.1;
 
         output.push('(');
         for (idx, item) in items.iter().enumerate() {
@@ -56,16 +88,19 @@ impl Serializer {
         Ok(())
     }
 
-    fn serialize_item(item: &Item, output: &mut String) -> SerializerResult<()> {
+    fn serialize_item(input_item: &Item, output: &mut String) -> SerializerResult<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-item
-        Self::serialize_bare_item(&item.0, output);
-        Self::serialize_parameters(&item.1, output);
+        Self::serialize_bare_item(&input_item.0, output);
+        Self::serialize_parameters(&input_item.1, output);
         Ok(())
     }
 
-    fn serialize_bare_item(bare_item: &BareItem, output: &mut String) -> SerializerResult<()> {
+    fn serialize_bare_item(
+        input_bare_item: &BareItem,
+        output: &mut String,
+    ) -> SerializerResult<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-bare-item
-        Ok(match bare_item {
+        Ok(match input_bare_item {
             BareItem::Boolean(value) => Self::serialize_bool(*value, output)?,
             BareItem::String(value) => Self::serialize_string(value, output)?,
             BareItem::ByteSeq(value) => Self::serialize_byte_sequence(value, output)?,
@@ -75,10 +110,13 @@ impl Serializer {
         })
     }
 
-    fn serialize_parameters(value: &Parameters, output: &mut String) -> SerializerResult<()> {
+    fn serialize_parameters(
+        input_params: &Parameters,
+        output: &mut String,
+    ) -> SerializerResult<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-params
 
-        for (param_name, param_value) in value.iter() {
+        for (param_name, param_value) in input_params.iter() {
             output.push(';');
             &Self::serialize_key(param_name, output)?;
 
@@ -90,22 +128,22 @@ impl Serializer {
         Ok(())
     }
 
-    fn serialize_key(value: &str, output: &mut String) -> SerializerResult<()> {
+    fn serialize_key(input_key: &str, output: &mut String) -> SerializerResult<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-key
 
         let disallowed_chars =
             |c: char| !(c.is_ascii_lowercase() || c.is_ascii_digit() || "_-*.".contains(c));
 
-        if value.chars().any(disallowed_chars) {
+        if input_key.chars().any(disallowed_chars) {
             return Err("serialize_key: disallowed character in input");
         }
 
-        if let Some(char) = value.chars().next() {
+        if let Some(char) = input_key.chars().next() {
             if !(char.is_ascii_lowercase() || char == '*') {
                 return Err("serialize_key: first character is not lcalpha or '*'");
             }
         }
-        output.push_str(value);
+        output.push_str(input_key);
         Ok(())
     }
 
@@ -597,6 +635,44 @@ mod test {
 
         Serializer::serialize_list(&input, &mut buf)?;
         assert_eq!("(1 2), (42 43)", &buf);
+        Ok(())
+    }
+
+    #[test]
+    fn serialize_dictionary_with_params() -> Result<(), Box<dyn Error>> {
+        let mut buf = String::new();
+
+        let item1_params =
+            Parameters::from_iter(vec![("a".to_owned(), 1.into()), ("b".to_owned(), 2.into())]);
+        let item2_params = Parameters::new();
+        let item3_params = Parameters::from_iter(vec![
+            ("q".to_owned(), 9.into()),
+            ("r".to_owned(), BareItem::String("+w".to_owned())),
+        ]);
+
+        let item1 = Item(123.into(), item1_params);
+        let item2 = Item(456.into(), item2_params);
+        let item3 = Item(789.into(), item3_params);
+
+        let input = Dictionary::from_iter(vec![
+            ("abc".to_owned(), item1.into()),
+            ("def".to_owned(), item2.into()),
+            ("ghi".to_owned(), item3.into()),
+        ]);
+
+        Serializer::serialize_dictionary(&input, &mut buf)?;
+        assert_eq!("abc=123;a=1;b=2, def=456, ghi=789;q=9;r=\"+w\"", &buf);
+        Ok(())
+    }
+
+    #[test]
+    fn serialize_dict_empty_value() -> Result<(), Box<dyn Error>> {
+        let mut buf = String::new();
+
+        let inner_list = InnerList(vec![], Parameters::new());
+        let input = Dictionary::from_iter(vec![("a".to_owned(), inner_list.into())]);
+        Serializer::serialize_dictionary(&input, &mut buf)?;
+        assert_eq!("a=()", &buf);
         Ok(())
     }
 }
