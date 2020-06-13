@@ -13,13 +13,58 @@ impl Serializer {
         Ok("1".to_owned())
     }
 
+    fn serialize_list(list: &List, output: &mut String) -> SerializerResult<()> {
+        // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-list
+
+        for (idx, member) in list.iter().enumerate() {
+            match member {
+                ListEntry::Item(item) => {
+                    Self::serialize_item(item, output)?;
+                }
+                ListEntry::InnerList(inner_list) => {
+                    Self::serialize_inner_list(inner_list, output)?;
+                }
+            };
+
+            // If more member_values remain in input_list:
+            //      Append “,” to output.
+            //      Append a single SP to output.
+            if idx < list.len() - 1 {
+                output.push_str(", ");
+            }
+        }
+        Ok(())
+    }
+
+    fn serialize_inner_list(inner_list: &InnerList, output: &mut String) -> SerializerResult<()> {
+        // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-innerlist
+
+        let items = &inner_list.0;
+        let inner_list_parameters = &inner_list.1;
+
+        output.push('(');
+        for (idx, item) in items.iter().enumerate() {
+            Self::serialize_item(item, output)?;
+
+            // If more values remain in inner_list, append a single SP to output
+            if idx < items.len() - 1 {
+                output.push_str(" ");
+            }
+        }
+        output.push(')');
+        Self::serialize_parameters(inner_list_parameters, output);
+        Ok(())
+    }
+
     fn serialize_item(item: &Item, output: &mut String) -> SerializerResult<()> {
+        // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-item
         Self::serialize_bare_item(&item.0, output);
         Self::serialize_parameters(&item.1, output);
         Ok(())
     }
 
     fn serialize_bare_item(bare_item: &BareItem, output: &mut String) -> SerializerResult<()> {
+        // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-bare-item
         Ok(match bare_item {
             BareItem::Boolean(value) => Self::serialize_bool(*value, output)?,
             BareItem::String(value) => Self::serialize_string(value, output)?,
@@ -31,6 +76,8 @@ impl Serializer {
     }
 
     fn serialize_parameters(value: &Parameters, output: &mut String) -> SerializerResult<()> {
+        // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-params
+
         for (param_name, param_value) in value.iter() {
             output.push(';');
             &Self::serialize_key(param_name, output)?;
@@ -44,6 +91,8 @@ impl Serializer {
     }
 
     fn serialize_key(value: &str, output: &mut String) -> SerializerResult<()> {
+        // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-key
+
         let disallowed_chars =
             |c: char| !(c.is_ascii_lowercase() || c.is_ascii_digit() || "_-*.".contains(c));
 
@@ -73,6 +122,7 @@ impl Serializer {
 
     fn serialize_decimal(value: Decimal, output: &mut String) -> SerializerResult<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-decimal
+
         let integer_comp_length = 12;
         let fraction_length = 3;
 
@@ -87,6 +137,8 @@ impl Serializer {
     }
 
     fn serialize_string(value: &str, output: &mut String) -> SerializerResult<()> {
+        // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-integer
+
         if !value.is_ascii() {
             return Err("serialize_string: non-ascii character");
         }
@@ -109,6 +161,8 @@ impl Serializer {
     }
 
     fn serialize_token(value: &str, output: &mut String) -> SerializerResult<()> {
+        // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-token
+
         if !value.is_ascii() {
             return Err("serialize_string: non-ascii character");
         }
@@ -132,6 +186,8 @@ impl Serializer {
     }
 
     fn serialize_byte_sequence(value: &[u8], output: &mut String) -> SerializerResult<()> {
+        // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-binary
+
         output.push(':');
         let encoded = BASE64.encode(value.as_ref());
         output.push_str(&encoded);
@@ -140,6 +196,8 @@ impl Serializer {
     }
 
     fn serialize_bool(value: bool, output: &mut String) -> SerializerResult<()> {
+        // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-boolean
+
         let val = match value {
             true => "?1",
             false => "?0",
@@ -502,6 +560,43 @@ mod test {
             Err("serialize_key: first character is not lcalpha or '*'"),
             Serializer::serialize_key("7key", &mut buf)
         );
+        Ok(())
+    }
+
+    #[test]
+    fn serialize_list_of_items_and_inner_list() -> Result<(), Box<dyn Error>> {
+        let mut buf = String::new();
+
+        let item1 = Item(12.into(), Parameters::new());
+        let item2 = Item(14.into(), Parameters::new());
+        let item3 = Item(BareItem::Token("a".to_owned()), Parameters::new());
+        let item4 = Item(BareItem::Token("b".to_owned()), Parameters::new());
+        let inner_list_param = Parameters::from_iter(vec![(
+            "param".to_owned(),
+            BareItem::String("param_value_1".to_owned()),
+        )]);
+        let inner_list = InnerList(vec![item3, item4], inner_list_param);
+        let input: List = vec![item1.into(), item2.into(), inner_list.into()];
+
+        Serializer::serialize_list(&input, &mut buf)?;
+        assert_eq!("12, 14, (a b);param=\"param_value_1\"", &buf);
+        Ok(())
+    }
+
+    #[test]
+    fn serialize_list_of_lists() -> Result<(), Box<dyn Error>> {
+        let mut buf = String::new();
+
+        let item1 = Item(1.into(), Parameters::new());
+        let item2 = Item(2.into(), Parameters::new());
+        let item3 = Item(42.into(), Parameters::new());
+        let item4 = Item(43.into(), Parameters::new());
+        let inner_list_1 = InnerList(vec![item1, item2], Parameters::new());
+        let inner_list_2 = InnerList(vec![item3, item4], Parameters::new());
+        let input: List = vec![inner_list_1.into(), inner_list_2.into()];
+
+        Serializer::serialize_list(&input, &mut buf)?;
+        assert_eq!("(1 2), (42 43)", &buf);
         Ok(())
     }
 }
