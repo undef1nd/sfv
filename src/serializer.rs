@@ -9,16 +9,25 @@ struct Serializer;
 
 impl Serializer {
     fn serialize(header: &Header) -> SerializerResult<String> {
-        // match and call respective func
-        Ok("1".to_owned())
+        let mut output = String::new();
+        match header {
+            Header::Item(value) => Self::serialize_item(value, &mut output)?,
+            Header::List(value) => Self::serialize_list(value, &mut output)?,
+            Header::Dictionary(value) => Self::serialize_dictionary(value, &mut output)?,
+        };
+        Ok(output)
     }
 
     fn serialize_dictionary(input_dict: &Dictionary, output: &mut String) -> SerializerResult<()> {
+        // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-dictionary
+
         for (idx, (member_name, member_value)) in input_dict.iter().enumerate() {
             Self::serialize_key(member_name, output)?;
 
             match member_value {
                 ListEntry::Item(ref item) => {
+                    // If dict member is boolean true, no need to serialize it: only its params must be serialized
+                    // Otherwise serialize entire item with its params
                     if item.0 == BareItem::Boolean(true) {
                         Self::serialize_parameters(&item.1, output)?;
                     } else {
@@ -90,8 +99,9 @@ impl Serializer {
 
     fn serialize_item(input_item: &Item, output: &mut String) -> SerializerResult<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-item
-        Self::serialize_bare_item(&input_item.0, output);
-        Self::serialize_parameters(&input_item.1, output);
+
+        Self::serialize_bare_item(&input_item.0, output)?;
+        Self::serialize_parameters(&input_item.1, output)?;
         Ok(())
     }
 
@@ -100,6 +110,7 @@ impl Serializer {
         output: &mut String,
     ) -> SerializerResult<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-bare-item
+
         Ok(match input_bare_item {
             BareItem::Boolean(value) => Self::serialize_bool(*value, output)?,
             BareItem::String(value) => Self::serialize_string(value, output)?,
@@ -249,14 +260,92 @@ impl Serializer {
 mod test {
     use super::*;
     use rust_decimal::prelude::FromStr;
+    use serde_json::Deserializer;
     use std::error::Error;
     use std::iter::FromIterator;
 
-    // #[test]
-    // fn serialize() -> Result<(), Box<dyn Error>> {
-    //    assert_eq!(1, 1);
-    //     Ok(())
-    // }
+    #[test]
+    fn serialize_header_empty_dict() -> Result<(), Box<dyn Error>> {
+        let dict_header = Header::Dictionary(Dictionary::new());
+        assert_eq!("", Serializer::serialize(&dict_header)?);
+        Ok(())
+    }
+
+    #[test]
+    fn serialize_header_empty_list() -> Result<(), Box<dyn Error>> {
+        let list_header = Header::List(List::new());
+        assert_eq!("", Serializer::serialize(&list_header)?);
+        Ok(())
+    }
+
+    #[test]
+    fn serialize_header_list_mixed_members_with_params() -> Result<(), Box<dyn Error>> {
+        let item1 = Item(Decimal::from_str("42.4568")?.into(), Parameters::new());
+        let item2_param =
+            Parameters::from_iter(vec![("itm2_p".to_owned(), BareItem::Boolean(true))]);
+        let item2 = Item(17.into(), item2_param);
+
+        let inner_list_item1_param =
+            Parameters::from_iter(vec![("in1_p".to_owned(), BareItem::Boolean(false))]);
+        let inner_list_item1 = Item(BareItem::String("str1".to_owned()), inner_list_item1_param);
+        let inner_list_item2_param = Parameters::from_iter(vec![(
+            "in2_p".to_owned(),
+            BareItem::String("valu\\e".to_owned()),
+        )]);
+        let inner_list_item2 = Item(BareItem::Token("str2".to_owned()), inner_list_item2_param);
+        let inner_list_param = Parameters::from_iter(vec![(
+            "inner_list_param".to_owned(),
+            BareItem::ByteSeq("weather".as_bytes().to_vec()),
+        )]);
+        let inner_list = InnerList(vec![inner_list_item1, inner_list_item2], inner_list_param);
+
+        let list: List = vec![item1.into(), item2.into(), inner_list.into()];
+        let list_header = Header::List(list);
+        let expected = "42.457, 17;itm2_p, (\"str1\";in1_p=?0 str2;in2_p=\"valu\\\\e\");inner_list_param=:d2VhdGhlcg==:";
+        assert_eq!(expected, Serializer::serialize(&list_header)?);
+        Ok(())
+    }
+
+    #[test]
+    fn serialize_header_errors() -> Result<(), Box<dyn Error>> {
+        let disallowed_item = Item(
+            BareItem::String("non-ascii text 🐹".into()),
+            Parameters::new(),
+        );
+        assert_eq!(
+            Err("serialize_string: non-ascii character"),
+            Serializer::serialize(&Header::Item(disallowed_item))
+        );
+
+        let disallowed_item = Item(
+            Decimal::from_str("12345678912345.123")?.into(),
+            Parameters::new(),
+        );
+        assert_eq!(
+            Err("serialize_decimal: integer component > 12 digits"),
+            Serializer::serialize(&Header::Item(disallowed_item))
+        );
+
+        let param_with_disallowed_key = Parameters::from_iter(vec![("_key".to_owned(), 13.into())]);
+        let disallowed_item = Item(12.into(), param_with_disallowed_key);
+        assert_eq!(
+            Err("serialize_key: first character is not lcalpha or '*'"),
+            Serializer::serialize(&Header::Item(disallowed_item))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn serialize_item_byteseq_with_param() -> Result<(), Box<dyn Error>> {
+        let mut buf = String::new();
+
+        let item_param = ("a".to_owned(), BareItem::Token("*ab_1".into()));
+        let item_param = Parameters::from_iter(vec![item_param]);
+        let item = Item(BareItem::ByteSeq("parser".as_bytes().to_vec()), item_param);
+        Serializer::serialize_item(&item, &mut buf)?;
+        assert_eq!(":cGFyc2Vy:;a=*ab_1", &buf);
+        Ok(())
+    }
 
     #[test]
     fn serialize_item_without_params() -> Result<(), Box<dyn Error>> {
@@ -639,14 +728,33 @@ mod test {
     }
 
     #[test]
+    fn serialize_list_with_bool_item_and_bool_params() -> Result<(), Box<dyn Error>> {
+        let mut buf = String::new();
+
+        let item1_params = Parameters::from_iter(vec![
+            ("a".to_owned(), BareItem::Boolean(true)),
+            ("b".to_owned(), BareItem::Boolean(false)),
+        ]);
+        let item1 = Item(BareItem::Boolean(false), item1_params);
+        let item2 = Item(BareItem::Token("cde_456".to_owned()), Parameters::new());
+
+        let input: List = vec![item1.into(), item2.into()];
+        Serializer::serialize_list(&input, &mut buf)?;
+        assert_eq!("?0;a;b=?0, cde_456", &buf);
+        Ok(())
+    }
+
+    #[test]
     fn serialize_dictionary_with_params() -> Result<(), Box<dyn Error>> {
         let mut buf = String::new();
 
-        let item1_params =
-            Parameters::from_iter(vec![("a".to_owned(), 1.into()), ("b".to_owned(), 2.into())]);
+        let item1_params = Parameters::from_iter(vec![
+            ("a".to_owned(), 1.into()),
+            ("b".to_owned(), BareItem::Boolean(true)),
+        ]);
         let item2_params = Parameters::new();
         let item3_params = Parameters::from_iter(vec![
-            ("q".to_owned(), 9.into()),
+            ("q".to_owned(), BareItem::Boolean(false)),
             ("r".to_owned(), BareItem::String("+w".to_owned())),
         ]);
 
@@ -661,12 +769,12 @@ mod test {
         ]);
 
         Serializer::serialize_dictionary(&input, &mut buf)?;
-        assert_eq!("abc=123;a=1;b=2, def=456, ghi=789;q=9;r=\"+w\"", &buf);
+        assert_eq!("abc=123;a=1;b, def=456, ghi=789;q=?0;r=\"+w\"", &buf);
         Ok(())
     }
 
     #[test]
-    fn serialize_dict_empty_value() -> Result<(), Box<dyn Error>> {
+    fn serialize_dict_empty_member_value() -> Result<(), Box<dyn Error>> {
         let mut buf = String::new();
 
         let inner_list = InnerList(vec![], Parameters::new());
