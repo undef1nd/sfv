@@ -9,16 +9,25 @@ struct Serializer;
 
 impl Serializer {
     fn serialize(header: &Header) -> SerializerResult<String> {
-        // match and call respective func
-        Ok("1".to_owned())
+        let mut output = String::new();
+        match header {
+            Header::Item(value) => Self::serialize_item(value, &mut output)?,
+            Header::List(value) => Self::serialize_list(value, &mut output)?,
+            Header::Dictionary(value) => Self::serialize_dictionary(value, &mut output)?,
+        };
+        Ok(output)
     }
 
     fn serialize_dictionary(input_dict: &Dictionary, output: &mut String) -> SerializerResult<()> {
+        // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-dictionary
+
         for (idx, (member_name, member_value)) in input_dict.iter().enumerate() {
             Self::serialize_key(member_name, output)?;
 
             match member_value {
                 ListEntry::Item(ref item) => {
+                    // If dict member is boolean true, no need to serialize it: only its params must be serialized
+                    // Otherwise serialize entire item with its params
                     if item.0 == BareItem::Boolean(true) {
                         Self::serialize_parameters(&item.1, output)?;
                     } else {
@@ -90,6 +99,7 @@ impl Serializer {
 
     fn serialize_item(input_item: &Item, output: &mut String) -> SerializerResult<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-item
+
         Self::serialize_bare_item(&input_item.0, output);
         Self::serialize_parameters(&input_item.1, output);
         Ok(())
@@ -100,6 +110,7 @@ impl Serializer {
         output: &mut String,
     ) -> SerializerResult<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-bare-item
+
         Ok(match input_bare_item {
             BareItem::Boolean(value) => Self::serialize_bool(*value, output)?,
             BareItem::String(value) => Self::serialize_string(value, output)?,
