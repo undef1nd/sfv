@@ -6,6 +6,7 @@ use std::error::Error;
 use std::path::PathBuf;
 use std::{env, fs};
 use structured_headers::parser::*;
+use structured_headers::serializer::Serializer;
 
 #[derive(Debug, PartialEq, Deserialize)]
 struct TestData {
@@ -52,7 +53,25 @@ fn execute_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
         _ => return Err("unknown header_type value".into()),
     };
 
-    assert_eq!(expected_header, actual_result?);
+    // Test parsing
+    let actual_header = actual_result?;
+    match (&actual_header, &expected_header) {
+        (Header::Dictionary(val1), Header::Dictionary(val2)) => {
+            assert!(val1.iter().eq(val2.iter()));
+        }
+        (Header::List(val1), Header::List(val2)) => {
+            assert!(val1.iter().eq(val2.iter()));
+        }
+        (_, _) => {
+            assert_eq!(expected_header, actual_header);
+        }
+    }
+
+    // Test serialization
+    if let Some(canonical_val) = &test_case.canonical {
+        let expected_serialized = canonical_val.join("");
+        assert_eq!(expected_serialized, Serializer::serialize(&actual_header)?)
+    }
     Ok(())
 }
 

@@ -1,14 +1,15 @@
 use crate::parser::*;
 use crate::utils;
 use data_encoding::BASE64;
+use rust_decimal::prelude::Zero;
 use rust_decimal::Decimal;
 
 type SerializerResult<T> = Result<T, &'static str>;
 
-struct Serializer;
+pub struct Serializer;
 
 impl Serializer {
-    fn serialize(header: &Header) -> SerializerResult<String> {
+    pub fn serialize(header: &Header) -> SerializerResult<String> {
         let mut output = String::new();
         match header {
             Header::Item(value) => Self::serialize_item(value, &mut output)?,
@@ -176,12 +177,21 @@ impl Serializer {
         let fraction_length = 3;
 
         let decimal = value.round_dp(fraction_length);
-        let int_comp = decimal.trunc().abs();
+        let int_comp = decimal.trunc();
+        let fract_comp = decimal.fract();
 
-        if int_comp.to_string().len() > integer_comp_length {
+        if int_comp.abs().to_string().len() > integer_comp_length {
             return Err("serialize_decimal: integer component > 12 digits");
         }
-        output.push_str(&decimal.to_string());
+
+        if fract_comp.is_zero() {
+            output.push_str(&int_comp.to_string());
+            output.push('.');
+            output.push('0');
+        } else {
+            output.push_str(&decimal.to_string());
+        }
+
         Ok(())
     }
 
@@ -417,6 +427,10 @@ mod test {
         let mut buf = String::new();
         Serializer::serialize_decimal(Decimal::from_str("-99.1346897")?, &mut buf);
         assert_eq!("-99.135", &buf);
+
+        buf.clear();
+        Serializer::serialize_decimal(Decimal::from_str("-1.00")?, &mut buf);
+        assert_eq!("-1.0", &buf);
 
         buf.clear();
         Serializer::serialize_decimal(
