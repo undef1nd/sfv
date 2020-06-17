@@ -62,18 +62,17 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v1
-
+        with:
+          submodules: 'true'
       - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           override: true
-
       - name: Run cargo-tarpaulin
         uses: actions-rs/tarpaulin@v0.1
         with:
           args: '--ignore-tests'
-
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v1
         with:
