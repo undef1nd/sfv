@@ -6,11 +6,12 @@ use std::error::Error;
 use std::path::PathBuf;
 use std::{env, fs};
 use structured_headers::parser::*;
+use structured_headers::serializer::Serializer;
 
 #[derive(Debug, PartialEq, Deserialize)]
 struct TestData {
     name: String,
-    raw: Vec<String>,
+    raw: Option<Vec<String>>,
     header_type: String,
     expected: Option<Value>,
     can_fail: Option<bool>,
@@ -18,10 +19,14 @@ struct TestData {
     canonical: Option<Vec<String>>,
 }
 
-fn execute_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
+fn run_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
     println!("- {}", &test_case.name);
 
-    let input = test_case.raw.join(", ");
+    let input = test_case
+        .raw
+        .as_ref()
+        .ok_or("raw value is not specified")?
+        .join(", ");
     let actual_result = Parser::parse(input.as_bytes(), &test_case.header_type);
 
     // Check that actual result for must_fail tests is Err
@@ -30,30 +35,70 @@ fn execute_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
+    let expected_header = build_expected_header(test_case)?;
+    let actual_header = actual_result?;
+
+    // Test parsing
+    match (&actual_header, &expected_header) {
+        (Header::Dictionary(val1), Header::Dictionary(val2)) => {
+            assert!(val1.iter().eq(val2.iter()));
+        }
+        (Header::List(val1), Header::List(val2)) => {
+            assert!(val1.iter().eq(val2.iter()));
+        }
+        (_, _) => {
+            assert_eq!(expected_header, actual_header);
+        }
+    }
+
+    // Test serialization
+    if let Some(canonical_val) = &test_case.canonical {
+        let expected_serialized = canonical_val.join("");
+        assert_eq!(expected_serialized, Serializer::serialize(&actual_header)?)
+    }
+    Ok(())
+}
+
+fn run_test_case_serialzation_only(test_case: &TestData) -> Result<(), Box<dyn Error>> {
+    let expected_header = build_expected_header(test_case)?;
+    let actual_result = Serializer::serialize(&expected_header);
+
+    if let Some(true) = test_case.must_fail {
+        assert!(actual_result.is_err());
+        return Ok(());
+    }
+
+    // Test serialization
+    if let Some(canonical_val) = &test_case.canonical {
+        let expected_serialized = canonical_val.join("");
+        assert_eq!(expected_serialized, actual_result?);
+    }
+
+    Ok(())
+}
+
+fn build_expected_header(test_case: &TestData) -> Result<Header, Box<dyn Error>> {
     let expected_value = test_case
         .expected
         .as_ref()
         .ok_or("test expected value is not specified")?;
 
     // Build expected Header from serde Value
-    let expected_header = match test_case.header_type.as_str() {
+    match test_case.header_type.as_str() {
         "item" => {
             let item = build_item(expected_value)?;
-            Header::Item(item)
+            Ok(Header::Item(item))
         }
         "list" => {
             let list = build_list(expected_value)?;
-            Header::List(list)
+            Ok(Header::List(list))
         }
         "dictionary" => {
             let dict = build_dict(expected_value)?;
-            Header::Dictionary(dict)
+            Ok(Header::Dictionary(dict))
         }
         _ => return Err("unknown header_type value".into()),
-    };
-
-    assert_eq!(expected_header, actual_result?);
-    Ok(())
+    }
 }
 
 fn build_list_or_item(member: &Value) -> Result<ListEntry, Box<dyn Error>> {
@@ -188,23 +233,48 @@ fn build_parameters(params_value: &Value) -> Result<Parameters, Box<dyn Error>> 
     Ok(parameters)
 }
 
-fn run_test_suite(tests_file: PathBuf) -> Result<(), Box<dyn Error>> {
+fn run_test_suite(tests_file: PathBuf, is_serialization: bool) -> Result<(), Box<dyn Error>> {
     let test_cases: Vec<TestData> = serde_json::from_reader(fs::File::open(tests_file)?)?;
     for test_data in test_cases.iter() {
-        execute_test_case(test_data)?;
+        if is_serialization {
+            run_test_case_serialzation_only(test_data)?;
+        } else {
+            run_test_case(test_data)?;
+        }
     }
     Ok(())
 }
 
 #[test]
-fn run_specification_tests() -> Result<(), Box<dyn Error>> {
+fn run_spec_parse_serialize_tests() -> Result<(), Box<dyn Error>> {
     let test_suites_dir: PathBuf = env::current_dir()?.join("tests").join("spec_tests");
     let json_files = fs::read_dir(test_suites_dir)?
         .filter_map(Result::ok)
         .filter(|fp| fp.path().extension().unwrap_or_default() == "json");
+
     for file_path in json_files {
         println!("\n## Test suite file: {:?}\n", &file_path.file_name());
-        run_test_suite(file_path.path())?
+        run_test_suite(file_path.path(), false)?
+    }
+    Ok(())
+}
+
+#[test]
+fn run_spec_serialize_only_tests() -> Result<(), Box<dyn Error>> {
+    let test_suites_dir: PathBuf = env::current_dir()?
+        .join("tests")
+        .join("spec_tests")
+        .join("serialisation-tests");
+    let json_files = fs::read_dir(test_suites_dir)?
+        .filter_map(Result::ok)
+        .filter(|fp| fp.path().extension().unwrap_or_default() == "json");
+
+    for file_path in json_files {
+        println!(
+            "\n## Serialization test suite file: {:?}\n",
+            &file_path.file_name()
+        );
+        run_test_suite(file_path.path(), true)?
     }
     Ok(())
 }

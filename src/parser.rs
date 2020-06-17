@@ -322,10 +322,7 @@ impl Parser {
         }
 
         let b64_content = input_chars.take_while(|c| c != &':').collect::<String>();
-        if !b64_content
-            .chars()
-            .all(|c| utils::is_allowed_b64_content(c))
-        {
+        if !b64_content.chars().all(utils::is_allowed_b64_content) {
             return Err("parse_byte_seq: invalid char in byte sequence");
         }
         match utils::base64()?.decode(b64_content.as_bytes()) {
@@ -401,7 +398,7 @@ impl Parser {
             .find('.')
             .map(|dot_pos| input_number.len() - dot_pos - 1);
         match chars_after_dot {
-            Some(0) => return Err("parse_number: decimal ends with '.'"),
+            Some(0) => Err("parse_number: decimal ends with '.'"),
             Some(1..=3) => {
                 let mut output_number = Decimal::from_str(&input_number)
                     .map_err(|_err| "parse_number: parsing f64 failed")?;

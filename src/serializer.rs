@@ -1,14 +1,15 @@
 use crate::parser::*;
 use crate::utils;
 use data_encoding::BASE64;
+use rust_decimal::prelude::Zero;
 use rust_decimal::Decimal;
 
 type SerializerResult<T> = Result<T, &'static str>;
 
-struct Serializer;
+pub struct Serializer;
 
 impl Serializer {
-    fn serialize(header: &Header) -> SerializerResult<String> {
+    pub fn serialize(header: &Header) -> SerializerResult<String> {
         let mut output = String::new();
         match header {
             Header::Item(value) => Self::serialize_item(value, &mut output)?,
@@ -93,7 +94,7 @@ impl Serializer {
             }
         }
         output.push(')');
-        Self::serialize_parameters(inner_list_parameters, output);
+        Self::serialize_parameters(inner_list_parameters, output)?;
         Ok(())
     }
 
@@ -111,14 +112,15 @@ impl Serializer {
     ) -> SerializerResult<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-bare-item
 
-        Ok(match input_bare_item {
+        match input_bare_item {
             BareItem::Boolean(value) => Self::serialize_bool(*value, output)?,
             BareItem::String(value) => Self::serialize_string(value, output)?,
             BareItem::ByteSeq(value) => Self::serialize_byte_sequence(value, output)?,
             BareItem::Token(value) => Self::serialize_token(value, output)?,
             BareItem::Number(Num::Integer(value)) => Self::serialize_integer(*value, output)?,
             BareItem::Number(Num::Decimal(value)) => Self::serialize_decimal(*value, output)?,
-        })
+        };
+        Ok(())
     }
 
     fn serialize_parameters(
@@ -129,11 +131,11 @@ impl Serializer {
 
         for (param_name, param_value) in input_params.iter() {
             output.push(';');
-            &Self::serialize_key(param_name, output)?;
+            Self::serialize_key(param_name, output)?;
 
             if param_value != &BareItem::Boolean(true) {
                 output.push('=');
-                &Self::serialize_bare_item(param_value, output)?;
+                Self::serialize_bare_item(param_value, output)?;
             }
         }
         Ok(())
@@ -176,12 +178,21 @@ impl Serializer {
         let fraction_length = 3;
 
         let decimal = value.round_dp(fraction_length);
-        let int_comp = decimal.trunc().abs();
+        let int_comp = decimal.trunc();
+        let fract_comp = decimal.fract();
 
-        if int_comp.to_string().len() > integer_comp_length {
+        if int_comp.abs().to_string().len() > integer_comp_length {
             return Err("serialize_decimal: integer component > 12 digits");
         }
-        output.push_str(&decimal.to_string());
+
+        if fract_comp.is_zero() {
+            output.push_str(&int_comp.to_string());
+            output.push('.');
+            output.push('0');
+        } else {
+            output.push_str(&decimal.to_string());
+        }
+
         Ok(())
     }
 
@@ -230,7 +241,7 @@ impl Serializer {
             return Err("serialise_token: disallowed character");
         }
 
-        output.push_str(value.into());
+        output.push_str(value);
         Ok(())
     }
 
@@ -247,10 +258,7 @@ impl Serializer {
     fn serialize_bool(value: bool, output: &mut String) -> SerializerResult<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-boolean
 
-        let val = match value {
-            true => "?1",
-            false => "?0",
-        };
+        let val = if value { "?1" } else { "?0" };
         output.push_str(val);
         Ok(())
     }
@@ -397,6 +405,7 @@ mod test {
         Ok(())
     }
 
+    #[test]
     fn serialize_integer_errors() -> Result<(), Box<dyn Error>> {
         let mut buf = String::new();
         assert_eq!(
@@ -415,8 +424,12 @@ mod test {
     #[test]
     fn serialize_decimal() -> Result<(), Box<dyn Error>> {
         let mut buf = String::new();
-        Serializer::serialize_decimal(Decimal::from_str("-99.1346897")?, &mut buf);
+        Serializer::serialize_decimal(Decimal::from_str("-99.1346897")?, &mut buf)?;
         assert_eq!("-99.135", &buf);
+
+        buf.clear();
+        Serializer::serialize_decimal(Decimal::from_str("-1.00")?, &mut buf)?;
+        assert_eq!("-1.0", &buf);
 
         buf.clear();
         Serializer::serialize_decimal(
