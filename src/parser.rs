@@ -69,10 +69,33 @@ pub enum Header {
     Item(Item),
 }
 
+
 pub struct Parser;
 
 impl Parser {
-    pub fn parse(input_bytes: &[u8], header_type: &str) -> ParserResult<Header> {
+
+    pub fn parse_dict_header(input_bytes: &[u8]) -> ParserResult<Dictionary> {
+        if Header::Dictionary(dict) = Self::parse(input_bytes, "dictionary")? {
+            Ok(dict)
+        }
+        else { Err("not a dictionary header") }
+    }
+
+    pub fn parse_list_header(input_bytes: &[u8]) -> ParserResult<Dictionary> {
+        if Header::List(dict) = Self::parse(input_bytes, "dictionary")? {
+            Ok(dict)
+        }
+        else { Err("not a list header") }
+    }
+
+    pub fn parse_item_header(input_bytes: &[u8]) -> ParserResult<Dictionary> {
+        if Header::Item(dict) = Self::parse(input_bytes, "dictionary")? {
+            Ok(dict)
+        }
+        else { Err("not an item header") }
+    }
+
+    fn parse(input_bytes: &[u8], header_type: &str) -> ParserResult<Header> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#text-parse
         if !input_bytes.is_ascii() {
             return Err("parse: non-ascii characters in input");
