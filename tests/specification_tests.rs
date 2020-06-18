@@ -31,7 +31,6 @@ fn run_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
     let actual_header = match test_case.header_type.as_str() {
         "dictionary" => {
             let res = Parser::parse_dict_header(input.as_bytes());
-            println!("{:?}, {:?}", test_case.must_fail, res.is_err());
             if let Some(true) = test_case.must_fail {
                 assert!(res.is_err());
                 return Ok(());

@@ -268,7 +268,6 @@ impl Serializer {
 mod test {
     use super::*;
     use rust_decimal::prelude::FromStr;
-    use serde_json::Deserializer;
     use std::error::Error;
     use std::iter::FromIterator;
 

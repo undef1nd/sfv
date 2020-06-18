@@ -70,16 +70,16 @@ pub enum Header {
 }
 
 pub enum HType {
-    L,
-    D,
-    I,
+    List,
+    Dictionary,
+    Item,
 }
 
 pub struct Parser;
 
 impl Parser {
     pub fn parse_dict_header(input_bytes: &[u8]) -> ParserResult<Dictionary> {
-        if let Header::Dictionary(dict) = Self::parse(input_bytes, HType::D)? {
+        if let Header::Dictionary(dict) = Self::parse(input_bytes, HType::Dictionary)? {
             Ok(dict)
         } else {
             Err("not a dictionary header")
@@ -87,16 +87,16 @@ impl Parser {
     }
 
     pub fn parse_list_header(input_bytes: &[u8]) -> ParserResult<List> {
-        if let Header::List(dict) = Self::parse(input_bytes, HType::L)? {
-            Ok(dict)
+        if let Header::List(list) = Self::parse(input_bytes, HType::List)? {
+            Ok(list)
         } else {
             Err("not a list header")
         }
     }
 
     pub fn parse_item_header(input_bytes: &[u8]) -> ParserResult<Item> {
-        if let Header::Item(dict) = Self::parse(input_bytes, HType::I)? {
-            Ok(dict)
+        if let Header::Item(item) = Self::parse(input_bytes, HType::Item)? {
+            Ok(item)
         } else {
             Err("not an item header")
         }
@@ -115,9 +115,9 @@ impl Parser {
         utils::consume_sp_chars(&mut input_chars);
 
         let output = match header_type {
-            HType::L => Header::List(Self::parse_list(&mut input_chars)?),
-            HType::D => Header::Dictionary(Self::parse_dict(&mut input_chars)?),
-            HType::I => Header::Item(Self::parse_item(&mut input_chars)?),
+            HType::List => Header::List(Self::parse_list(&mut input_chars)?),
+            HType::Dictionary => Header::Dictionary(Self::parse_dict(&mut input_chars)?),
+            HType::Item => Header::Item(Self::parse_item(&mut input_chars)?),
         };
 
         utils::consume_sp_chars(&mut input_chars);
@@ -512,13 +512,13 @@ mod tests {
         let input = "\"some_value\"".as_bytes();
         let parsed_item = Item(BareItem::String("some_value".to_owned()), Parameters::new());
         let expected = Header::Item(parsed_item);
-        assert_eq!(expected, Parser::parse(input, HType::I)?);
+        assert_eq!(expected, Parser::parse(input, HType::Item)?);
 
         let input = "12.35;a ".as_bytes();
         let param = Parameters::from_iter(vec![("a".to_owned(), BareItem::Boolean(true))]);
         let expected = Header::Item(Item(Decimal::from_str("12.35")?.into(), param));
 
-        assert_eq!(expected, Parser::parse(input, HType::I)?);
+        assert_eq!(expected, Parser::parse(input, HType::Item)?);
         Ok(())
     }
 
@@ -527,12 +527,12 @@ mod tests {
         let input = "\"some_value¢\"".as_bytes();
         assert_eq!(
             Err("parse: non-ascii characters in input"),
-            Parser::parse(input, HType::I)
+            Parser::parse(input, HType::Item)
         );
         let input = "\"some_value\" trailing_text".as_bytes();
         assert_eq!(
             Err("parse: trailing characters after parsed value"),
-            Parser::parse(input, HType::I)
+            Parser::parse(input, HType::Item)
         );
         // assert_eq!(
         //     Err("parse: unrecognized header type"),
@@ -540,7 +540,7 @@ mod tests {
         // );
         assert_eq!(
             Err("parse_bare_item: empty item"),
-            Parser::parse("".as_bytes(), HType::I)
+            Parser::parse("".as_bytes(), HType::Item)
         );
         Ok(())
     }
