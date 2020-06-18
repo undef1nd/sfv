@@ -62,87 +62,74 @@ impl From<Decimal> for BareItem {
     }
 }
 
-#[derive(Debug, PartialEq)]
-pub enum Header {
-    List(List),
-    Dictionary(Dictionary),
-    Item(Item),
+trait ParseHeader {
+    type Header;
+    fn parse(input_chars: &mut Peekable<Chars>) -> ParserResult<Self::Header>;
 }
 
-pub enum HType {
-    List,
-    Dictionary,
-    Item,
+impl ParseHeader for Item {
+    type Header = Item;
+
+    fn parse(input_chars: &mut Peekable<Chars>) -> ParserResult<Item> {
+        // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-item
+        let bare_item = Parser::parse_bare_item(input_chars)?;
+        let parameters = Parser::parse_parameters(input_chars)?;
+
+        Ok(Item(bare_item, parameters))
+    }
 }
 
-pub struct Parser;
+impl ParseHeader for List {
+    type Header = List;
 
-impl Parser {
-    pub fn parse_dict_header(input_bytes: &[u8]) -> ParserResult<Dictionary> {
-        if let Header::Dictionary(dict) = Self::parse(input_bytes, HType::Dictionary)? {
-            Ok(dict)
-        } else {
-            Err("not a dictionary header")
-        }
-    }
+    fn parse(input_chars: &mut Peekable<Chars>) -> ParserResult<List> {
+        // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-list
+        // List represents an array of (item_or_inner_list, parameters)
 
-    pub fn parse_list_header(input_bytes: &[u8]) -> ParserResult<List> {
-        if let Header::List(list) = Self::parse(input_bytes, HType::List)? {
-            Ok(list)
-        } else {
-            Err("not a list header")
-        }
-    }
+        let mut members = vec![];
 
-    pub fn parse_item_header(input_bytes: &[u8]) -> ParserResult<Item> {
-        if let Header::Item(item) = Self::parse(input_bytes, HType::Item)? {
-            Ok(item)
-        } else {
-            Err("not an item header")
-        }
-    }
+        while input_chars.peek().is_some() {
+            members.push(Parser::parse_list_entry(input_chars)?);
 
-    fn parse(input_bytes: &[u8], header_type: HType) -> ParserResult<Header> {
-        // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#text-parse
-        if !input_bytes.is_ascii() {
-            return Err("parse: non-ascii characters in input");
+            utils::consume_ows_chars(input_chars);
+
+            if input_chars.peek().is_none() {
+                return Ok(members);
+            }
+
+            if let Some(c) = input_chars.next() {
+                if c != ',' {
+                    return Err("parse_list: trailing characters after list member");
+                }
+            }
+
+            utils::consume_ows_chars(input_chars);
+
+            if input_chars.peek().is_none() {
+                return Err("parse_list: trailing comma");
+            }
         }
 
-        let mut input_chars = from_utf8(input_bytes)
-            .map_err(|_| "parse: conversion from bytes to str failed")?
-            .chars()
-            .peekable();
-        utils::consume_sp_chars(&mut input_chars);
-
-        let output = match header_type {
-            HType::List => Header::List(Self::parse_list(&mut input_chars)?),
-            HType::Dictionary => Header::Dictionary(Self::parse_dict(&mut input_chars)?),
-            HType::Item => Header::Item(Self::parse_item(&mut input_chars)?),
-        };
-
-        utils::consume_sp_chars(&mut input_chars);
-
-        if input_chars.next().is_some() {
-            return Err("parse: trailing characters after parsed value");
-        };
-        Ok(output)
+        Ok(members)
     }
+}
 
-    fn parse_dict(input_chars: &mut Peekable<Chars>) -> ParserResult<Dictionary> {
-        // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-dictionary
+impl ParseHeader for Dictionary {
+    type Header = Dictionary;
 
+    fn parse(input_chars: &mut Peekable<Chars>) -> ParserResult<Dictionary> {
         let mut dict = Dictionary::new();
 
         while input_chars.peek().is_some() {
-            let this_key = Self::parse_key(input_chars)?;
+            let this_key = Parser::parse_key(input_chars)?;
 
             if let Some('=') = input_chars.peek() {
                 input_chars.next();
-                let member = Self::parse_list_entry(input_chars)?;
+                let member = Parser::parse_list_entry(input_chars)?;
                 dict.insert(this_key, member);
             } else {
                 let value = true;
-                let params = Self::parse_parameters(input_chars)?;
+                let params = Parser::parse_parameters(input_chars)?;
                 let member = Item(BareItem::Boolean(value), params);
                 dict.insert(this_key, member.into());
             }
@@ -167,36 +154,43 @@ impl Parser {
         }
         Ok(dict)
     }
+}
 
-    fn parse_list(input_chars: &mut Peekable<Chars>) -> ParserResult<List> {
-        // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-list
-        // List represents an array of (item_or_inner_list, parameters)
+pub struct Parser;
 
-        let mut members = vec![];
+impl Parser {
+    pub fn parse_dict_header(input_bytes: &[u8]) -> ParserResult<Dictionary> {
+        Self::parse::<Dictionary>(input_bytes)
+    }
 
-        while input_chars.peek().is_some() {
-            members.push(Self::parse_list_entry(input_chars)?);
+    pub fn parse_list_header(input_bytes: &[u8]) -> ParserResult<List> {
+        Self::parse::<List>(input_bytes)
+    }
 
-            utils::consume_ows_chars(input_chars);
+    pub fn parse_item_header(input_bytes: &[u8]) -> ParserResult<Item> {
+        Self::parse::<Item>(input_bytes)
+    }
 
-            if input_chars.peek().is_none() {
-                return Ok(members);
-            }
-
-            if let Some(c) = input_chars.next() {
-                if c != ',' {
-                    return Err("parse_list: trailing characters after list member");
-                }
-            }
-
-            utils::consume_ows_chars(input_chars);
-
-            if input_chars.peek().is_none() {
-                return Err("parse_list: trailing comma");
-            }
+    fn parse<T: ParseHeader>(input_bytes: &[u8]) -> ParserResult<T::Header> {
+        // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#text-parse
+        if !input_bytes.is_ascii() {
+            return Err("parse: non-ascii characters in input");
         }
 
-        Ok(members)
+        let mut input_chars = from_utf8(input_bytes)
+            .map_err(|_| "parse: conversion from bytes to str failed")?
+            .chars()
+            .peekable();
+        utils::consume_sp_chars(&mut input_chars);
+
+        let output = T::parse(&mut input_chars)?;
+
+        utils::consume_sp_chars(&mut input_chars);
+
+        if input_chars.next().is_some() {
+            return Err("parse: trailing characters after parsed value");
+        };
+        Ok(output)
     }
 
     fn parse_list_entry(input_chars: &mut Peekable<Chars>) -> ParserResult<ListEntry> {
@@ -209,7 +203,7 @@ impl Parser {
                 Ok(ListEntry::InnerList(parsed))
             }
             _ => {
-                let parsed = Self::parse_item(input_chars)?;
+                let parsed = Item::parse(input_chars)?;
                 Ok(ListEntry::Item(parsed))
             }
         }
@@ -232,7 +226,7 @@ impl Parser {
                 return Ok(InnerList(inner_list, params));
             }
 
-            let parsed_item = Self::parse_item(input_chars)?;
+            let parsed_item = Item::parse(input_chars)?;
             inner_list.push(parsed_item);
 
             if let Some(c) = input_chars.peek() {
@@ -243,14 +237,6 @@ impl Parser {
         }
 
         Err("parse_inner_list: the end of the inner list was not found")
-    }
-
-    fn parse_item(input_chars: &mut Peekable<Chars>) -> ParserResult<Item> {
-        // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-item
-        let bare_item = Self::parse_bare_item(input_chars)?;
-        let parameters = Self::parse_parameters(input_chars)?;
-
-        Ok(Item(bare_item, parameters))
     }
 
     fn parse_bare_item(mut input_chars: &mut Peekable<Chars>) -> ParserResult<BareItem> {
