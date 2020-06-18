@@ -19,105 +19,176 @@ struct TestData {
     canonical: Option<Vec<String>>,
 }
 
-fn run_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
-    println!("- {}", &test_case.name);
+impl TestData {
+    fn run_test_case(&self) -> Result<(), Box<dyn Error>> {
+        println!("- {}", &self.name);
 
-    let input = test_case
-        .raw
-        .as_ref()
-        .ok_or("raw value is not specified")?
-        .join(", ");
-
-    let actual_header = match test_case.header_type.as_str() {
-        "dictionary" => {
-            let res = Parser::parse_dict_header(input.as_bytes());
-            if let Some(true) = test_case.must_fail {
-                assert!(res.is_err());
-                return Ok(());
-            };
-            Header::Dictionary(res?)
-        }
-        "list" => {
-            let res = Parser::parse_list_header(input.as_bytes());
-            if let Some(true) = test_case.must_fail {
-                assert!(res.is_err());
-                return Ok(());
-            };
-            Header::List(res?)
-        }
-        "item" => {
-            let res = Parser::parse_item_header(input.as_bytes());
-            if let Some(true) = test_case.must_fail {
-                assert!(res.is_err());
-                return Ok(());
-            };
-            Header::Item(res?)
-        }
-        _ => return Err("unexpected header type".into()),
-    };
-
-    let expected_header = build_expected_header(test_case)?;
-
-    // Test parsing
-    match (&actual_header, &expected_header) {
-        (Header::Dictionary(val1), Header::Dictionary(val2)) => {
-            assert!(val1.iter().eq(val2.iter()));
-        }
-        (Header::List(val1), Header::List(val2)) => {
-            assert!(val1.iter().eq(val2.iter()));
-        }
-        (_, _) => {
-            assert_eq!(expected_header, actual_header);
+        match self.header_type.as_str() {
+            "dictionary" => self.dict(),
+            "list" => self.list(),
+            "item" => self.item(),
+            _ => return Err("unexpected header type".into()),
         }
     }
 
-    // Test serialization
-    if let Some(canonical_val) = &test_case.canonical {
-        let expected_serialized = canonical_val.join("");
-        assert_eq!(expected_serialized, Serializer::serialize(&actual_header)?)
-    }
-    Ok(())
-}
+    fn run_test_case_serialzation_only(&self) -> Result<(), Box<dyn Error>> {
+        match self.header_type.as_str() {
+            "dictionary" => {
+                let expected_value = self
+                    .expected
+                    .as_ref()
+                    .ok_or("test expected value is not specified")?;
+                let expected_header = build_dict(expected_value)?;
+                let actual_result = Serializer::serialize(&expected_header);
 
-fn run_test_case_serialzation_only(test_case: &TestData) -> Result<(), Box<dyn Error>> {
-    let expected_header = build_expected_header(test_case)?;
-    let actual_result = Serializer::serialize(&expected_header);
+                if let Some(true) = self.must_fail {
+                    assert!(actual_result.is_err());
+                    return Ok(());
+                }
 
-    if let Some(true) = test_case.must_fail {
-        assert!(actual_result.is_err());
-        return Ok(());
-    }
+                // Test serialization
+                if let Some(canonical_val) = &self.canonical {
+                    let expected_serialized = canonical_val.join("");
+                    assert_eq!(expected_serialized, actual_result?);
+                }
 
-    // Test serialization
-    if let Some(canonical_val) = &test_case.canonical {
-        let expected_serialized = canonical_val.join("");
-        assert_eq!(expected_serialized, actual_result?);
-    }
+                Ok(())
+            }
+            "list" => {
+                let expected_value = self
+                    .expected
+                    .as_ref()
+                    .ok_or("test expected value is not specified")?;
+                let expected_header = build_list(expected_value)?;
+                let actual_result = Serializer::serialize(&expected_header);
 
-    Ok(())
-}
+                if let Some(true) = self.must_fail {
+                    assert!(actual_result.is_err());
+                    return Ok(());
+                }
 
-fn build_expected_header(test_case: &TestData) -> Result<Header, Box<dyn Error>> {
-    let expected_value = test_case
-        .expected
-        .as_ref()
-        .ok_or("test expected value is not specified")?;
+                // Test serialization
+                if let Some(canonical_val) = &self.canonical {
+                    let expected_serialized = canonical_val.join("");
+                    assert_eq!(expected_serialized, actual_result?);
+                }
 
-    // Build expected Header from serde Value
-    match test_case.header_type.as_str() {
-        "item" => {
-            let item = build_item(expected_value)?;
-            Ok(Header::Item(item))
+                Ok(())
+            }
+            "item" => {
+                let expected_value = self
+                    .expected
+                    .as_ref()
+                    .ok_or("test expected value is not specified")?;
+                let expected_header = build_item(expected_value)?;
+                let actual_result = Serializer::serialize(&expected_header);
+
+                if let Some(true) = self.must_fail {
+                    assert!(actual_result.is_err());
+                    return Ok(());
+                }
+
+                // Test serialization
+                if let Some(canonical_val) = &self.canonical {
+                    let expected_serialized = canonical_val.join("");
+                    assert_eq!(expected_serialized, actual_result?);
+                }
+
+                Ok(())
+            }
+            _ => return Err("unexpected header type".into()),
         }
-        "list" => {
-            let list = build_list(expected_value)?;
-            Ok(Header::List(list))
+    }
+
+    fn dict(&self) -> Result<(), Box<dyn Error>> {
+        let input = self
+            .raw
+            .as_ref()
+            .ok_or("raw value is not specified")?
+            .join(", ");
+
+        let actual_result = Parser::parse_dict_header(input.as_bytes());
+
+        if let Some(true) = &self.must_fail {
+            assert!(actual_result.is_err());
+            return Ok(());
+        };
+
+        let expected_value = self
+            .expected
+            .as_ref()
+            .ok_or("test expected value is not specified")?;
+
+        let actual_header = actual_result?;
+        let expected_result = build_dict(expected_value)?;
+        assert!(expected_result.iter().eq(actual_header.iter()));
+
+        // Test serialization
+        if let Some(canonical_val) = &self.canonical {
+            let expected_serialized = canonical_val.join("");
+            assert_eq!(expected_serialized, Serializer::serialize(&actual_header)?)
         }
-        "dictionary" => {
-            let dict = build_dict(expected_value)?;
-            Ok(Header::Dictionary(dict))
+        Ok(())
+    }
+    fn list(&self) -> Result<(), Box<dyn Error>> {
+        let input = &self
+            .raw
+            .as_ref()
+            .ok_or("raw value is not specified")?
+            .join(", ");
+
+        let actual_result = Parser::parse_list_header(input.as_bytes());
+
+        if let Some(true) = &self.must_fail {
+            assert!(actual_result.is_err());
+            return Ok(());
+        };
+
+        let expected_value = self
+            .expected
+            .as_ref()
+            .ok_or("test expected value is not specified")?;
+
+        let actual_header = actual_result?;
+        let expected_result = build_list(expected_value)?;
+        assert!(expected_result.iter().eq(actual_header.iter()));
+
+        // Test serialization
+        if let Some(canonical_val) = &self.canonical {
+            let expected_serialized = canonical_val.join("");
+            assert_eq!(expected_serialized, Serializer::serialize(&actual_header)?)
         }
-        _ => return Err("unknown header_type value".into()),
+        Ok(())
+    }
+    fn item(&self) -> Result<(), Box<dyn Error>> {
+        let input = &self
+            .raw
+            .as_ref()
+            .ok_or("raw value is not specified")?
+            .join(", ");
+
+        let actual_result = Parser::parse_item_header(input.as_bytes());
+
+        if let Some(true) = &self.must_fail {
+            assert!(actual_result.is_err());
+            return Ok(());
+        };
+
+        let expected_value = self
+            .expected
+            .as_ref()
+            .ok_or("test expected value is not specified")?;
+
+        let actual_header = actual_result?;
+        let expected_result = build_item(expected_value)?;
+        assert_eq!(expected_result, actual_header);
+
+        // Test serialization
+        if let Some(canonical_val) = &self.canonical {
+            let expected_serialized = canonical_val.join("");
+            assert_eq!(expected_serialized, Serializer::serialize(&actual_header)?)
+        }
+        Ok(())
     }
 }
 
@@ -257,9 +328,9 @@ fn run_test_suite(tests_file: PathBuf, is_serialization: bool) -> Result<(), Box
     let test_cases: Vec<TestData> = serde_json::from_reader(fs::File::open(tests_file)?)?;
     for test_data in test_cases.iter() {
         if is_serialization {
-            run_test_case_serialzation_only(test_data)?;
+            test_data.run_test_case_serialzation_only()?;
         } else {
-            run_test_case(test_data)?;
+            test_data.run_test_case()?;
         }
     }
     Ok(())
