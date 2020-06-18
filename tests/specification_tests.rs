@@ -27,16 +27,37 @@ fn run_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
         .as_ref()
         .ok_or("raw value is not specified")?
         .join(", ");
-    let actual_result = Parser::parse(input.as_bytes(), &test_case.header_type);
 
-    // Check that actual result for must_fail tests is Err
-    if let Some(true) = test_case.must_fail {
-        assert!(actual_result.is_err());
-        return Ok(());
-    }
+    let actual_header = match test_case.header_type.as_str() {
+        "dictionary" => {
+            let res = Parser::parse_dict_header(input.as_bytes());
+            println!("{:?}, {:?}", test_case.must_fail, res.is_err());
+            if let Some(true) = test_case.must_fail {
+                assert!(res.is_err());
+                return Ok(());
+            };
+            Header::Dictionary(res?)
+        }
+        "list" => {
+            let res = Parser::parse_list_header(input.as_bytes());
+            if let Some(true) = test_case.must_fail {
+                assert!(res.is_err());
+                return Ok(());
+            };
+            Header::List(res?)
+        }
+        "item" => {
+            let res = Parser::parse_item_header(input.as_bytes());
+            if let Some(true) = test_case.must_fail {
+                assert!(res.is_err());
+                return Ok(());
+            };
+            Header::Item(res?)
+        }
+        _ => return Err("unexpected header type".into()),
+    };
 
     let expected_header = build_expected_header(test_case)?;
-    let actual_header = actual_result?;
 
     // Test parsing
     match (&actual_header, &expected_header) {

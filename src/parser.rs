@@ -69,33 +69,40 @@ pub enum Header {
     Item(Item),
 }
 
+pub enum HType {
+    L,
+    D,
+    I,
+}
 
 pub struct Parser;
 
 impl Parser {
-
     pub fn parse_dict_header(input_bytes: &[u8]) -> ParserResult<Dictionary> {
-        if Header::Dictionary(dict) = Self::parse(input_bytes, "dictionary")? {
+        if let Header::Dictionary(dict) = Self::parse(input_bytes, HType::D)? {
             Ok(dict)
+        } else {
+            Err("not a dictionary header")
         }
-        else { Err("not a dictionary header") }
     }
 
-    pub fn parse_list_header(input_bytes: &[u8]) -> ParserResult<Dictionary> {
-        if Header::List(dict) = Self::parse(input_bytes, "dictionary")? {
+    pub fn parse_list_header(input_bytes: &[u8]) -> ParserResult<List> {
+        if let Header::List(dict) = Self::parse(input_bytes, HType::L)? {
             Ok(dict)
+        } else {
+            Err("not a list header")
         }
-        else { Err("not a list header") }
     }
 
-    pub fn parse_item_header(input_bytes: &[u8]) -> ParserResult<Dictionary> {
-        if Header::Item(dict) = Self::parse(input_bytes, "dictionary")? {
+    pub fn parse_item_header(input_bytes: &[u8]) -> ParserResult<Item> {
+        if let Header::Item(dict) = Self::parse(input_bytes, HType::I)? {
             Ok(dict)
+        } else {
+            Err("not an item header")
         }
-        else { Err("not an item header") }
     }
 
-    fn parse(input_bytes: &[u8], header_type: &str) -> ParserResult<Header> {
+    fn parse(input_bytes: &[u8], header_type: HType) -> ParserResult<Header> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#text-parse
         if !input_bytes.is_ascii() {
             return Err("parse: non-ascii characters in input");
@@ -108,10 +115,9 @@ impl Parser {
         utils::consume_sp_chars(&mut input_chars);
 
         let output = match header_type {
-            "list" => Header::List(Self::parse_list(&mut input_chars)?),
-            "dictionary" => Header::Dictionary(Self::parse_dict(&mut input_chars)?),
-            "item" => Header::Item(Self::parse_item(&mut input_chars)?),
-            _ => return Err("parse: unrecognized header type"),
+            HType::L => Header::List(Self::parse_list(&mut input_chars)?),
+            HType::D => Header::Dictionary(Self::parse_dict(&mut input_chars)?),
+            HType::I => Header::Item(Self::parse_item(&mut input_chars)?),
         };
 
         utils::consume_sp_chars(&mut input_chars);
@@ -506,13 +512,13 @@ mod tests {
         let input = "\"some_value\"".as_bytes();
         let parsed_item = Item(BareItem::String("some_value".to_owned()), Parameters::new());
         let expected = Header::Item(parsed_item);
-        assert_eq!(expected, Parser::parse(input, "item")?);
+        assert_eq!(expected, Parser::parse(input, HType::I)?);
 
         let input = "12.35;a ".as_bytes();
         let param = Parameters::from_iter(vec![("a".to_owned(), BareItem::Boolean(true))]);
         let expected = Header::Item(Item(Decimal::from_str("12.35")?.into(), param));
 
-        assert_eq!(expected, Parser::parse(input, "item")?);
+        assert_eq!(expected, Parser::parse(input, HType::I)?);
         Ok(())
     }
 
@@ -521,20 +527,20 @@ mod tests {
         let input = "\"some_value¢\"".as_bytes();
         assert_eq!(
             Err("parse: non-ascii characters in input"),
-            Parser::parse(input, "item")
+            Parser::parse(input, HType::I)
         );
         let input = "\"some_value\" trailing_text".as_bytes();
         assert_eq!(
             Err("parse: trailing characters after parsed value"),
-            Parser::parse(input, "item")
+            Parser::parse(input, HType::I)
         );
-        assert_eq!(
-            Err("parse: unrecognized header type"),
-            Parser::parse(input, "invalid_type")
-        );
+        // assert_eq!(
+        //     Err("parse: unrecognized header type"),
+        //     Parser::parse(input, "invalid_type")
+        // );
         assert_eq!(
             Err("parse_bare_item: empty item"),
-            Parser::parse("".as_bytes(), "item")
+            Parser::parse("".as_bytes(), HType::I)
         );
         Ok(())
     }
