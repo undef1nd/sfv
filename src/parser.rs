@@ -1,11 +1,10 @@
 use crate::utils;
+use crate::Res;
 use indexmap::IndexMap;
 use rust_decimal::prelude::*;
 use std::fmt::Debug;
 use std::iter::Peekable;
 use std::str::{from_utf8, Chars};
-
-type ParserResult<T> = Result<T, &'static str>;
 
 pub type Dictionary = IndexMap<String, ListEntry>;
 pub type Parameters = IndexMap<String, BareItem>;
@@ -64,13 +63,13 @@ impl From<Decimal> for BareItem {
 
 trait ParseHeader {
     type Header;
-    fn parse(input_chars: &mut Peekable<Chars>) -> ParserResult<Self::Header>;
+    fn parse(input_chars: &mut Peekable<Chars>) -> Res<Self::Header>;
 }
 
 impl ParseHeader for Item {
     type Header = Item;
 
-    fn parse(input_chars: &mut Peekable<Chars>) -> ParserResult<Item> {
+    fn parse(input_chars: &mut Peekable<Chars>) -> Res<Item> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-item
         let bare_item = Parser::parse_bare_item(input_chars)?;
         let parameters = Parser::parse_parameters(input_chars)?;
@@ -82,7 +81,7 @@ impl ParseHeader for Item {
 impl ParseHeader for List {
     type Header = List;
 
-    fn parse(input_chars: &mut Peekable<Chars>) -> ParserResult<List> {
+    fn parse(input_chars: &mut Peekable<Chars>) -> Res<List> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-list
         // List represents an array of (item_or_inner_list, parameters)
 
@@ -117,7 +116,7 @@ impl ParseHeader for List {
 impl ParseHeader for Dictionary {
     type Header = Dictionary;
 
-    fn parse(input_chars: &mut Peekable<Chars>) -> ParserResult<Dictionary> {
+    fn parse(input_chars: &mut Peekable<Chars>) -> Res<Dictionary> {
         let mut dict = Dictionary::new();
 
         while input_chars.peek().is_some() {
@@ -159,19 +158,19 @@ impl ParseHeader for Dictionary {
 pub struct Parser;
 
 impl Parser {
-    pub fn parse_dict_header(input_bytes: &[u8]) -> ParserResult<Dictionary> {
+    pub fn parse_dict_header(input_bytes: &[u8]) -> Res<Dictionary> {
         Self::parse::<Dictionary>(input_bytes)
     }
 
-    pub fn parse_list_header(input_bytes: &[u8]) -> ParserResult<List> {
+    pub fn parse_list_header(input_bytes: &[u8]) -> Res<List> {
         Self::parse::<List>(input_bytes)
     }
 
-    pub fn parse_item_header(input_bytes: &[u8]) -> ParserResult<Item> {
+    pub fn parse_item_header(input_bytes: &[u8]) -> Res<Item> {
         Self::parse::<Item>(input_bytes)
     }
 
-    fn parse<T: ParseHeader>(input_bytes: &[u8]) -> ParserResult<T::Header> {
+    fn parse<T: ParseHeader>(input_bytes: &[u8]) -> Res<T::Header> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#text-parse
         if !input_bytes.is_ascii() {
             return Err("parse: non-ascii characters in input");
@@ -193,7 +192,7 @@ impl Parser {
         Ok(output)
     }
 
-    fn parse_list_entry(input_chars: &mut Peekable<Chars>) -> ParserResult<ListEntry> {
+    fn parse_list_entry(input_chars: &mut Peekable<Chars>) -> Res<ListEntry> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-item-or-list
         // ListEntry represents a tuple (item_or_inner_list, parameters)
 
@@ -209,7 +208,7 @@ impl Parser {
         }
     }
 
-    fn parse_inner_list(input_chars: &mut Peekable<Chars>) -> ParserResult<InnerList> {
+    fn parse_inner_list(input_chars: &mut Peekable<Chars>) -> Res<InnerList> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-innerlist
 
         if Some('(') != input_chars.next() {
@@ -239,7 +238,7 @@ impl Parser {
         Err("parse_inner_list: the end of the inner list was not found")
     }
 
-    fn parse_bare_item(mut input_chars: &mut Peekable<Chars>) -> ParserResult<BareItem> {
+    fn parse_bare_item(mut input_chars: &mut Peekable<Chars>) -> Res<BareItem> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-bare-item
         if input_chars.peek().is_none() {
             return Err("parse_bare_item: empty item");
@@ -261,7 +260,7 @@ impl Parser {
         }
     }
 
-    fn parse_bool(input_chars: &mut Peekable<Chars>) -> ParserResult<bool> {
+    fn parse_bool(input_chars: &mut Peekable<Chars>) -> Res<bool> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-boolean
 
         if input_chars.next() != Some('?') {
@@ -275,7 +274,7 @@ impl Parser {
         }
     }
 
-    fn parse_string(input_chars: &mut Peekable<Chars>) -> ParserResult<String> {
+    fn parse_string(input_chars: &mut Peekable<Chars>) -> Res<String> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-string
 
         if input_chars.next() != Some('\"') {
@@ -300,7 +299,7 @@ impl Parser {
         Err("parse_string: no closing '\"'")
     }
 
-    fn parse_token(input_chars: &mut Peekable<Chars>) -> ParserResult<String> {
+    fn parse_token(input_chars: &mut Peekable<Chars>) -> Res<String> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-token
 
         if let Some(first_char) = input_chars.peek() {
@@ -325,7 +324,7 @@ impl Parser {
         Ok(output_string)
     }
 
-    fn parse_byte_sequence(input_chars: &mut Peekable<Chars>) -> ParserResult<Vec<u8>> {
+    fn parse_byte_sequence(input_chars: &mut Peekable<Chars>) -> Res<Vec<u8>> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-binary
 
         if input_chars.next() != Some(':') {
@@ -346,7 +345,7 @@ impl Parser {
         }
     }
 
-    fn parse_number(input_chars: &mut Peekable<Chars>) -> ParserResult<Num> {
+    fn parse_number(input_chars: &mut Peekable<Chars>) -> Res<Num> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-number
 
         let mut sign = 1;
@@ -402,7 +401,7 @@ impl Parser {
         }
     }
 
-    fn extract_digits(input_chars: &mut Peekable<Chars>) -> ParserResult<(bool, String)> {
+    fn extract_digits(input_chars: &mut Peekable<Chars>) -> Res<(bool, String)> {
         let mut is_integer = true;
         let mut input_number = String::from("");
         while let Some(curr_char) = input_chars.peek() {
@@ -433,7 +432,7 @@ impl Parser {
         Ok((is_integer, input_number))
     }
 
-    fn parse_parameters(input_chars: &mut Peekable<Chars>) -> ParserResult<Parameters> {
+    fn parse_parameters(input_chars: &mut Peekable<Chars>) -> Res<Parameters> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-param
 
         let mut params = Parameters::new();
@@ -465,7 +464,7 @@ impl Parser {
         Ok(params)
     }
 
-    fn parse_key(input_chars: &mut Peekable<Chars>) -> ParserResult<String> {
+    fn parse_key(input_chars: &mut Peekable<Chars>) -> Res<String> {
         match input_chars.peek() {
             Some(c) if c == &'*' || c.is_ascii_lowercase() => (),
             _ => return Err("parse_key: first character is not lcalpha or '*'"),
@@ -497,14 +496,14 @@ mod tests {
     fn parse() -> Result<(), Box<dyn Error>> {
         let input = "\"some_value\"".as_bytes();
         let parsed_item = Item(BareItem::String("some_value".to_owned()), Parameters::new());
-        let expected = Header::Item(parsed_item);
-        assert_eq!(expected, Parser::parse(input, HType::Item)?);
+        let expected = parsed_item;
+        assert_eq!(expected, Parser::parse::<Item>(input)?);
 
         let input = "12.35;a ".as_bytes();
         let param = Parameters::from_iter(vec![("a".to_owned(), BareItem::Boolean(true))]);
-        let expected = Header::Item(Item(Decimal::from_str("12.35")?.into(), param));
+        let expected = Item(Decimal::from_str("12.35")?.into(), param);
 
-        assert_eq!(expected, Parser::parse(input, HType::Item)?);
+        assert_eq!(expected, Parser::parse::<Item>(input)?);
         Ok(())
     }
 
@@ -513,20 +512,16 @@ mod tests {
         let input = "\"some_value¢\"".as_bytes();
         assert_eq!(
             Err("parse: non-ascii characters in input"),
-            Parser::parse(input, HType::Item)
+            Parser::parse::<Item>(input)
         );
         let input = "\"some_value\" trailing_text".as_bytes();
         assert_eq!(
             Err("parse: trailing characters after parsed value"),
-            Parser::parse(input, HType::Item)
+            Parser::parse::<Item>(input)
         );
-        // assert_eq!(
-        //     Err("parse: unrecognized header type"),
-        //     Parser::parse(input, "invalid_type")
-        // );
         assert_eq!(
             Err("parse_bare_item: empty item"),
-            Parser::parse("".as_bytes(), HType::Item)
+            Parser::parse::<Item>("".as_bytes())
         );
         Ok(())
     }
@@ -537,7 +532,7 @@ mod tests {
         let item1 = Item(1.into(), Parameters::new());
         let item2 = Item(42.into(), Parameters::new());
         let expected_list: List = vec![item1.into(), item2.into()];
-        assert_eq!(expected_list, Parser::parse_list(&mut input)?);
+        assert_eq!(expected_list, List::parse(&mut input)?);
         Ok(())
     }
 
@@ -547,7 +542,7 @@ mod tests {
         let item1 = Item(1.into(), Parameters::new());
         let item2 = Item(42.into(), Parameters::new());
         let expected_list: List = vec![item1.into(), item2.into()];
-        assert_eq!(expected_list, Parser::parse_list(&mut input)?);
+        assert_eq!(expected_list, List::parse(&mut input)?);
         Ok(())
     }
 
@@ -561,7 +556,7 @@ mod tests {
         let inner_list_1 = InnerList(vec![item1, item2], Parameters::new());
         let inner_list_2 = InnerList(vec![item3, item4], Parameters::new());
         let expected_list: List = vec![inner_list_1.into(), inner_list_2.into()];
-        assert_eq!(expected_list, Parser::parse_list(&mut input)?);
+        assert_eq!(expected_list, List::parse(&mut input)?);
         Ok(())
     }
 
@@ -570,7 +565,7 @@ mod tests {
         let mut input = "()".chars().peekable();
         let inner_list = InnerList(vec![], Parameters::new());
         let expected_list: List = vec![inner_list.into()];
-        assert_eq!(expected_list, Parser::parse_list(&mut input)?);
+        assert_eq!(expected_list, List::parse(&mut input)?);
         Ok(())
     }
 
@@ -578,7 +573,7 @@ mod tests {
     fn parse_list_empty() -> Result<(), Box<dyn Error>> {
         let mut input = "".chars().peekable();
         let expected_list: List = vec![];
-        assert_eq!(expected_list, Parser::parse_list(&mut input)?);
+        assert_eq!(expected_list, List::parse(&mut input)?);
         Ok(())
     }
 
@@ -591,7 +586,7 @@ mod tests {
             Parameters::from_iter(vec![("k".to_owned(), BareItem::Token("*".to_owned()))]);
         let inner_list = InnerList(vec![item1, item2], inner_list_param);
         let expected_list: List = vec![inner_list.into()];
-        assert_eq!(expected_list, Parser::parse_list(&mut input)?);
+        assert_eq!(expected_list, List::parse(&mut input)?);
         Ok(())
     }
 
@@ -608,7 +603,7 @@ mod tests {
         )]);
         let inner_list = InnerList(vec![item3, item4], inner_list_param);
         let expected_list: List = vec![item1.into(), item2.into(), inner_list.into()];
-        assert_eq!(expected_list, Parser::parse_list(&mut input)?);
+        assert_eq!(expected_list, List::parse(&mut input)?);
         Ok(())
     }
 
@@ -617,49 +612,34 @@ mod tests {
         let mut input = ",".chars().peekable();
         assert_eq!(
             Err("parse_bare_item: item type can't be identified"),
-            Parser::parse_list(&mut input)
+            List::parse(&mut input)
         );
 
         let mut input = "a, b c".chars().peekable();
         assert_eq!(
             Err("parse_list: trailing characters after list member"),
-            Parser::parse_list(&mut input)
+            List::parse(&mut input)
         );
 
         let mut input = "a,".chars().peekable();
-        assert_eq!(
-            Err("parse_list: trailing comma"),
-            Parser::parse_list(&mut input)
-        );
+        assert_eq!(Err("parse_list: trailing comma"), List::parse(&mut input));
 
         let mut input = "a     ,    ".chars().peekable();
-        assert_eq!(
-            Err("parse_list: trailing comma"),
-            Parser::parse_list(&mut input)
-        );
+        assert_eq!(Err("parse_list: trailing comma"), List::parse(&mut input));
 
         let mut input = "a\t \t ,\t ".chars().peekable();
-        assert_eq!(
-            Err("parse_list: trailing comma"),
-            Parser::parse_list(&mut input)
-        );
+        assert_eq!(Err("parse_list: trailing comma"), List::parse(&mut input));
 
         let mut input = "a\t\t,\t\t\t".chars().peekable();
-        assert_eq!(
-            Err("parse_list: trailing comma"),
-            Parser::parse_list(&mut input)
-        );
+        assert_eq!(Err("parse_list: trailing comma"), List::parse(&mut input));
 
         let mut input = "(a b),".chars().peekable();
-        assert_eq!(
-            Err("parse_list: trailing comma"),
-            Parser::parse_list(&mut input)
-        );
+        assert_eq!(Err("parse_list: trailing comma"), List::parse(&mut input));
 
         let mut input = "(1, 2, (a b)".chars().peekable();
         assert_eq!(
             Err("parse_inner_list: bad delimitation"),
-            Parser::parse_list(&mut input)
+            List::parse(&mut input)
         );
 
         Ok(())
@@ -690,10 +670,7 @@ mod tests {
     #[test]
     fn parse_item_int_with_space() -> Result<(), Box<dyn Error>> {
         let mut input = "12 ".chars().peekable();
-        assert_eq!(
-            Item(12.into(), Parameters::new()),
-            Parser::parse_item(&mut input)?
-        );
+        assert_eq!(Item(12.into(), Parameters::new()), Item::parse(&mut input)?);
         Ok(())
     }
 
@@ -703,7 +680,7 @@ mod tests {
         let param = Parameters::from_iter(vec![("a".to_owned(), BareItem::Boolean(true))]);
         assert_eq!(
             Item(Decimal::from_str("12.35")?.into(), param),
-            Parser::parse_item(&mut input)?
+            Item::parse(&mut input)?
         );
         Ok(())
     }
@@ -713,7 +690,7 @@ mod tests {
         let param = Parameters::from_iter(vec![("a1".to_owned(), BareItem::Token("*".to_owned()))]);
         assert_eq!(
             Item(BareItem::String("12.35".to_owned()), param),
-            Parser::parse_item(&mut "\"12.35\";a1=*".chars().peekable())?
+            Item::parse(&mut "\"12.35\";a1=*".chars().peekable())?
         );
         Ok(())
     }
@@ -722,7 +699,7 @@ mod tests {
     fn parse_item_errors() -> Result<(), Box<dyn Error>> {
         assert_eq!(
             Err("parse_bare_item: empty item"),
-            Parser::parse_item(&mut "".chars().peekable())
+            Item::parse(&mut "".chars().peekable())
         );
         Ok(())
     }
@@ -731,7 +708,7 @@ mod tests {
     fn parse_dict_empty() -> Result<(), Box<dyn Error>> {
         assert_eq!(
             Dictionary::new(),
-            Parser::parse_dict(&mut "".chars().peekable())?
+            Dictionary::parse(&mut "".chars().peekable())?
         );
         Ok(())
     }
@@ -741,12 +718,12 @@ mod tests {
         let mut input = "abc=123;a=1;b=2 def".chars().peekable();
         assert_eq!(
             Err("parse_dict: trailing characters after dictionary member"),
-            Parser::parse_dict(&mut input)
+            Dictionary::parse(&mut input)
         );
         let mut input = "abc=123;a=1,".chars().peekable();
         assert_eq!(
             Err("parse_dict: trailing comma"),
-            Parser::parse_dict(&mut input)
+            Dictionary::parse(&mut input)
         );
         Ok(())
     }
@@ -772,7 +749,7 @@ mod tests {
             ("def".to_owned(), item2.into()),
             ("ghi".to_owned(), item3.into()),
         ]);
-        assert_eq!(expected_dict, Parser::parse_dict(&mut input)?);
+        assert_eq!(expected_dict, Dictionary::parse(&mut input)?);
 
         Ok(())
     }
@@ -782,7 +759,7 @@ mod tests {
         let mut input = "a=()".chars().peekable();
         let inner_list = InnerList(vec![], Parameters::new());
         let expected_dict = Dictionary::from_iter(vec![("a".to_owned(), inner_list.into())]);
-        assert_eq!(expected_dict, Parser::parse_dict(&mut input)?);
+        assert_eq!(expected_dict, Dictionary::parse(&mut input)?);
         Ok(())
     }
 
@@ -799,7 +776,7 @@ mod tests {
             ("b".to_owned(), item2.into()),
             ("c".to_owned(), item3.into()),
         ]);
-        assert_eq!(expected_dict, Parser::parse_dict(&mut input)?);
+        assert_eq!(expected_dict, Dictionary::parse(&mut input)?);
         Ok(())
     }
 
@@ -816,9 +793,9 @@ mod tests {
         let mut input1 = "a=1 ,  b=2".chars().peekable();
         let mut input2 = "a=1\t,\tb=2".chars().peekable();
         let mut input3 = "a=1, b=2".chars().peekable();
-        assert_eq!(expected_dict, Parser::parse_dict(&mut input1)?);
-        assert_eq!(expected_dict, Parser::parse_dict(&mut input2)?);
-        assert_eq!(expected_dict, Parser::parse_dict(&mut input3)?);
+        assert_eq!(expected_dict, Dictionary::parse(&mut input1)?);
+        assert_eq!(expected_dict, Dictionary::parse(&mut input2)?);
+        assert_eq!(expected_dict, Dictionary::parse(&mut input3)?);
 
         Ok(())
     }
