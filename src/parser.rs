@@ -4,13 +4,12 @@ use std::iter::Peekable;
 use std::str::{from_utf8, Chars};
 
 pub trait ParseHeader {
-    type Header;
-    fn parse(input_chars: &mut Peekable<Chars>) -> Res<Self::Header>;
+    fn parse(input_chars: &mut Peekable<Chars>) -> Res<Self>
+    where
+        Self: Sized;
 }
 
 impl ParseHeader for Item {
-    type Header = Item;
-
     fn parse(input_chars: &mut Peekable<Chars>) -> Res<Item> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-item
         let bare_item = Parser::parse_bare_item(input_chars)?;
@@ -21,8 +20,6 @@ impl ParseHeader for Item {
 }
 
 impl ParseHeader for List {
-    type Header = List;
-
     fn parse(input_chars: &mut Peekable<Chars>) -> Res<List> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-list
         // List represents an array of (item_or_inner_list, parameters)
@@ -56,8 +53,6 @@ impl ParseHeader for List {
 }
 
 impl ParseHeader for Dictionary {
-    type Header = Dictionary;
-
     fn parse(input_chars: &mut Peekable<Chars>) -> Res<Dictionary> {
         let mut dict = Dictionary::new();
 
@@ -112,7 +107,7 @@ impl Parser {
         Self::parse::<Item>(input_bytes)
     }
 
-    pub(crate) fn parse<T: ParseHeader>(input_bytes: &[u8]) -> Res<T::Header> {
+    pub(crate) fn parse<T: ParseHeader>(input_bytes: &[u8]) -> Res<T> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#text-parse
         if !input_bytes.is_ascii() {
             return Err("parse: non-ascii characters in input");
