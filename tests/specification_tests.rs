@@ -6,7 +6,7 @@ use std::error::Error;
 use std::path::PathBuf;
 use std::{env, fs};
 use structured_headers::parser::Parser;
-use structured_headers::serializer::Serializer;
+use structured_headers::serializer::{SerializeHeader, Serializer};
 use structured_headers::{BareItem, Dictionary, InnerList, Item, List, ListEntry, Num, Parameters};
 
 #[derive(Debug, PartialEq, Deserialize)]
@@ -69,9 +69,9 @@ fn run_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
     if let Some(canonical_val) = &test_case.canonical {
         let expected_serialized = canonical_val.join("");
         let actual_serialized = match actual_header {
-            Header::Item(value) => Serializer::serialize::<Item>(&value),
-            Header::List(value) => Serializer::serialize::<List>(&value),
-            Header::Dict(value) => Serializer::serialize::<Dictionary>(&value),
+            Header::Item(value) => value.serialize_header(),
+            Header::List(value) => value.serialize_header(),
+            Header::Dict(value) => value.serialize_header(),
         }?;
         assert_eq!(expected_serialized, actual_serialized);
     }
@@ -81,9 +81,9 @@ fn run_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
 fn run_test_case_serialzation_only(test_case: &TestData) -> Result<(), Box<dyn Error>> {
     let expected_header = build_expected_header(test_case)?;
     let actual_result = match expected_header {
-        Header::Item(value) => Serializer::serialize::<Item>(&value),
-        Header::List(value) => Serializer::serialize::<List>(&value),
-        Header::Dict(value) => Serializer::serialize::<Dictionary>(&value),
+        Header::Item(value) => value.serialize_header(),
+        Header::List(value) => value.serialize_header(),
+        Header::Dict(value) => value.serialize_header(),
     };
 
     if let Some(true) = test_case.must_fail {

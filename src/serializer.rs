@@ -3,11 +3,68 @@ use data_encoding::BASE64;
 use rust_decimal::prelude::Zero;
 
 pub trait SerializeHeader {
-    fn serialize(input_dict: &Self, output: &mut String) -> Result<()>;
+    fn serialize_header(&self) -> Result<String>;
 }
 
 impl SerializeHeader for Dictionary {
-    fn serialize(input_dict: &Dictionary, output: &mut String) -> Result<()> {
+    fn serialize_header(&self) -> Result<String> {
+        let mut output = String::new();
+        Serializer::serialize_dict(self, &mut output)?;
+        Ok(output)
+    }
+}
+
+impl SerializeHeader for List {
+    fn serialize_header(&self) -> Result<String> {
+        let mut output = String::new();
+        Serializer::serialize_list(self, &mut output)?;
+        Ok(output)
+    }
+}
+
+impl SerializeHeader for Item {
+    fn serialize_header(&self) -> Result<String> {
+        let mut output = String::new();
+        Serializer::serialize_item(self, &mut output)?;
+        Ok(output)
+    }
+}
+
+pub struct Serializer;
+
+impl Serializer {
+    pub(crate) fn serialize_item(input_item: &Item, output: &mut String) -> Result<()> {
+        // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-item
+
+        Serializer::serialize_bare_item(&input_item.0, output)?;
+        Serializer::serialize_parameters(&input_item.1, output)?;
+        Ok(())
+    }
+
+    pub(crate) fn serialize_list(input_list: &List, output: &mut String) -> Result<()> {
+        // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-list
+
+        for (idx, member) in input_list.iter().enumerate() {
+            match member {
+                ListEntry::Item(item) => {
+                    Serializer::serialize_item(item, output)?;
+                }
+                ListEntry::InnerList(inner_list) => {
+                    Serializer::serialize_inner_list(inner_list, output)?;
+                }
+            };
+
+            // If more items remain in input_list:
+            //      Append “,” to output.
+            //      Append a single SP to output.
+            if idx < input_list.len() - 1 {
+                output.push_str(", ");
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn serialize_dict(input_dict: &Dictionary, output: &mut String) -> Result<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-dictionary
 
         for (idx, (member_name, member_value)) in input_dict.iter().enumerate() {
@@ -21,7 +78,7 @@ impl SerializeHeader for Dictionary {
                         Serializer::serialize_parameters(&item.1, output)?;
                     } else {
                         output.push('=');
-                        Item::serialize(&item, output)?;
+                        Serializer::serialize_item(&item, output)?;
                     }
                 }
                 ListEntry::InnerList(inner_list) => {
@@ -39,51 +96,6 @@ impl SerializeHeader for Dictionary {
         }
         Ok(())
     }
-}
-
-impl SerializeHeader for List {
-    fn serialize(input_list: &List, output: &mut String) -> Result<()> {
-        // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-list
-
-        for (idx, member) in input_list.iter().enumerate() {
-            match member {
-                ListEntry::Item(item) => {
-                    Item::serialize(item, output)?;
-                }
-                ListEntry::InnerList(inner_list) => {
-                    Serializer::serialize_inner_list(inner_list, output)?;
-                }
-            };
-
-            // If more items remain in input_list:
-            //      Append “,” to output.
-            //      Append a single SP to output.
-            if idx < input_list.len() - 1 {
-                output.push_str(", ");
-            }
-        }
-        Ok(())
-    }
-}
-
-impl SerializeHeader for Item {
-    fn serialize(input_item: &Item, output: &mut String) -> Result<()> {
-        // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-item
-
-        Serializer::serialize_bare_item(&input_item.0, output)?;
-        Serializer::serialize_parameters(&input_item.1, output)?;
-        Ok(())
-    }
-}
-
-pub struct Serializer;
-
-impl Serializer {
-    pub fn serialize<T: SerializeHeader>(header: &T) -> Result<String> {
-        let mut output = String::new();
-        T::serialize(header, &mut output)?;
-        Ok(output)
-    }
 
     fn serialize_inner_list(input_inner_list: &InnerList, output: &mut String) -> Result<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-innerlist
@@ -93,7 +105,7 @@ impl Serializer {
 
         output.push('(');
         for (idx, item) in items.iter().enumerate() {
-            Item::serialize(item, output)?;
+            Serializer::serialize_item(item, output)?;
 
             // If more values remain in inner_list, append a single SP to output
             if idx < items.len() - 1 {
