@@ -107,7 +107,7 @@ impl Parser {
         Self::parse::<Item>(input_bytes)
     }
 
-    pub(crate) fn parse<T: ParseHeader>(input_bytes: &[u8]) -> Result<T> {
+    fn parse<T: ParseHeader>(input_bytes: &[u8]) -> Result<T> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#text-parse
         if !input_bytes.is_ascii() {
             return Err("parse: non-ascii characters in input");

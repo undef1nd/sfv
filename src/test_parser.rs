@@ -10,13 +10,13 @@ fn parse() -> result::Result<(), Box<dyn Error>> {
     let input = "\"some_value\"".as_bytes();
     let parsed_item = Item(BareItem::String("some_value".to_owned()), Parameters::new());
     let expected = parsed_item;
-    assert_eq!(expected, Parser::parse::<Item>(input)?);
+    assert_eq!(expected, Parser::parse_item_header(input)?);
 
     let input = "12.35;a ".as_bytes();
     let param = Parameters::from_iter(vec![("a".to_owned(), BareItem::Boolean(true))]);
     let expected = Item(Decimal::from_str("12.35")?.into(), param);
 
-    assert_eq!(expected, Parser::parse::<Item>(input)?);
+    assert_eq!(expected, Parser::parse_item_header(input)?);
     Ok(())
 }
 
@@ -25,16 +25,16 @@ fn parse_errors() -> result::Result<(), Box<dyn Error>> {
     let input = "\"some_value¢\"".as_bytes();
     assert_eq!(
         Err("parse: non-ascii characters in input"),
-        Parser::parse::<Item>(input)
+        Parser::parse_item_header(input)
     );
     let input = "\"some_value\" trailing_text".as_bytes();
     assert_eq!(
         Err("parse: trailing characters after parsed value"),
-        Parser::parse::<Item>(input)
+        Parser::parse_item_header(input)
     );
     assert_eq!(
         Err("parse_bare_item: empty item"),
-        Parser::parse::<Item>("".as_bytes())
+        Parser::parse_item_header("".as_bytes())
     );
     Ok(())
 }
