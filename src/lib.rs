@@ -7,7 +7,7 @@ pub mod serializer;
 pub(crate) mod test_parser;
 pub(crate) mod test_serializer;
 
-type Res<R> = Result<R, &'static str>;
+type Res<T> = Result<T, &'static str>;
 
 pub type Dictionary = IndexMap<String, ListEntry>;
 pub type Parameters = IndexMap<String, BareItem>;
