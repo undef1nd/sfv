@@ -9,14 +9,14 @@ use std::result;
 #[test]
 fn serialize_header_empty_dict() -> result::Result<(), Box<dyn Error>> {
     let dict_header = Dictionary::new();
-    assert_eq!("", dict_header.serialize_header()?);
+    assert_eq!("", dict_header.serialize()?);
     Ok(())
 }
 
 #[test]
 fn serialize_header_empty_list() -> result::Result<(), Box<dyn Error>> {
     let list_header = List::new();
-    assert_eq!("", list_header.serialize_header()?);
+    assert_eq!("", list_header.serialize()?);
     Ok(())
 }
 
@@ -42,7 +42,7 @@ fn serialize_header_list_mixed_members_with_params() -> result::Result<(), Box<d
 
     let list_header: List = vec![item1.into(), item2.into(), inner_list.into()];
     let expected = "42.457, 17;itm2_p, (\"str1\";in1_p=?0 str2;in2_p=\"valu\\\\e\");inner_list_param=:d2VhdGhlcg==:";
-    assert_eq!(expected, list_header.serialize_header()?);
+    assert_eq!(expected, list_header.serialize()?);
     Ok(())
 }
 
@@ -54,7 +54,7 @@ fn serialize_header_errors() -> result::Result<(), Box<dyn Error>> {
     );
     assert_eq!(
         Err("serialize_string: non-ascii character"),
-        disallowed_item.serialize_header()
+        disallowed_item.serialize()
     );
 
     let disallowed_item = Item(
@@ -63,14 +63,14 @@ fn serialize_header_errors() -> result::Result<(), Box<dyn Error>> {
     );
     assert_eq!(
         Err("serialize_decimal: integer component > 12 digits"),
-        disallowed_item.serialize_header()
+        disallowed_item.serialize()
     );
 
     let param_with_disallowed_key = Parameters::from_iter(vec![("_key".to_owned(), 13.into())]);
     let disallowed_item = Item(12.into(), param_with_disallowed_key);
     assert_eq!(
         Err("serialize_key: first character is not lcalpha or '*'"),
-        disallowed_item.serialize_header()
+        disallowed_item.serialize()
     );
     Ok(())
 }

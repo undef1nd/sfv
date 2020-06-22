@@ -3,11 +3,11 @@ use data_encoding::BASE64;
 use rust_decimal::prelude::Zero;
 
 pub trait SerializeHeader {
-    fn serialize_header(&self) -> Result<String>;
+    fn serialize(&self) -> Result<String>;
 }
 
 impl SerializeHeader for Dictionary {
-    fn serialize_header(&self) -> Result<String> {
+    fn serialize(&self) -> Result<String> {
         let mut output = String::new();
         Serializer::serialize_dict(self, &mut output)?;
         Ok(output)
@@ -15,7 +15,7 @@ impl SerializeHeader for Dictionary {
 }
 
 impl SerializeHeader for List {
-    fn serialize_header(&self) -> Result<String> {
+    fn serialize(&self) -> Result<String> {
         let mut output = String::new();
         Serializer::serialize_list(self, &mut output)?;
         Ok(output)
@@ -23,7 +23,7 @@ impl SerializeHeader for List {
 }
 
 impl SerializeHeader for Item {
-    fn serialize_header(&self) -> Result<String> {
+    fn serialize(&self) -> Result<String> {
         let mut output = String::new();
         Serializer::serialize_item(self, &mut output)?;
         Ok(output)
