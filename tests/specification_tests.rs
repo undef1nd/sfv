@@ -26,6 +26,15 @@ enum Header {
     List(List),
     Dict(Dictionary),
 }
+impl Header {
+    fn serialize(&self) -> Result<String, &'static str> {
+        match self {
+            Header::Item(value) => value.serialize(),
+            Header::List(value) => value.serialize(),
+            Header::Dict(value) => value.serialize(),
+        }
+    }
+}
 
 fn run_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
     println!("- {}", &test_case.name);
@@ -68,11 +77,7 @@ fn run_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
     // Test serialization
     if let Some(canonical_val) = &test_case.canonical {
         let expected_serialized = canonical_val.join("");
-        let actual_serialized = match actual_header {
-            Header::Item(value) => value.serialize(),
-            Header::List(value) => value.serialize(),
-            Header::Dict(value) => value.serialize(),
-        }?;
+        let actual_serialized = actual_header.serialize()?;
         assert_eq!(expected_serialized, actual_serialized);
     }
     Ok(())
@@ -80,11 +85,7 @@ fn run_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
 
 fn run_test_case_serialzation_only(test_case: &TestData) -> Result<(), Box<dyn Error>> {
     let expected_header = build_expected_header(test_case)?;
-    let actual_result = match expected_header {
-        Header::Item(value) => value.serialize(),
-        Header::List(value) => value.serialize(),
-        Header::Dict(value) => value.serialize(),
-    };
+    let actual_result = expected_header.serialize();
 
     if let Some(true) = test_case.must_fail {
         assert!(actual_result.is_err());
