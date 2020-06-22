@@ -7,9 +7,9 @@ pub mod serializer;
 pub(crate) mod test_parser;
 pub(crate) mod test_serializer;
 
-// Alias for Result with &'static str type Error
-// std Result is used in tests
-type Res<T> = Result<T, &'static str>;
+// Alias for Result with &'static str as Err
+// std::result::Result is used in tests
+type Result<T> = std::result::Result<T, &'static str>;
 
 pub type Dictionary = IndexMap<String, ListEntry>;
 pub type Parameters = IndexMap<String, BareItem>;

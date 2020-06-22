@@ -3,9 +3,10 @@ use crate::*;
 use rust_decimal::prelude::FromStr;
 use std::error::Error;
 use std::iter::FromIterator;
+use std::result;
 
 #[test]
-fn parse() -> Result<(), Box<dyn Error>> {
+fn parse() -> result::Result<(), Box<dyn Error>> {
     let input = "\"some_value\"".as_bytes();
     let parsed_item = Item(BareItem::String("some_value".to_owned()), Parameters::new());
     let expected = parsed_item;
@@ -20,7 +21,7 @@ fn parse() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_errors() -> Result<(), Box<dyn Error>> {
+fn parse_errors() -> result::Result<(), Box<dyn Error>> {
     let input = "\"some_value¢\"".as_bytes();
     assert_eq!(
         Err("parse: non-ascii characters in input"),
@@ -39,7 +40,7 @@ fn parse_errors() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_list_of_numbers() -> Result<(), Box<dyn Error>> {
+fn parse_list_of_numbers() -> result::Result<(), Box<dyn Error>> {
     let mut input = "1,42".chars().peekable();
     let item1 = Item(1.into(), Parameters::new());
     let item2 = Item(42.into(), Parameters::new());
@@ -49,7 +50,7 @@ fn parse_list_of_numbers() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_list_with_multiple_spaces() -> Result<(), Box<dyn Error>> {
+fn parse_list_with_multiple_spaces() -> result::Result<(), Box<dyn Error>> {
     let mut input = "1  ,  42".chars().peekable();
     let item1 = Item(1.into(), Parameters::new());
     let item2 = Item(42.into(), Parameters::new());
@@ -59,7 +60,7 @@ fn parse_list_with_multiple_spaces() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_list_of_lists() -> Result<(), Box<dyn Error>> {
+fn parse_list_of_lists() -> result::Result<(), Box<dyn Error>> {
     let mut input = "(1 2), (42 43)".chars().peekable();
     let item1 = Item(1.into(), Parameters::new());
     let item2 = Item(2.into(), Parameters::new());
@@ -73,7 +74,7 @@ fn parse_list_of_lists() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_list_empty_inner_list() -> Result<(), Box<dyn Error>> {
+fn parse_list_empty_inner_list() -> result::Result<(), Box<dyn Error>> {
     let mut input = "()".chars().peekable();
     let inner_list = InnerList(vec![], Parameters::new());
     let expected_list: List = vec![inner_list.into()];
@@ -82,7 +83,7 @@ fn parse_list_empty_inner_list() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_list_empty() -> Result<(), Box<dyn Error>> {
+fn parse_list_empty() -> result::Result<(), Box<dyn Error>> {
     let mut input = "".chars().peekable();
     let expected_list: List = vec![];
     assert_eq!(expected_list, List::parse(&mut input)?);
@@ -90,7 +91,7 @@ fn parse_list_empty() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_list_of_lists_with_param_and_spaces() -> Result<(), Box<dyn Error>> {
+fn parse_list_of_lists_with_param_and_spaces() -> result::Result<(), Box<dyn Error>> {
     let mut input = "(  1  42  ); k=*".chars().peekable();
     let item1 = Item(1.into(), Parameters::new());
     let item2 = Item(42.into(), Parameters::new());
@@ -103,7 +104,7 @@ fn parse_list_of_lists_with_param_and_spaces() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_list_of_items_and_lists_with_param() -> Result<(), Box<dyn Error>> {
+fn parse_list_of_items_and_lists_with_param() -> result::Result<(), Box<dyn Error>> {
     let mut input = "12, 14, (a  b); param=\"param_value_1\"".chars().peekable();
     let item1 = Item(12.into(), Parameters::new());
     let item2 = Item(14.into(), Parameters::new());
@@ -120,7 +121,7 @@ fn parse_list_of_items_and_lists_with_param() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_list_errors() -> Result<(), Box<dyn Error>> {
+fn parse_list_errors() -> result::Result<(), Box<dyn Error>> {
     let mut input = ",".chars().peekable();
     assert_eq!(
         Err("parse_bare_item: item type can't be identified"),
@@ -158,7 +159,7 @@ fn parse_list_errors() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_inner_list_errors() -> Result<(), Box<dyn Error>> {
+fn parse_inner_list_errors() -> result::Result<(), Box<dyn Error>> {
     let mut input = "c b); a=1".chars().peekable();
     assert_eq!(
         Err("parse_inner_list: input does not start with '('"),
@@ -168,7 +169,7 @@ fn parse_inner_list_errors() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_inner_list_with_param_and_spaces() -> Result<(), Box<dyn Error>> {
+fn parse_inner_list_with_param_and_spaces() -> result::Result<(), Box<dyn Error>> {
     let mut input = "(c b); a=1".chars().peekable();
     let inner_list_param = Parameters::from_iter(vec![("a".to_owned(), 1.into())]);
 
@@ -180,14 +181,14 @@ fn parse_inner_list_with_param_and_spaces() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_item_int_with_space() -> Result<(), Box<dyn Error>> {
+fn parse_item_int_with_space() -> result::Result<(), Box<dyn Error>> {
     let mut input = "12 ".chars().peekable();
     assert_eq!(Item(12.into(), Parameters::new()), Item::parse(&mut input)?);
     Ok(())
 }
 
 #[test]
-fn parse_item_decimal_with_bool_param_and_space() -> Result<(), Box<dyn Error>> {
+fn parse_item_decimal_with_bool_param_and_space() -> result::Result<(), Box<dyn Error>> {
     let mut input = "12.35;a ".chars().peekable();
     let param = Parameters::from_iter(vec![("a".to_owned(), BareItem::Boolean(true))]);
     assert_eq!(
@@ -198,7 +199,7 @@ fn parse_item_decimal_with_bool_param_and_space() -> Result<(), Box<dyn Error>> 
 }
 
 #[test]
-fn parse_item_number_with_param() -> Result<(), Box<dyn Error>> {
+fn parse_item_number_with_param() -> result::Result<(), Box<dyn Error>> {
     let param = Parameters::from_iter(vec![("a1".to_owned(), BareItem::Token("*".to_owned()))]);
     assert_eq!(
         Item(BareItem::String("12.35".to_owned()), param),
@@ -208,7 +209,7 @@ fn parse_item_number_with_param() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_item_errors() -> Result<(), Box<dyn Error>> {
+fn parse_item_errors() -> result::Result<(), Box<dyn Error>> {
     assert_eq!(
         Err("parse_bare_item: empty item"),
         Item::parse(&mut "".chars().peekable())
@@ -217,7 +218,7 @@ fn parse_item_errors() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_dict_empty() -> Result<(), Box<dyn Error>> {
+fn parse_dict_empty() -> result::Result<(), Box<dyn Error>> {
     assert_eq!(
         Dictionary::new(),
         Dictionary::parse(&mut "".chars().peekable())?
@@ -226,7 +227,7 @@ fn parse_dict_empty() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_dict_errors() -> Result<(), Box<dyn Error>> {
+fn parse_dict_errors() -> result::Result<(), Box<dyn Error>> {
     let mut input = "abc=123;a=1;b=2 def".chars().peekable();
     assert_eq!(
         Err("parse_dict: trailing characters after dictionary member"),
@@ -241,7 +242,7 @@ fn parse_dict_errors() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_dict_with_spaces_and_params() -> Result<(), Box<dyn Error>> {
+fn parse_dict_with_spaces_and_params() -> result::Result<(), Box<dyn Error>> {
     let mut input = "abc=123;a=1;b=2, def=456, ghi=789;q=9;r=\"+w\""
         .chars()
         .peekable();
@@ -267,7 +268,7 @@ fn parse_dict_with_spaces_and_params() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_dict_empty_value() -> Result<(), Box<dyn Error>> {
+fn parse_dict_empty_value() -> result::Result<(), Box<dyn Error>> {
     let mut input = "a=()".chars().peekable();
     let inner_list = InnerList(vec![], Parameters::new());
     let expected_dict = Dictionary::from_iter(vec![("a".to_owned(), inner_list.into())]);
@@ -276,7 +277,7 @@ fn parse_dict_empty_value() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_dict_with_token_param() -> Result<(), Box<dyn Error>> {
+fn parse_dict_with_token_param() -> result::Result<(), Box<dyn Error>> {
     let mut input = "a=1, b;foo=*, c=3".chars().peekable();
     let item2_params =
         Parameters::from_iter(vec![("foo".to_owned(), BareItem::Token("*".to_owned()))]);
@@ -293,7 +294,7 @@ fn parse_dict_with_token_param() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_dict_multiple_spaces() -> Result<(), Box<dyn Error>> {
+fn parse_dict_multiple_spaces() -> result::Result<(), Box<dyn Error>> {
     // input1, input2, input3 must be parsed into the same structure
     let item1 = Item(1.into(), Parameters::new());
     let item2 = Item(2.into(), Parameters::new());
@@ -313,7 +314,7 @@ fn parse_dict_multiple_spaces() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_bare_item() -> Result<(), Box<dyn Error>> {
+fn parse_bare_item() -> result::Result<(), Box<dyn Error>> {
     assert_eq!(
         BareItem::Boolean(false),
         Parser::parse_bare_item(&mut "?0".chars().peekable())?
@@ -338,7 +339,7 @@ fn parse_bare_item() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_bare_item_errors() -> Result<(), Box<dyn Error>> {
+fn parse_bare_item_errors() -> result::Result<(), Box<dyn Error>> {
     assert_eq!(
         Err("parse_bare_item: item type can't be identified"),
         Parser::parse_bare_item(&mut "!?0".chars().peekable())
@@ -355,7 +356,7 @@ fn parse_bare_item_errors() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_bool() -> Result<(), Box<dyn Error>> {
+fn parse_bool() -> result::Result<(), Box<dyn Error>> {
     let mut input = "?0gk".chars().peekable();
     assert_eq!(false, Parser::parse_bool(&mut input)?);
     assert_eq!(input.collect::<String>(), "gk");
@@ -366,7 +367,7 @@ fn parse_bool() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_bool_errors() -> Result<(), Box<dyn Error>> {
+fn parse_bool_errors() -> result::Result<(), Box<dyn Error>> {
     assert_eq!(
         Err("parse_bool: first character is not '?'"),
         Parser::parse_bool(&mut "".chars().peekable())
@@ -379,7 +380,7 @@ fn parse_bool_errors() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_string() -> Result<(), Box<dyn Error>> {
+fn parse_string() -> result::Result<(), Box<dyn Error>> {
     let mut input = "\"some string\" ;not string".chars().peekable();
     assert_eq!("some string".to_owned(), Parser::parse_string(&mut input)?);
     assert_eq!(input.collect::<String>(), " ;not string");
@@ -404,7 +405,7 @@ fn parse_string() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_string_errors() -> Result<(), Box<dyn Error>> {
+fn parse_string_errors() -> result::Result<(), Box<dyn Error>> {
     assert_eq!(
         Err("parse_string: first character is not '\"'"),
         Parser::parse_string(&mut "test".chars().peekable())
@@ -429,7 +430,7 @@ fn parse_string_errors() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_token() -> Result<(), Box<dyn Error>> {
+fn parse_token() -> result::Result<(), Box<dyn Error>> {
     let mut input = "*some:token}not token".chars().peekable();
     assert_eq!("*some:token".to_owned(), Parser::parse_token(&mut input)?);
     assert_eq!(input.collect::<String>(), "}not token");
@@ -467,7 +468,7 @@ fn parse_token() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_token_errors() -> Result<(), Box<dyn Error>> {
+fn parse_token_errors() -> result::Result<(), Box<dyn Error>> {
     let mut input = "765token".chars().peekable();
     assert_eq!(
         Err("parse_token: first character is not ALPHA or '*'"),
@@ -487,7 +488,7 @@ fn parse_token_errors() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_byte_sequence() -> Result<(), Box<dyn Error>> {
+fn parse_byte_sequence() -> result::Result<(), Box<dyn Error>> {
     let mut input = ":aGVsbG8:rest_of_str".chars().peekable();
     assert_eq!(
         "hello".to_owned().into_bytes(),
@@ -515,7 +516,7 @@ fn parse_byte_sequence() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_byte_sequence_errors() -> Result<(), Box<dyn Error>> {
+fn parse_byte_sequence_errors() -> result::Result<(), Box<dyn Error>> {
     assert_eq!(
         Err("parse_byte_seq: first char is not ':'"),
         Parser::parse_byte_sequence(&mut "aGVsbG8".chars().peekable())
@@ -532,7 +533,7 @@ fn parse_byte_sequence_errors() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_number_int() -> Result<(), Box<dyn Error>> {
+fn parse_number_int() -> result::Result<(), Box<dyn Error>> {
     let mut input = "-733333333332d.14".chars().peekable();
     assert_eq!(
         Num::Integer(-733333333332),
@@ -589,7 +590,7 @@ fn parse_number_int() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_number_decimal() -> Result<(), Box<dyn Error>> {
+fn parse_number_decimal() -> result::Result<(), Box<dyn Error>> {
     let mut input = "00.42 test string".chars().peekable();
     assert_eq!(
         Num::Decimal(Decimal::from_str("0.42")?),
@@ -630,7 +631,7 @@ fn parse_number_decimal() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_number_errors() -> Result<(), Box<dyn Error>> {
+fn parse_number_errors() -> result::Result<(), Box<dyn Error>> {
     let mut input = ":aGVsbG8:rest".chars().peekable();
     assert_eq!(
         Err("parse_number: input number does not start with a digit"),
@@ -702,7 +703,7 @@ fn parse_number_errors() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_params_string() -> Result<(), Box<dyn Error>> {
+fn parse_params_string() -> result::Result<(), Box<dyn Error>> {
     let mut input = ";b=\"param_val\"".chars().peekable();
     let expected = Parameters::from_iter(vec![(
         "b".to_owned(),
@@ -713,7 +714,7 @@ fn parse_params_string() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_params_bool() -> Result<(), Box<dyn Error>> {
+fn parse_params_bool() -> result::Result<(), Box<dyn Error>> {
     let mut input = ";b;a".chars().peekable();
     let expected = Parameters::from_iter(vec![
         ("b".to_owned(), BareItem::Boolean(true)),
@@ -724,7 +725,7 @@ fn parse_params_bool() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_params_mixed_types() -> Result<(), Box<dyn Error>> {
+fn parse_params_mixed_types() -> result::Result<(), Box<dyn Error>> {
     let mut input = ";key1=?0;key2=746.15".chars().peekable();
     let expected = Parameters::from_iter(vec![
         ("key1".to_owned(), BareItem::Boolean(false)),
@@ -735,7 +736,7 @@ fn parse_params_mixed_types() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_params_with_spaces() -> Result<(), Box<dyn Error>> {
+fn parse_params_with_spaces() -> result::Result<(), Box<dyn Error>> {
     let mut input = "; key1=?0; key2=11111".chars().peekable();
     let expected = Parameters::from_iter(vec![
         ("key1".to_owned(), BareItem::Boolean(false)),
@@ -746,7 +747,7 @@ fn parse_params_with_spaces() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_params_empty() -> Result<(), Box<dyn Error>> {
+fn parse_params_empty() -> result::Result<(), Box<dyn Error>> {
     assert_eq!(
         Parameters::new(),
         Parser::parse_parameters(&mut " key1=?0; key2=11111".chars().peekable())?
@@ -767,7 +768,7 @@ fn parse_params_empty() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_key() -> Result<(), Box<dyn Error>> {
+fn parse_key() -> result::Result<(), Box<dyn Error>> {
     assert_eq!(
         "a".to_owned(),
         Parser::parse_key(&mut "a=1".chars().peekable())?
@@ -788,7 +789,7 @@ fn parse_key() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn parse_key_errors() -> Result<(), Box<dyn Error>> {
+fn parse_key_errors() -> result::Result<(), Box<dyn Error>> {
     assert_eq!(
         Err("parse_key: first character is not lcalpha or '*'"),
         Parser::parse_key(&mut "[*f=10".chars().peekable())

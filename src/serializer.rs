@@ -3,11 +3,11 @@ use data_encoding::BASE64;
 use rust_decimal::prelude::Zero;
 
 pub trait SerializeHeader {
-    fn serialize(input_dict: &Self, output: &mut String) -> Res<()>;
+    fn serialize(input_dict: &Self, output: &mut String) -> Result<()>;
 }
 
 impl SerializeHeader for Dictionary {
-    fn serialize(input_dict: &Dictionary, output: &mut String) -> Res<()> {
+    fn serialize(input_dict: &Dictionary, output: &mut String) -> Result<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-dictionary
 
         for (idx, (member_name, member_value)) in input_dict.iter().enumerate() {
@@ -42,7 +42,7 @@ impl SerializeHeader for Dictionary {
 }
 
 impl SerializeHeader for List {
-    fn serialize(input_list: &List, output: &mut String) -> Res<()> {
+    fn serialize(input_list: &List, output: &mut String) -> Result<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-list
 
         for (idx, member) in input_list.iter().enumerate() {
@@ -67,7 +67,7 @@ impl SerializeHeader for List {
 }
 
 impl SerializeHeader for Item {
-    fn serialize(input_item: &Item, output: &mut String) -> Res<()> {
+    fn serialize(input_item: &Item, output: &mut String) -> Result<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-item
 
         Serializer::serialize_bare_item(&input_item.0, output)?;
@@ -79,13 +79,13 @@ impl SerializeHeader for Item {
 pub struct Serializer;
 
 impl Serializer {
-    pub fn serialize<T: SerializeHeader>(header: &T) -> Res<String> {
+    pub fn serialize<T: SerializeHeader>(header: &T) -> Result<String> {
         let mut output = String::new();
         T::serialize(header, &mut output)?;
         Ok(output)
     }
 
-    fn serialize_inner_list(input_inner_list: &InnerList, output: &mut String) -> Res<()> {
+    fn serialize_inner_list(input_inner_list: &InnerList, output: &mut String) -> Result<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-innerlist
 
         let items = &input_inner_list.0;
@@ -105,7 +105,10 @@ impl Serializer {
         Ok(())
     }
 
-    pub(crate) fn serialize_bare_item(input_bare_item: &BareItem, output: &mut String) -> Res<()> {
+    pub(crate) fn serialize_bare_item(
+        input_bare_item: &BareItem,
+        output: &mut String,
+    ) -> Result<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-bare-item
 
         match input_bare_item {
@@ -119,7 +122,10 @@ impl Serializer {
         Ok(())
     }
 
-    pub(crate) fn serialize_parameters(input_params: &Parameters, output: &mut String) -> Res<()> {
+    pub(crate) fn serialize_parameters(
+        input_params: &Parameters,
+        output: &mut String,
+    ) -> Result<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-params
 
         for (param_name, param_value) in input_params.iter() {
@@ -134,7 +140,7 @@ impl Serializer {
         Ok(())
     }
 
-    pub(crate) fn serialize_key(input_key: &str, output: &mut String) -> Res<()> {
+    pub(crate) fn serialize_key(input_key: &str, output: &mut String) -> Result<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-key
 
         let disallowed_chars =
@@ -153,7 +159,7 @@ impl Serializer {
         Ok(())
     }
 
-    pub(crate) fn serialize_integer(value: i64, output: &mut String) -> Res<()> {
+    pub(crate) fn serialize_integer(value: i64, output: &mut String) -> Result<()> {
         //https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-integer
 
         let (min_int, max_int) = (-999_999_999_999_999_i64, 999_999_999_999_999_i64);
@@ -164,7 +170,7 @@ impl Serializer {
         Ok(())
     }
 
-    pub(crate) fn serialize_decimal(value: Decimal, output: &mut String) -> Res<()> {
+    pub(crate) fn serialize_decimal(value: Decimal, output: &mut String) -> Result<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-decimal
 
         let integer_comp_length = 12;
@@ -189,7 +195,7 @@ impl Serializer {
         Ok(())
     }
 
-    pub(crate) fn serialize_string(value: &str, output: &mut String) -> Res<()> {
+    pub(crate) fn serialize_string(value: &str, output: &mut String) -> Result<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-integer
 
         if !value.is_ascii() {
@@ -213,7 +219,7 @@ impl Serializer {
         Ok(())
     }
 
-    pub(crate) fn serialize_token(value: &str, output: &mut String) -> Res<()> {
+    pub(crate) fn serialize_token(value: &str, output: &mut String) -> Result<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-token
 
         if !value.is_ascii() {
@@ -238,7 +244,7 @@ impl Serializer {
         Ok(())
     }
 
-    pub(crate) fn serialize_byte_sequence(value: &[u8], output: &mut String) -> Res<()> {
+    pub(crate) fn serialize_byte_sequence(value: &[u8], output: &mut String) -> Result<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-binary
 
         output.push(':');
@@ -248,7 +254,7 @@ impl Serializer {
         Ok(())
     }
 
-    pub(crate) fn serialize_bool(value: bool, output: &mut String) -> Res<()> {
+    pub(crate) fn serialize_bool(value: bool, output: &mut String) -> Result<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-boolean
 
         let val = if value { "?1" } else { "?0" };
