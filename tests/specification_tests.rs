@@ -5,8 +5,9 @@ use serde_json::Value;
 use std::error::Error;
 use std::path::PathBuf;
 use std::{env, fs};
-use structured_headers::parser::*;
+use structured_headers::parser::Parser;
 use structured_headers::serializer::Serializer;
+use structured_headers::{BareItem, Dictionary, InnerList, Item, List, ListEntry, Num, Parameters};
 
 #[derive(Debug, PartialEq, Deserialize)]
 struct TestData {
@@ -19,6 +20,13 @@ struct TestData {
     canonical: Option<Vec<String>>,
 }
 
+#[derive(Debug, PartialEq)]
+enum Header {
+    Item(Item),
+    List(List),
+    Dict(Dictionary),
+}
+
 fn run_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
     println!("- {}", &test_case.name);
 
@@ -27,7 +35,13 @@ fn run_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
         .as_ref()
         .ok_or("raw value is not specified")?
         .join(", ");
-    let actual_result = Parser::parse(input.as_bytes(), &test_case.header_type);
+
+    let actual_result = match test_case.header_type.as_str() {
+        "item" => Parser::parse_item_header(input.as_bytes()).map(|itm| Header::Item(itm)),
+        "list" => Parser::parse_list_header(input.as_bytes()).map(|lst| Header::List(lst)),
+        "dictionary" => Parser::parse_dict_header(input.as_bytes()).map(|dict| Header::Dict(dict)),
+        _ => return Err("spec_tests: unexpected header type in test case".into()),
+    };
 
     // Check that actual result for must_fail tests is Err
     if let Some(true) = test_case.must_fail {
@@ -40,7 +54,7 @@ fn run_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
 
     // Test parsing
     match (&actual_header, &expected_header) {
-        (Header::Dictionary(val1), Header::Dictionary(val2)) => {
+        (Header::Dict(val1), Header::Dict(val2)) => {
             assert!(val1.iter().eq(val2.iter()));
         }
         (Header::List(val1), Header::List(val2)) => {
@@ -54,14 +68,23 @@ fn run_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
     // Test serialization
     if let Some(canonical_val) = &test_case.canonical {
         let expected_serialized = canonical_val.join("");
-        assert_eq!(expected_serialized, Serializer::serialize(&actual_header)?)
+        let actual_serialized = match actual_header {
+            Header::Item(value) => Serializer::serialize::<Item>(&value),
+            Header::List(value) => Serializer::serialize::<List>(&value),
+            Header::Dict(value) => Serializer::serialize::<Dictionary>(&value),
+        }?;
+        assert_eq!(expected_serialized, actual_serialized);
     }
     Ok(())
 }
 
 fn run_test_case_serialzation_only(test_case: &TestData) -> Result<(), Box<dyn Error>> {
     let expected_header = build_expected_header(test_case)?;
-    let actual_result = Serializer::serialize(&expected_header);
+    let actual_result = match expected_header {
+        Header::Item(value) => Serializer::serialize::<Item>(&value),
+        Header::List(value) => Serializer::serialize::<List>(&value),
+        Header::Dict(value) => Serializer::serialize::<Dictionary>(&value),
+    };
 
     if let Some(true) = test_case.must_fail {
         assert!(actual_result.is_err());
@@ -95,7 +118,7 @@ fn build_expected_header(test_case: &TestData) -> Result<Header, Box<dyn Error>>
         }
         "dictionary" => {
             let dict = build_dict(expected_value)?;
-            Ok(Header::Dictionary(dict))
+            Ok(Header::Dict(dict))
         }
         _ => return Err("unknown header_type value".into()),
     }
