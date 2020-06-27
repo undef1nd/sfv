@@ -1,4 +1,4 @@
-name: Rust checks
+name: CI
 
 on: [push]
 
