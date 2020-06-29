@@ -4,8 +4,12 @@ pub use rust_decimal::Decimal;
 
 pub mod parser;
 pub mod serializer;
-pub(crate) mod test_parser;
-pub(crate) mod test_serializer;
+
+#[cfg(test)]
+mod test_parser;
+
+#[cfg(test)]
+mod test_serializer;
 
 // Alias for Result with &'static str as Err
 // std::result::Result is used in tests
