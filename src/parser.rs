@@ -422,7 +422,3 @@ impl Parser {
         Ok(output)
     }
 }
-
-#[cfg(test)]
-#[path = "./test_parser.rs"]
-mod test_serializer;

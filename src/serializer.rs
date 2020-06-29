@@ -274,7 +274,3 @@ impl Serializer {
         Ok(())
     }
 }
-
-#[cfg(test)]
-#[path = "./test_serializer.rs"]
-mod test_serializer;
