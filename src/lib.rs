@@ -19,7 +19,7 @@ pub type Dictionary = IndexMap<String, ListEntry>;
 pub type Parameters = IndexMap<String, BareItem>;
 pub type List = Vec<ListEntry>;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ListEntry {
     Item(Item),
     InnerList(InnerList),
@@ -37,19 +37,19 @@ impl From<InnerList> for ListEntry {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct InnerList(pub Vec<Item>, pub Parameters);
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Item(pub BareItem, pub Parameters);
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Num {
     Decimal(Decimal),
     Integer(i64),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum BareItem {
     Number(Num),
     String(String),
