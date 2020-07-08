@@ -1,27 +1,27 @@
 use crate::serializer::*;
 use crate::*;
 use rust_decimal::prelude::FromStr;
-use serializer::SerializeHeader;
+use serializer::SerializeValue;
 use std::error::Error;
 use std::iter::FromIterator;
 use std::result;
 
 #[test]
-fn serialize_header_empty_dict() -> result::Result<(), Box<dyn Error>> {
-    let dict_header = Dictionary::new();
-    assert_eq!("", dict_header.serialize()?);
+fn serialize_value_empty_dict() -> result::Result<(), Box<dyn Error>> {
+    let dict_field_value = Dictionary::new();
+    assert_eq!("", dict_field_value.serialize_value()?);
     Ok(())
 }
 
 #[test]
-fn serialize_header_empty_list() -> result::Result<(), Box<dyn Error>> {
-    let list_header = List::new();
-    assert_eq!("", list_header.serialize()?);
+fn serialize_value_empty_list() -> result::Result<(), Box<dyn Error>> {
+    let list_field_value = List::new();
+    assert_eq!("", list_field_value.serialize_value()?);
     Ok(())
 }
 
 #[test]
-fn serialize_header_list_mixed_members_with_params() -> result::Result<(), Box<dyn Error>> {
+fn serialize_value_list_mixed_members_with_params() -> result::Result<(), Box<dyn Error>> {
     let item1 = Item(Decimal::from_str("42.4568")?.into(), Parameters::new());
     let item2_param = Parameters::from_iter(vec![("itm2_p".to_owned(), BareItem::Boolean(true))]);
     let item2 = Item(17.into(), item2_param);
@@ -40,21 +40,21 @@ fn serialize_header_list_mixed_members_with_params() -> result::Result<(), Box<d
     )]);
     let inner_list = InnerList(vec![inner_list_item1, inner_list_item2], inner_list_param);
 
-    let list_header: List = vec![item1.into(), item2.into(), inner_list.into()];
+    let list_field_value: List = vec![item1.into(), item2.into(), inner_list.into()];
     let expected = "42.457, 17;itm2_p, (\"str1\";in1_p=?0 str2;in2_p=\"valu\\\\e\");inner_list_param=:d2VhdGhlcg==:";
-    assert_eq!(expected, list_header.serialize()?);
+    assert_eq!(expected, list_field_value.serialize_value()?);
     Ok(())
 }
 
 #[test]
-fn serialize_header_errors() -> result::Result<(), Box<dyn Error>> {
+fn serialize_value_errors() -> result::Result<(), Box<dyn Error>> {
     let disallowed_item = Item(
         BareItem::String("non-ascii text 🐹".into()),
         Parameters::new(),
     );
     assert_eq!(
         Err("serialize_string: non-ascii character"),
-        disallowed_item.serialize()
+        disallowed_item.serialize_value()
     );
 
     let disallowed_item = Item(
@@ -63,14 +63,14 @@ fn serialize_header_errors() -> result::Result<(), Box<dyn Error>> {
     );
     assert_eq!(
         Err("serialize_decimal: integer component > 12 digits"),
-        disallowed_item.serialize()
+        disallowed_item.serialize_value()
     );
 
     let param_with_disallowed_key = Parameters::from_iter(vec![("_key".to_owned(), 13.into())]);
     let disallowed_item = Item(12.into(), param_with_disallowed_key);
     assert_eq!(
         Err("serialize_key: first character is not lcalpha or '*'"),
-        disallowed_item.serialize()
+        disallowed_item.serialize_value()
     );
     Ok(())
 }

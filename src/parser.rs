@@ -3,13 +3,13 @@ use rust_decimal::prelude::*;
 use std::iter::Peekable;
 use std::str::{from_utf8, Chars};
 
-pub trait ParseHeader {
+pub trait ParseValue {
     fn parse(input_chars: &mut Peekable<Chars>) -> Result<Self>
     where
         Self: Sized;
 }
 
-impl ParseHeader for Item {
+impl ParseValue for Item {
     fn parse(input_chars: &mut Peekable<Chars>) -> Result<Item> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-item
         let bare_item = Parser::parse_bare_item(input_chars)?;
@@ -19,7 +19,7 @@ impl ParseHeader for Item {
     }
 }
 
-impl ParseHeader for List {
+impl ParseValue for List {
     fn parse(input_chars: &mut Peekable<Chars>) -> Result<List> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-list
         // List represents an array of (item_or_inner_list, parameters)
@@ -52,7 +52,7 @@ impl ParseHeader for List {
     }
 }
 
-impl ParseHeader for Dictionary {
+impl ParseValue for Dictionary {
     fn parse(input_chars: &mut Peekable<Chars>) -> Result<Dictionary> {
         let mut dict = Dictionary::new();
 
@@ -95,19 +95,19 @@ impl ParseHeader for Dictionary {
 pub struct Parser;
 
 impl Parser {
-    pub fn parse_dict_header(input_bytes: &[u8]) -> Result<Dictionary> {
+    pub fn parse_dictionary(input_bytes: &[u8]) -> Result<Dictionary> {
         Self::parse::<Dictionary>(input_bytes)
     }
 
-    pub fn parse_list_header(input_bytes: &[u8]) -> Result<List> {
+    pub fn parse_list(input_bytes: &[u8]) -> Result<List> {
         Self::parse::<List>(input_bytes)
     }
 
-    pub fn parse_item_header(input_bytes: &[u8]) -> Result<Item> {
+    pub fn parse_item(input_bytes: &[u8]) -> Result<Item> {
         Self::parse::<Item>(input_bytes)
     }
 
-    fn parse<T: ParseHeader>(input_bytes: &[u8]) -> Result<T> {
+    fn parse<T: ParseValue>(input_bytes: &[u8]) -> Result<T> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#text-parse
         if !input_bytes.is_ascii() {
             return Err("parse: non-ascii characters in input");

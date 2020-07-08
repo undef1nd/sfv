@@ -2,12 +2,12 @@ use data_encoding::BASE32;
 use rust_decimal::prelude::*;
 use serde::Deserialize;
 use serde_json::Value;
+use sfv::parser::Parser;
+use sfv::serializer::{SerializeValue, Serializer};
+use sfv::{BareItem, Dictionary, InnerList, Item, List, ListEntry, Num, Parameters};
 use std::error::Error;
 use std::path::PathBuf;
 use std::{env, fs};
-use structured_headers::parser::Parser;
-use structured_headers::serializer::{SerializeHeader, Serializer};
-use structured_headers::{BareItem, Dictionary, InnerList, Item, List, ListEntry, Num, Parameters};
 
 #[derive(Debug, PartialEq, Deserialize)]
 struct TestData {
@@ -21,17 +21,17 @@ struct TestData {
 }
 
 #[derive(Debug, PartialEq)]
-enum Header {
+enum FieldType {
     Item(Item),
     List(List),
     Dict(Dictionary),
 }
-impl Header {
+impl FieldType {
     fn serialize(&self) -> Result<String, &'static str> {
         match self {
-            Header::Item(value) => value.serialize(),
-            Header::List(value) => value.serialize(),
-            Header::Dict(value) => value.serialize(),
+            FieldType::Item(value) => value.serialize_value(),
+            FieldType::List(value) => value.serialize_value(),
+            FieldType::Dict(value) => value.serialize_value(),
         }
     }
 }
@@ -46,10 +46,12 @@ fn run_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
         .join(", ");
 
     let actual_result = match test_case.header_type.as_str() {
-        "item" => Parser::parse_item_header(input.as_bytes()).map(|itm| Header::Item(itm)),
-        "list" => Parser::parse_list_header(input.as_bytes()).map(|lst| Header::List(lst)),
-        "dictionary" => Parser::parse_dict_header(input.as_bytes()).map(|dict| Header::Dict(dict)),
-        _ => return Err("spec_tests: unexpected header type in test case".into()),
+        "item" => Parser::parse_item(input.as_bytes()).map(|itm| FieldType::Item(itm)),
+        "list" => Parser::parse_list(input.as_bytes()).map(|lst| FieldType::List(lst)),
+        "dictionary" => {
+            Parser::parse_dictionary(input.as_bytes()).map(|dict| FieldType::Dict(dict))
+        }
+        _ => return Err("spec_tests: unexpected field value type in test case".into()),
     };
 
     // Check that actual result for must_fail tests is Err
@@ -58,34 +60,34 @@ fn run_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
-    let expected_header = build_expected_header(test_case)?;
-    let actual_header = actual_result?;
+    let expected_field_value = build_expected_field_value(test_case)?;
+    let actual_field_value = actual_result?;
 
     // Test parsing
-    match (&actual_header, &expected_header) {
-        (Header::Dict(val1), Header::Dict(val2)) => {
+    match (&actual_field_value, &expected_field_value) {
+        (FieldType::Dict(val1), FieldType::Dict(val2)) => {
             assert!(val1.iter().eq(val2.iter()));
         }
-        (Header::List(val1), Header::List(val2)) => {
+        (FieldType::List(val1), FieldType::List(val2)) => {
             assert!(val1.iter().eq(val2.iter()));
         }
         (_, _) => {
-            assert_eq!(expected_header, actual_header);
+            assert_eq!(expected_field_value, actual_field_value);
         }
     }
 
     // Test serialization
     if let Some(canonical_val) = &test_case.canonical {
         let expected_serialized = canonical_val.join("");
-        let actual_serialized = actual_header.serialize()?;
+        let actual_serialized = actual_field_value.serialize()?;
         assert_eq!(expected_serialized, actual_serialized);
     }
     Ok(())
 }
 
 fn run_test_case_serialzation_only(test_case: &TestData) -> Result<(), Box<dyn Error>> {
-    let expected_header = build_expected_header(test_case)?;
-    let actual_result = expected_header.serialize();
+    let expected_field_value = build_expected_field_value(test_case)?;
+    let actual_result = expected_field_value.serialize();
 
     if let Some(true) = test_case.must_fail {
         assert!(actual_result.is_err());
@@ -101,27 +103,27 @@ fn run_test_case_serialzation_only(test_case: &TestData) -> Result<(), Box<dyn E
     Ok(())
 }
 
-fn build_expected_header(test_case: &TestData) -> Result<Header, Box<dyn Error>> {
+fn build_expected_field_value(test_case: &TestData) -> Result<FieldType, Box<dyn Error>> {
     let expected_value = test_case
         .expected
         .as_ref()
         .ok_or("test expected value is not specified")?;
 
-    // Build expected Header from serde Value
+    // Build expected Structured Field Value from serde Value
     match test_case.header_type.as_str() {
         "item" => {
             let item = build_item(expected_value)?;
-            Ok(Header::Item(item))
+            Ok(FieldType::Item(item))
         }
         "list" => {
             let list = build_list(expected_value)?;
-            Ok(Header::List(list))
+            Ok(FieldType::List(list))
         }
         "dictionary" => {
             let dict = build_dict(expected_value)?;
-            Ok(Header::Dict(dict))
+            Ok(FieldType::Dict(dict))
         }
-        _ => return Err("unknown header_type value".into()),
+        _ => return Err("unknown field type".into()),
     }
 }
 
