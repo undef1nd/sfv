@@ -1,6 +1,6 @@
 [package]
 name = "sfv"
-description = "Structured Field Values for HTTP. Implementation of IETF draft https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html v19"
+description = "Structured Field Values for HTTP. Implementation of IETF draft https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html"
 version = "0.1.0"
 authors = ["Tania Batieva <yalyna.ts@gmail.com>"]
 edition = "2018"
