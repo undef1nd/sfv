@@ -2,28 +2,28 @@ use crate::*;
 use data_encoding::BASE64;
 use rust_decimal::prelude::Zero;
 
-pub trait SerializeHeader {
-    fn serialize(&self) -> Result<String>;
+pub trait SerializeValue {
+    fn serialize_value(&self) -> Result<String>;
 }
 
-impl SerializeHeader for Dictionary {
-    fn serialize(&self) -> Result<String> {
+impl SerializeValue for Dictionary {
+    fn serialize_value(&self) -> Result<String> {
         let mut output = String::new();
         Serializer::serialize_dict(self, &mut output)?;
         Ok(output)
     }
 }
 
-impl SerializeHeader for List {
-    fn serialize(&self) -> Result<String> {
+impl SerializeValue for List {
+    fn serialize_value(&self) -> Result<String> {
         let mut output = String::new();
         Serializer::serialize_list(self, &mut output)?;
         Ok(output)
     }
 }
 
-impl SerializeHeader for Item {
-    fn serialize(&self) -> Result<String> {
+impl SerializeValue for Item {
+    fn serialize_value(&self) -> Result<String> {
         let mut output = String::new();
         Serializer::serialize_item(self, &mut output)?;
         Ok(output)

@@ -1,6 +1,9 @@
 mod utils;
 use indexmap::IndexMap;
-pub use rust_decimal::Decimal;
+pub use rust_decimal::{
+    prelude::{FromPrimitive, FromStr},
+    Decimal,
+};
 
 pub mod parser;
 pub mod serializer;
