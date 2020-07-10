@@ -1,18 +1,20 @@
+mod parser;
+mod serializer;
 mod utils;
+
+#[cfg(test)]
+mod test_parser;
+#[cfg(test)]
+mod test_serializer;
 use indexmap::IndexMap;
+
 pub use rust_decimal::{
     prelude::{FromPrimitive, FromStr},
     Decimal,
 };
 
-pub mod parser;
-pub mod serializer;
-
-#[cfg(test)]
-mod test_parser;
-
-#[cfg(test)]
-mod test_serializer;
+pub use parser::{ParseValue, Parser};
+pub use serializer::SerializeValue;
 
 // Alias for Result with &'static str as Err
 // std::result::Result is used in tests

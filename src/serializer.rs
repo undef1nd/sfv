@@ -1,4 +1,7 @@
-use crate::*;
+use crate::utils;
+use crate::{
+    BareItem, Decimal, Dictionary, InnerList, Item, List, ListEntry, Num, Parameters, Result,
+};
 use data_encoding::BASE64;
 use rust_decimal::prelude::Zero;
 
@@ -30,7 +33,7 @@ impl SerializeValue for Item {
     }
 }
 
-pub struct Serializer;
+pub(crate) struct Serializer;
 
 impl Serializer {
     pub(crate) fn serialize_item(input_item: &Item, output: &mut String) -> Result<()> {
@@ -41,6 +44,7 @@ impl Serializer {
         Ok(())
     }
 
+    #[deny(clippy::ptr_arg)]
     pub(crate) fn serialize_list(input_list: &List, output: &mut String) -> Result<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-list
 
