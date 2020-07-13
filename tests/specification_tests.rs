@@ -1,10 +1,10 @@
 use data_encoding::BASE32;
-use rust_decimal::prelude::*;
 use serde::Deserialize;
 use serde_json::Value;
-use sfv::parser::Parser;
-use sfv::serializer::{SerializeValue, Serializer};
-use sfv::{BareItem, Dictionary, InnerList, Item, List, ListEntry, Num, Parameters};
+use sfv::FromStr;
+use sfv::Parser;
+use sfv::SerializeValue;
+use sfv::{BareItem, Decimal, Dictionary, InnerList, Item, List, ListEntry, Num, Parameters};
 use std::error::Error;
 use std::path::PathBuf;
 use std::{env, fs};
