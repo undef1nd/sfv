@@ -13,7 +13,7 @@ pub use rust_decimal::{
     Decimal,
 };
 
-pub use parser::{ParseValue, Parser};
+pub use parser::{ParseMore, ParseValue, Parser};
 pub use serializer::SerializeValue;
 
 // Alias for Result with &'static str as Err

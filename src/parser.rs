@@ -12,6 +12,12 @@ pub trait ParseValue {
         Self: Sized;
 }
 
+pub trait ParseMore {
+    fn parse_more(self, input_bytes: &[u8]) -> Result<Self>
+    where
+        Self: Sized;
+}
+
 impl ParseValue for Item {
     fn parse(input_chars: &mut Peekable<Chars>) -> Result<Item> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-item
@@ -92,6 +98,22 @@ impl ParseValue for Dictionary {
             }
         }
         Ok(dict)
+    }
+}
+
+impl ParseMore for List {
+    fn parse_more(mut self, input_bytes: &[u8]) -> Result<List> {
+        let parsed_list = Parser::parse_list(input_bytes)?;
+        self.extend(parsed_list);
+        Ok(self)
+    }
+}
+
+impl ParseMore for Dictionary {
+    fn parse_more(mut self, input_bytes: &[u8]) -> Result<Dictionary> {
+        let parsed_dict = Parser::parse_dictionary(input_bytes)?;
+        self.extend(parsed_dict);
+        Ok(self)
     }
 }
 
