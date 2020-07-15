@@ -1,6 +1,6 @@
 use crate::FromStr;
 use crate::{BareItem, Decimal, Dictionary, InnerList, Item, List, Num, Parameters};
-use crate::{ParseValue, Parser};
+use crate::{ParseMore, ParseValue, Parser};
 use std::error::Error;
 use std::iter::FromIterator;
 use std::result;
@@ -794,5 +794,38 @@ fn parse_key_errors() -> result::Result<(), Box<dyn Error>> {
         Err("parse_key: first character is not lcalpha or '*'"),
         Parser::parse_key(&mut "[*f=10".chars().peekable())
     );
+    Ok(())
+}
+
+#[test]
+fn parse_more_list() -> result::Result<(), Box<dyn Error>> {
+    let item1 = Item(1.into(), Parameters::new());
+    let item2 = Item(2.into(), Parameters::new());
+    let item3 = Item(42.into(), Parameters::new());
+    let inner_list_1 = InnerList(vec![item1, item2], Parameters::new());
+    let expected_list: List = vec![inner_list_1.into(), item3.into()];
+
+    let mut parsed_list = Parser::parse_list("(1 2)".as_bytes())?;
+    assert!(parsed_list.parse_more("42".as_bytes()).is_ok());
+    assert_eq!(expected_list, parsed_list);
+    Ok(())
+}
+
+#[test]
+fn parse_more_dict() -> result::Result<(), Box<dyn Error>> {
+    let item2_params =
+        Parameters::from_iter(vec![("foo".to_owned(), BareItem::Token("*".to_owned()))]);
+    let item1 = Item(1.into(), Parameters::new());
+    let item2 = Item(BareItem::Boolean(true), item2_params);
+    let item3 = Item(3.into(), Parameters::new());
+    let expected_dict = Dictionary::from_iter(vec![
+        ("a".to_owned(), item1.into()),
+        ("b".to_owned(), item2.into()),
+        ("c".to_owned(), item3.into()),
+    ]);
+
+    let mut parsed_dict = Parser::parse_dictionary("a=1, b;foo=*".as_bytes())?;
+    assert!(parsed_dict.parse_more(" c=3".as_bytes()).is_ok());
+    assert_eq!(expected_dict, parsed_dict);
     Ok(())
 }
