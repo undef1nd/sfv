@@ -13,7 +13,9 @@ pub trait ParseValue {
 }
 
 pub trait ParseMore {
-    fn parse_more(&mut self, input_bytes: &[u8]) -> Result<()>;
+    fn parse_more(self, input_bytes: &[u8]) -> Result<Self>
+    where
+        Self: Sized;
 }
 
 impl ParseValue for Item {
@@ -100,18 +102,18 @@ impl ParseValue for Dictionary {
 }
 
 impl ParseMore for List {
-    fn parse_more(&mut self, input_bytes: &[u8]) -> Result<()> {
+    fn parse_more(mut self, input_bytes: &[u8]) -> Result<List> {
         let parsed_list = Parser::parse_list(input_bytes)?;
         self.extend(parsed_list);
-        Ok(())
+        Ok(self)
     }
 }
 
 impl ParseMore for Dictionary {
-    fn parse_more(&mut self, input_bytes: &[u8]) -> Result<()> {
+    fn parse_more(mut self, input_bytes: &[u8]) -> Result<Dictionary> {
         let parsed_dict = Parser::parse_dictionary(input_bytes)?;
         self.extend(parsed_dict);
-        Ok(())
+        Ok(self)
     }
 }
 
