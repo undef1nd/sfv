@@ -1,10 +1,13 @@
 [package]
 name = "sfv"
-description = "Structured Field Values for HTTP. Implementation of IETF draft https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html"
 version = "0.1.0"
 authors = ["Tania Batieva <yalyna.ts@gmail.com>"]
 edition = "2018"
 license = "MIT/Apache-2.0"
+description = "Structured Field Values for HTTP. Implementation of IETF draft https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html"
+repository = "https://github.com/undef1nd/sfv"
+keywords = ["http-header", "structured-header", ]
+exclude = ["tests/**"]
 
 
 [dependencies]
