@@ -2,4 +2,4 @@
 
 # Structured Field Values for HTTP
 
-https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html
+Implementation of IETF draft https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html
