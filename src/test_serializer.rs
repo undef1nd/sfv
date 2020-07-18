@@ -9,14 +9,20 @@ use std::result;
 #[test]
 fn serialize_value_empty_dict() -> result::Result<(), Box<dyn Error>> {
     let dict_field_value = Dictionary::new();
-    assert_eq!("", dict_field_value.serialize_value()?);
+    assert_eq!(
+        Err("serialize_dictionary: serializing empty field is not allowed"),
+        dict_field_value.serialize_value()
+    );
     Ok(())
 }
 
 #[test]
 fn serialize_value_empty_list() -> result::Result<(), Box<dyn Error>> {
     let list_field_value = List::new();
-    assert_eq!("", list_field_value.serialize_value()?);
+    assert_eq!(
+        Err("serialize_list: serializing empty field is not allowed"),
+        list_field_value.serialize_value()
+    );
     Ok(())
 }
 
