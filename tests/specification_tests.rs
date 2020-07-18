@@ -78,14 +78,17 @@ fn run_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
 
     // Test serialization
     if let Some(canonical_val) = &test_case.canonical {
-        let expected_serialized = canonical_val.join("");
-        let actual_serialized = actual_field_value.serialize()?;
-        assert_eq!(expected_serialized, actual_serialized);
+        let actual_result = actual_field_value.serialize();
+        if canonical_val.is_empty() {
+            assert!(actual_result.is_err());
+        } else {
+            assert_eq!(canonical_val[0], actual_result?);
+        }
     }
     Ok(())
 }
 
-fn run_test_case_serialzation_only(test_case: &TestData) -> Result<(), Box<dyn Error>> {
+fn run_test_case_serialization_only(test_case: &TestData) -> Result<(), Box<dyn Error>> {
     let expected_field_value = build_expected_field_value(test_case)?;
     let actual_result = expected_field_value.serialize();
 
@@ -96,8 +99,11 @@ fn run_test_case_serialzation_only(test_case: &TestData) -> Result<(), Box<dyn E
 
     // Test serialization
     if let Some(canonical_val) = &test_case.canonical {
-        let expected_serialized = canonical_val.join("");
-        assert_eq!(expected_serialized, actual_result?);
+        if canonical_val.is_empty() {
+            assert!(actual_result.is_err());
+        } else {
+            assert_eq!(canonical_val[0], actual_result?);
+        }
     }
 
     Ok(())
@@ -263,7 +269,7 @@ fn run_test_suite(tests_file: PathBuf, is_serialization: bool) -> Result<(), Box
     let test_cases: Vec<TestData> = serde_json::from_reader(fs::File::open(tests_file)?)?;
     for test_data in test_cases.iter() {
         if is_serialization {
-            run_test_case_serialzation_only(test_data)?;
+            run_test_case_serialization_only(test_data)?;
         } else {
             run_test_case(test_data)?;
         }

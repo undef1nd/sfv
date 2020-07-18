@@ -47,6 +47,9 @@ impl Serializer {
     #[deny(clippy::ptr_arg)]
     pub(crate) fn serialize_list(input_list: &List, output: &mut String) -> Result<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-list
+        if input_list.len() == 0 {
+            return Err("serialize_list: serializing empty field is not allowed");
+        }
 
         for (idx, member) in input_list.iter().enumerate() {
             match member {
@@ -70,6 +73,9 @@ impl Serializer {
 
     pub(crate) fn serialize_dict(input_dict: &Dictionary, output: &mut String) -> Result<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-dictionary
+        if input_dict.len() == 0 {
+            return Err("serialize_dictionary: serializing empty field is not allowed");
+        }
 
         for (idx, (member_name, member_value)) in input_dict.iter().enumerate() {
             Serializer::serialize_key(member_name, output)?;
