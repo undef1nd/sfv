@@ -805,8 +805,8 @@ fn parse_more_list() -> result::Result<(), Box<dyn Error>> {
     let inner_list_1 = InnerList(vec![item1, item2], Parameters::new());
     let expected_list: List = vec![inner_list_1.into(), item3.into()];
 
-    let parsed_first_line = Parser::parse_list("(1 2)".as_bytes())?;
-    let parsed_header = parsed_first_line.parse_more("42".as_bytes())?;
+    let mut parsed_header = Parser::parse_list("(1 2)".as_bytes())?;
+    let _ = parsed_header.parse_more("42".as_bytes())?;
     assert_eq!(expected_list, parsed_header);
     Ok(())
 }
@@ -824,8 +824,8 @@ fn parse_more_dict() -> result::Result<(), Box<dyn Error>> {
         ("c".to_owned(), item3.into()),
     ]);
 
-    let parsed_first_line = Parser::parse_dictionary("a=1, b;foo=*\t\t".as_bytes())?;
-    let parsed_header = parsed_first_line.parse_more(" c=3".as_bytes())?;
+    let mut parsed_header = Parser::parse_dictionary("a=1, b;foo=*\t\t".as_bytes())?;
+    let _ = parsed_header.parse_more(" c=3".as_bytes())?;
     assert_eq!(expected_dict, parsed_header);
     Ok(())
 }
