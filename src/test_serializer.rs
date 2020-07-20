@@ -4,10 +4,9 @@ use crate::SerializeValue;
 use crate::{BareItem, Decimal, Dictionary, InnerList, Item, List, Parameters};
 use std::error::Error;
 use std::iter::FromIterator;
-use std::result;
 
 #[test]
-fn serialize_value_empty_dict() -> result::Result<(), Box<dyn Error>> {
+fn serialize_value_empty_dict() -> Result<(), Box<dyn Error>> {
     let dict_field_value = Dictionary::new();
     assert_eq!(
         Err("serialize_dictionary: serializing empty field is not allowed"),
@@ -17,7 +16,7 @@ fn serialize_value_empty_dict() -> result::Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn serialize_value_empty_list() -> result::Result<(), Box<dyn Error>> {
+fn serialize_value_empty_list() -> Result<(), Box<dyn Error>> {
     let list_field_value = List::new();
     assert_eq!(
         Err("serialize_list: serializing empty field is not allowed"),
@@ -27,7 +26,7 @@ fn serialize_value_empty_list() -> result::Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn serialize_value_list_mixed_members_with_params() -> result::Result<(), Box<dyn Error>> {
+fn serialize_value_list_mixed_members_with_params() -> Result<(), Box<dyn Error>> {
     let item1 = Item::new(Decimal::from_str("42.4568")?.into());
     let item2_param = Parameters::from_iter(vec![("itm2_p".to_owned(), BareItem::Boolean(true))]);
     let item2 = Item::with_params(17.into(), item2_param);
@@ -56,7 +55,7 @@ fn serialize_value_list_mixed_members_with_params() -> result::Result<(), Box<dy
 }
 
 #[test]
-fn serialize_value_errors() -> result::Result<(), Box<dyn Error>> {
+fn serialize_value_errors() -> Result<(), Box<dyn Error>> {
     let disallowed_item = Item::new(BareItem::String("non-ascii text 🐹".into()));
     assert_eq!(
         Err("serialize_string: non-ascii character"),
@@ -79,7 +78,7 @@ fn serialize_value_errors() -> result::Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn serialize_item_byteseq_with_param() -> result::Result<(), Box<dyn Error>> {
+fn serialize_item_byteseq_with_param() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
 
     let item_param = ("a".to_owned(), BareItem::Token("*ab_1".into()));
@@ -91,7 +90,7 @@ fn serialize_item_byteseq_with_param() -> result::Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn serialize_item_without_params() -> result::Result<(), Box<dyn Error>> {
+fn serialize_item_without_params() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
     let item = Item::new(1.into());
     Serializer::serialize_item(&item, &mut buf)?;
@@ -100,7 +99,7 @@ fn serialize_item_without_params() -> result::Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn serialize_item_with_bool_true_param() -> result::Result<(), Box<dyn Error>> {
+fn serialize_item_with_bool_true_param() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
     let param = Parameters::from_iter(vec![("a".to_owned(), BareItem::Boolean(true))]);
     let item = Item::with_params(Decimal::from_str("12.35")?.into(), param);
@@ -110,7 +109,7 @@ fn serialize_item_with_bool_true_param() -> result::Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn serialize_item_with_token_param() -> result::Result<(), Box<dyn Error>> {
+fn serialize_item_with_token_param() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
     let param = Parameters::from_iter(vec![("a1".to_owned(), BareItem::Token("*tok".to_owned()))]);
     let item = Item::with_params(BareItem::String("12.35".to_owned()), param);
@@ -120,7 +119,7 @@ fn serialize_item_with_token_param() -> result::Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn serialize_integer() -> result::Result<(), Box<dyn Error>> {
+fn serialize_integer() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
     Serializer::serialize_integer(-12, &mut buf)?;
     assert_eq!("-12", &buf);
@@ -140,7 +139,7 @@ fn serialize_integer() -> result::Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn serialize_integer_errors() -> result::Result<(), Box<dyn Error>> {
+fn serialize_integer_errors() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
     assert_eq!(
         Err("serialize_integer: integer is out of range"),
@@ -156,7 +155,7 @@ fn serialize_integer_errors() -> result::Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn serialize_decimal() -> result::Result<(), Box<dyn Error>> {
+fn serialize_decimal() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
     Serializer::serialize_decimal(Decimal::from_str("-99.1346897")?, &mut buf)?;
     assert_eq!("-99.135", &buf);
@@ -195,7 +194,7 @@ fn serialize_decimal() -> result::Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn serialize_decimal_errors() -> result::Result<(), Box<dyn Error>> {
+fn serialize_decimal_errors() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
     assert_eq!(
         Err("serialize_decimal: integer component > 12 digits"),
@@ -205,7 +204,7 @@ fn serialize_decimal_errors() -> result::Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn serialize_string() -> result::Result<(), Box<dyn Error>> {
+fn serialize_string() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
     Serializer::serialize_string("1.1 text", &mut buf)?;
     assert_eq!("\"1.1 text\"", &buf);
@@ -233,7 +232,7 @@ fn serialize_string() -> result::Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn serialize_string_errors() -> result::Result<(), Box<dyn Error>> {
+fn serialize_string_errors() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
 
     assert_eq!(
@@ -257,7 +256,7 @@ fn serialize_string_errors() -> result::Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn serialize_token() -> result::Result<(), Box<dyn Error>> {
+fn serialize_token() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
     Serializer::serialize_token("*", &mut buf)?;
     assert_eq!("*", &buf);
@@ -277,7 +276,7 @@ fn serialize_token() -> result::Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn serialize_token_errors() -> result::Result<(), Box<dyn Error>> {
+fn serialize_token_errors() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
 
     assert_eq!(
@@ -296,7 +295,7 @@ fn serialize_token_errors() -> result::Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn serialize_byte_sequence() -> result::Result<(), Box<dyn Error>> {
+fn serialize_byte_sequence() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
     Serializer::serialize_byte_sequence("hello".as_bytes(), &mut buf)?;
     assert_eq!(":aGVsbG8=:", &buf);
@@ -333,7 +332,7 @@ fn serialize_byte_sequence() -> result::Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn serialize_bool() -> result::Result<(), Box<dyn Error>> {
+fn serialize_bool() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
     Serializer::serialize_bool(true, &mut buf)?;
     assert_eq!("?1", &buf);
@@ -345,7 +344,7 @@ fn serialize_bool() -> result::Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn serialize_params_bool() -> result::Result<(), Box<dyn Error>> {
+fn serialize_params_bool() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
 
     let input = Parameters::from_iter(vec![
@@ -359,7 +358,7 @@ fn serialize_params_bool() -> result::Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn serialize_params_string() -> result::Result<(), Box<dyn Error>> {
+fn serialize_params_string() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
 
     let input = Parameters::from_iter(vec![(
@@ -372,7 +371,7 @@ fn serialize_params_string() -> result::Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn serialize_params_numbers() -> result::Result<(), Box<dyn Error>> {
+fn serialize_params_numbers() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
 
     let input = Parameters::from_iter(vec![
@@ -385,7 +384,7 @@ fn serialize_params_numbers() -> result::Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn serialize_params_mixed_types() -> result::Result<(), Box<dyn Error>> {
+fn serialize_params_mixed_types() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
 
     let input = Parameters::from_iter(vec![
@@ -398,7 +397,7 @@ fn serialize_params_mixed_types() -> result::Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn serialize_key() -> result::Result<(), Box<dyn Error>> {
+fn serialize_key() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
     Serializer::serialize_key("*a_fg", &mut buf)?;
     assert_eq!("*a_fg", &buf);
@@ -419,7 +418,7 @@ fn serialize_key() -> result::Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn serialize_key_erros() -> result::Result<(), Box<dyn Error>> {
+fn serialize_key_erros() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
 
     assert_eq!(
@@ -438,7 +437,7 @@ fn serialize_key_erros() -> result::Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn serialize_list_of_items_and_inner_list() -> result::Result<(), Box<dyn Error>> {
+fn serialize_list_of_items_and_inner_list() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
 
     let item1 = Item::new(12.into());
@@ -458,7 +457,7 @@ fn serialize_list_of_items_and_inner_list() -> result::Result<(), Box<dyn Error>
 }
 
 #[test]
-fn serialize_list_of_lists() -> result::Result<(), Box<dyn Error>> {
+fn serialize_list_of_lists() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
 
     let item1 = Item::new(1.into());
@@ -475,7 +474,7 @@ fn serialize_list_of_lists() -> result::Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn serialize_list_with_bool_item_and_bool_params() -> result::Result<(), Box<dyn Error>> {
+fn serialize_list_with_bool_item_and_bool_params() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
 
     let item1_params = Parameters::from_iter(vec![
@@ -492,7 +491,7 @@ fn serialize_list_with_bool_item_and_bool_params() -> result::Result<(), Box<dyn
 }
 
 #[test]
-fn serialize_dictionary_with_params() -> result::Result<(), Box<dyn Error>> {
+fn serialize_dictionary_with_params() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
 
     let item1_params = Parameters::from_iter(vec![
@@ -521,7 +520,7 @@ fn serialize_dictionary_with_params() -> result::Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn serialize_dict_empty_member_value() -> result::Result<(), Box<dyn Error>> {
+fn serialize_dict_empty_member_value() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
 
     let inner_list = InnerList::new(vec![]);

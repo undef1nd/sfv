@@ -16,9 +16,7 @@ pub use rust_decimal::{
 pub use parser::{ParseMore, ParseValue, Parser};
 pub use serializer::SerializeValue;
 
-// Alias for Result with &'static str as Err
-// std::result::Result is used in tests
-type Result<T> = std::result::Result<T, &'static str>;
+type SFVResult<T> = std::result::Result<T, &'static str>;
 
 pub type Dictionary = IndexMap<String, ListEntry>;
 pub type Parameters = IndexMap<String, BareItem>;
