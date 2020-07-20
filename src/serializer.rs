@@ -39,8 +39,8 @@ impl Serializer {
     pub(crate) fn serialize_item(input_item: &Item, output: &mut String) -> Result<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-item
 
-        Serializer::serialize_bare_item(&input_item.0, output)?;
-        Serializer::serialize_parameters(&input_item.1, output)?;
+        Serializer::serialize_bare_item(&input_item.bare_item, output)?;
+        Serializer::serialize_parameters(&input_item.params, output)?;
         Ok(())
     }
 
@@ -84,8 +84,8 @@ impl Serializer {
                 ListEntry::Item(ref item) => {
                     // If dict member is boolean true, no need to serialize it: only its params must be serialized
                     // Otherwise serialize entire item with its params
-                    if item.0 == BareItem::Boolean(true) {
-                        Serializer::serialize_parameters(&item.1, output)?;
+                    if item.bare_item == BareItem::Boolean(true) {
+                        Serializer::serialize_parameters(&item.params, output)?;
                     } else {
                         output.push('=');
                         Serializer::serialize_item(&item, output)?;
@@ -110,8 +110,8 @@ impl Serializer {
     fn serialize_inner_list(input_inner_list: &InnerList, output: &mut String) -> Result<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-innerlist
 
-        let items = &input_inner_list.0;
-        let inner_list_parameters = &input_inner_list.1;
+        let items = &input_inner_list.items;
+        let inner_list_parameters = &input_inner_list.params;
 
         output.push('(');
         for (idx, item) in items.iter().enumerate() {

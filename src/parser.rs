@@ -22,9 +22,9 @@ impl ParseValue for Item {
     fn parse(input_chars: &mut Peekable<Chars>) -> Result<Item> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-item
         let bare_item = Parser::parse_bare_item(input_chars)?;
-        let parameters = Parser::parse_parameters(input_chars)?;
+        let params = Parser::parse_parameters(input_chars)?;
 
-        Ok(Item(bare_item, parameters))
+        Ok(Item { bare_item, params })
     }
 }
 
@@ -75,7 +75,10 @@ impl ParseValue for Dictionary {
             } else {
                 let value = true;
                 let params = Parser::parse_parameters(input_chars)?;
-                let member = Item(BareItem::Boolean(value), params);
+                let member = Item {
+                    bare_item: BareItem::Boolean(value),
+                    params,
+                };
                 dict.insert(this_key, member.into());
             }
 
@@ -184,7 +187,10 @@ impl Parser {
             if Some(&')') == input_chars.peek() {
                 input_chars.next();
                 let params = Self::parse_parameters(input_chars)?;
-                return Ok(InnerList(inner_list, params));
+                return Ok(InnerList {
+                    items: inner_list,
+                    params,
+                });
             }
 
             let parsed_item = Item::parse(input_chars)?;
@@ -398,8 +404,6 @@ impl Parser {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-param
 
         let mut params = Parameters::new();
-        // expected.insert("str".to_owned(), BareItem::String("param_val".to_owned()));
-        // Ok(expected)
 
         while let Some(curr_char) = input_chars.peek() {
             if curr_char == &';' {
