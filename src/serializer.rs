@@ -1,16 +1,16 @@
 use crate::utils;
 use crate::{
-    BareItem, Decimal, Dictionary, InnerList, Item, List, ListEntry, Num, Parameters, Result,
+    BareItem, Decimal, Dictionary, InnerList, Item, List, ListEntry, Num, Parameters, SFVResult,
 };
 use data_encoding::BASE64;
 use rust_decimal::prelude::Zero;
 
 pub trait SerializeValue {
-    fn serialize_value(&self) -> Result<String>;
+    fn serialize_value(&self) -> SFVResult<String>;
 }
 
 impl SerializeValue for Dictionary {
-    fn serialize_value(&self) -> Result<String> {
+    fn serialize_value(&self) -> SFVResult<String> {
         let mut output = String::new();
         Serializer::serialize_dict(self, &mut output)?;
         Ok(output)
@@ -18,7 +18,7 @@ impl SerializeValue for Dictionary {
 }
 
 impl SerializeValue for List {
-    fn serialize_value(&self) -> Result<String> {
+    fn serialize_value(&self) -> SFVResult<String> {
         let mut output = String::new();
         Serializer::serialize_list(self, &mut output)?;
         Ok(output)
@@ -26,7 +26,7 @@ impl SerializeValue for List {
 }
 
 impl SerializeValue for Item {
-    fn serialize_value(&self) -> Result<String> {
+    fn serialize_value(&self) -> SFVResult<String> {
         let mut output = String::new();
         Serializer::serialize_item(self, &mut output)?;
         Ok(output)
@@ -36,16 +36,16 @@ impl SerializeValue for Item {
 pub(crate) struct Serializer;
 
 impl Serializer {
-    pub(crate) fn serialize_item(input_item: &Item, output: &mut String) -> Result<()> {
+    pub(crate) fn serialize_item(input_item: &Item, output: &mut String) -> SFVResult<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-item
 
-        Serializer::serialize_bare_item(&input_item.0, output)?;
-        Serializer::serialize_parameters(&input_item.1, output)?;
+        Serializer::serialize_bare_item(&input_item.bare_item, output)?;
+        Serializer::serialize_parameters(&input_item.params, output)?;
         Ok(())
     }
 
     #[deny(clippy::ptr_arg)]
-    pub(crate) fn serialize_list(input_list: &List, output: &mut String) -> Result<()> {
+    pub(crate) fn serialize_list(input_list: &List, output: &mut String) -> SFVResult<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-list
         if input_list.len() == 0 {
             return Err("serialize_list: serializing empty field is not allowed");
@@ -71,7 +71,7 @@ impl Serializer {
         Ok(())
     }
 
-    pub(crate) fn serialize_dict(input_dict: &Dictionary, output: &mut String) -> Result<()> {
+    pub(crate) fn serialize_dict(input_dict: &Dictionary, output: &mut String) -> SFVResult<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-dictionary
         if input_dict.len() == 0 {
             return Err("serialize_dictionary: serializing empty field is not allowed");
@@ -84,8 +84,8 @@ impl Serializer {
                 ListEntry::Item(ref item) => {
                     // If dict member is boolean true, no need to serialize it: only its params must be serialized
                     // Otherwise serialize entire item with its params
-                    if item.0 == BareItem::Boolean(true) {
-                        Serializer::serialize_parameters(&item.1, output)?;
+                    if item.bare_item == BareItem::Boolean(true) {
+                        Serializer::serialize_parameters(&item.params, output)?;
                     } else {
                         output.push('=');
                         Serializer::serialize_item(&item, output)?;
@@ -107,11 +107,11 @@ impl Serializer {
         Ok(())
     }
 
-    fn serialize_inner_list(input_inner_list: &InnerList, output: &mut String) -> Result<()> {
+    fn serialize_inner_list(input_inner_list: &InnerList, output: &mut String) -> SFVResult<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-innerlist
 
-        let items = &input_inner_list.0;
-        let inner_list_parameters = &input_inner_list.1;
+        let items = &input_inner_list.items;
+        let inner_list_parameters = &input_inner_list.params;
 
         output.push('(');
         for (idx, item) in items.iter().enumerate() {
@@ -130,7 +130,7 @@ impl Serializer {
     pub(crate) fn serialize_bare_item(
         input_bare_item: &BareItem,
         output: &mut String,
-    ) -> Result<()> {
+    ) -> SFVResult<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-bare-item
 
         match input_bare_item {
@@ -147,7 +147,7 @@ impl Serializer {
     pub(crate) fn serialize_parameters(
         input_params: &Parameters,
         output: &mut String,
-    ) -> Result<()> {
+    ) -> SFVResult<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-params
 
         for (param_name, param_value) in input_params.iter() {
@@ -162,7 +162,7 @@ impl Serializer {
         Ok(())
     }
 
-    pub(crate) fn serialize_key(input_key: &str, output: &mut String) -> Result<()> {
+    pub(crate) fn serialize_key(input_key: &str, output: &mut String) -> SFVResult<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-key
 
         let disallowed_chars =
@@ -181,7 +181,7 @@ impl Serializer {
         Ok(())
     }
 
-    pub(crate) fn serialize_integer(value: i64, output: &mut String) -> Result<()> {
+    pub(crate) fn serialize_integer(value: i64, output: &mut String) -> SFVResult<()> {
         //https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-integer
 
         let (min_int, max_int) = (-999_999_999_999_999_i64, 999_999_999_999_999_i64);
@@ -192,7 +192,7 @@ impl Serializer {
         Ok(())
     }
 
-    pub(crate) fn serialize_decimal(value: Decimal, output: &mut String) -> Result<()> {
+    pub(crate) fn serialize_decimal(value: Decimal, output: &mut String) -> SFVResult<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-decimal
 
         let integer_comp_length = 12;
@@ -217,7 +217,7 @@ impl Serializer {
         Ok(())
     }
 
-    pub(crate) fn serialize_string(value: &str, output: &mut String) -> Result<()> {
+    pub(crate) fn serialize_string(value: &str, output: &mut String) -> SFVResult<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-integer
 
         if !value.is_ascii() {
@@ -241,7 +241,7 @@ impl Serializer {
         Ok(())
     }
 
-    pub(crate) fn serialize_token(value: &str, output: &mut String) -> Result<()> {
+    pub(crate) fn serialize_token(value: &str, output: &mut String) -> SFVResult<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-token
 
         if !value.is_ascii() {
@@ -266,7 +266,7 @@ impl Serializer {
         Ok(())
     }
 
-    pub(crate) fn serialize_byte_sequence(value: &[u8], output: &mut String) -> Result<()> {
+    pub(crate) fn serialize_byte_sequence(value: &[u8], output: &mut String) -> SFVResult<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-binary
 
         output.push(':');
@@ -276,7 +276,7 @@ impl Serializer {
         Ok(())
     }
 
-    pub(crate) fn serialize_bool(value: bool, output: &mut String) -> Result<()> {
+    pub(crate) fn serialize_bool(value: bool, output: &mut String) -> SFVResult<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-boolean
 
         let val = if value { "?1" } else { "?0" };

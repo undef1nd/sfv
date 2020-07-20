@@ -1,35 +1,35 @@
 use crate::utils;
 use crate::{
     BareItem, Decimal, Dictionary, FromStr, InnerList, Item, List, ListEntry, Num, Parameters,
-    Result,
+    SFVResult,
 };
 use std::iter::Peekable;
 use std::str::{from_utf8, Chars};
 
 pub trait ParseValue {
-    fn parse(input_chars: &mut Peekable<Chars>) -> Result<Self>
+    fn parse(input_chars: &mut Peekable<Chars>) -> SFVResult<Self>
     where
         Self: Sized;
 }
 
 pub trait ParseMore {
-    fn parse_more(&mut self, input_bytes: &[u8]) -> Result<()>
+    fn parse_more(&mut self, input_bytes: &[u8]) -> SFVResult<()>
     where
         Self: Sized;
 }
 
 impl ParseValue for Item {
-    fn parse(input_chars: &mut Peekable<Chars>) -> Result<Item> {
+    fn parse(input_chars: &mut Peekable<Chars>) -> SFVResult<Item> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-item
         let bare_item = Parser::parse_bare_item(input_chars)?;
-        let parameters = Parser::parse_parameters(input_chars)?;
+        let params = Parser::parse_parameters(input_chars)?;
 
-        Ok(Item(bare_item, parameters))
+        Ok(Item { bare_item, params })
     }
 }
 
 impl ParseValue for List {
-    fn parse(input_chars: &mut Peekable<Chars>) -> Result<List> {
+    fn parse(input_chars: &mut Peekable<Chars>) -> SFVResult<List> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-list
         // List represents an array of (item_or_inner_list, parameters)
 
@@ -62,7 +62,7 @@ impl ParseValue for List {
 }
 
 impl ParseValue for Dictionary {
-    fn parse(input_chars: &mut Peekable<Chars>) -> Result<Dictionary> {
+    fn parse(input_chars: &mut Peekable<Chars>) -> SFVResult<Dictionary> {
         let mut dict = Dictionary::new();
 
         while input_chars.peek().is_some() {
@@ -75,7 +75,10 @@ impl ParseValue for Dictionary {
             } else {
                 let value = true;
                 let params = Parser::parse_parameters(input_chars)?;
-                let member = Item(BareItem::Boolean(value), params);
+                let member = Item {
+                    bare_item: BareItem::Boolean(value),
+                    params,
+                };
                 dict.insert(this_key, member.into());
             }
 
@@ -102,7 +105,7 @@ impl ParseValue for Dictionary {
 }
 
 impl ParseMore for List {
-    fn parse_more(&mut self, input_bytes: &[u8]) -> Result<()> {
+    fn parse_more(&mut self, input_bytes: &[u8]) -> SFVResult<()> {
         let parsed_list = Parser::parse_list(input_bytes)?;
         self.extend(parsed_list);
         Ok(())
@@ -110,7 +113,7 @@ impl ParseMore for List {
 }
 
 impl ParseMore for Dictionary {
-    fn parse_more(&mut self, input_bytes: &[u8]) -> Result<()> {
+    fn parse_more(&mut self, input_bytes: &[u8]) -> SFVResult<()> {
         let parsed_dict = Parser::parse_dictionary(input_bytes)?;
         self.extend(parsed_dict);
         Ok(())
@@ -120,19 +123,19 @@ impl ParseMore for Dictionary {
 pub struct Parser;
 
 impl Parser {
-    pub fn parse_dictionary(input_bytes: &[u8]) -> Result<Dictionary> {
+    pub fn parse_dictionary(input_bytes: &[u8]) -> SFVResult<Dictionary> {
         Self::parse::<Dictionary>(input_bytes)
     }
 
-    pub fn parse_list(input_bytes: &[u8]) -> Result<List> {
+    pub fn parse_list(input_bytes: &[u8]) -> SFVResult<List> {
         Self::parse::<List>(input_bytes)
     }
 
-    pub fn parse_item(input_bytes: &[u8]) -> Result<Item> {
+    pub fn parse_item(input_bytes: &[u8]) -> SFVResult<Item> {
         Self::parse::<Item>(input_bytes)
     }
 
-    fn parse<T: ParseValue>(input_bytes: &[u8]) -> Result<T> {
+    fn parse<T: ParseValue>(input_bytes: &[u8]) -> SFVResult<T> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#text-parse
         if !input_bytes.is_ascii() {
             return Err("parse: non-ascii characters in input");
@@ -154,7 +157,7 @@ impl Parser {
         Ok(output)
     }
 
-    fn parse_list_entry(input_chars: &mut Peekable<Chars>) -> Result<ListEntry> {
+    fn parse_list_entry(input_chars: &mut Peekable<Chars>) -> SFVResult<ListEntry> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-item-or-list
         // ListEntry represents a tuple (item_or_inner_list, parameters)
 
@@ -170,7 +173,7 @@ impl Parser {
         }
     }
 
-    pub(crate) fn parse_inner_list(input_chars: &mut Peekable<Chars>) -> Result<InnerList> {
+    pub(crate) fn parse_inner_list(input_chars: &mut Peekable<Chars>) -> SFVResult<InnerList> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-innerlist
 
         if Some('(') != input_chars.next() {
@@ -184,7 +187,10 @@ impl Parser {
             if Some(&')') == input_chars.peek() {
                 input_chars.next();
                 let params = Self::parse_parameters(input_chars)?;
-                return Ok(InnerList(inner_list, params));
+                return Ok(InnerList {
+                    items: inner_list,
+                    params,
+                });
             }
 
             let parsed_item = Item::parse(input_chars)?;
@@ -200,7 +206,7 @@ impl Parser {
         Err("parse_inner_list: the end of the inner list was not found")
     }
 
-    pub(crate) fn parse_bare_item(mut input_chars: &mut Peekable<Chars>) -> Result<BareItem> {
+    pub(crate) fn parse_bare_item(mut input_chars: &mut Peekable<Chars>) -> SFVResult<BareItem> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-bare-item
         if input_chars.peek().is_none() {
             return Err("parse_bare_item: empty item");
@@ -222,7 +228,7 @@ impl Parser {
         }
     }
 
-    pub(crate) fn parse_bool(input_chars: &mut Peekable<Chars>) -> Result<bool> {
+    pub(crate) fn parse_bool(input_chars: &mut Peekable<Chars>) -> SFVResult<bool> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-boolean
 
         if input_chars.next() != Some('?') {
@@ -236,7 +242,7 @@ impl Parser {
         }
     }
 
-    pub(crate) fn parse_string(input_chars: &mut Peekable<Chars>) -> Result<String> {
+    pub(crate) fn parse_string(input_chars: &mut Peekable<Chars>) -> SFVResult<String> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-string
 
         if input_chars.next() != Some('\"') {
@@ -261,7 +267,7 @@ impl Parser {
         Err("parse_string: no closing '\"'")
     }
 
-    pub(crate) fn parse_token(input_chars: &mut Peekable<Chars>) -> Result<String> {
+    pub(crate) fn parse_token(input_chars: &mut Peekable<Chars>) -> SFVResult<String> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-token
 
         if let Some(first_char) = input_chars.peek() {
@@ -286,7 +292,7 @@ impl Parser {
         Ok(output_string)
     }
 
-    pub(crate) fn parse_byte_sequence(input_chars: &mut Peekable<Chars>) -> Result<Vec<u8>> {
+    pub(crate) fn parse_byte_sequence(input_chars: &mut Peekable<Chars>) -> SFVResult<Vec<u8>> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-binary
 
         if input_chars.next() != Some(':') {
@@ -307,7 +313,7 @@ impl Parser {
         }
     }
 
-    pub(crate) fn parse_number(input_chars: &mut Peekable<Chars>) -> Result<Num> {
+    pub(crate) fn parse_number(input_chars: &mut Peekable<Chars>) -> SFVResult<Num> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-number
 
         let mut sign = 1;
@@ -363,7 +369,7 @@ impl Parser {
         }
     }
 
-    fn extract_digits(input_chars: &mut Peekable<Chars>) -> Result<(bool, String)> {
+    fn extract_digits(input_chars: &mut Peekable<Chars>) -> SFVResult<(bool, String)> {
         let mut is_integer = true;
         let mut input_number = String::from("");
         while let Some(curr_char) = input_chars.peek() {
@@ -394,12 +400,10 @@ impl Parser {
         Ok((is_integer, input_number))
     }
 
-    pub(crate) fn parse_parameters(input_chars: &mut Peekable<Chars>) -> Result<Parameters> {
+    pub(crate) fn parse_parameters(input_chars: &mut Peekable<Chars>) -> SFVResult<Parameters> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#parse-param
 
         let mut params = Parameters::new();
-        // expected.insert("str".to_owned(), BareItem::String("param_val".to_owned()));
-        // Ok(expected)
 
         while let Some(curr_char) = input_chars.peek() {
             if curr_char == &';' {
@@ -426,7 +430,7 @@ impl Parser {
         Ok(params)
     }
 
-    pub(crate) fn parse_key(input_chars: &mut Peekable<Chars>) -> Result<String> {
+    pub(crate) fn parse_key(input_chars: &mut Peekable<Chars>) -> SFVResult<String> {
         match input_chars.peek() {
             Some(c) if c == &'*' || c.is_ascii_lowercase() => (),
             _ => return Err("parse_key: first character is not lcalpha or '*'"),

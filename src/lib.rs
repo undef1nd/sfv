@@ -16,9 +16,7 @@ pub use rust_decimal::{
 pub use parser::{ParseMore, ParseValue, Parser};
 pub use serializer::SerializeValue;
 
-// Alias for Result with &'static str as Err
-// std::result::Result is used in tests
-type Result<T> = std::result::Result<T, &'static str>;
+type SFVResult<T> = std::result::Result<T, &'static str>;
 
 pub type Dictionary = IndexMap<String, ListEntry>;
 pub type Parameters = IndexMap<String, BareItem>;
@@ -43,10 +41,45 @@ impl From<InnerList> for ListEntry {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct InnerList(pub Vec<Item>, pub Parameters);
+pub struct InnerList {
+    pub items: Vec<Item>,
+    pub params: Parameters,
+}
+
+impl InnerList {
+    fn new(items: Vec<Item>) -> InnerList {
+        InnerList {
+            items,
+            params: Parameters::new(),
+        }
+    }
+
+    pub fn with_params(items: Vec<Item>, params: Parameters) -> InnerList {
+        // if params.is_empty() {
+        //     return InnerList::new(items);
+        // }
+        InnerList { items, params }
+    }
+}
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Item(pub BareItem, pub Parameters);
+pub struct Item {
+    pub bare_item: BareItem,
+    pub params: Parameters,
+}
+
+impl Item {
+    fn new(bare_item: BareItem) -> Item {
+        Item {
+            bare_item,
+            params: Parameters::new(),
+        }
+    }
+
+    pub fn with_params(bare_item: BareItem, params: Parameters) -> Item {
+        Item { bare_item, params }
+    }
+}
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Num {
