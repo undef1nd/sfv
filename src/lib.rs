@@ -3,12 +3,48 @@
 for parsing HTTP field values into structured values and serializing them.
 It also exposes a set of types that might be useful for defining new structured fields.
 
+# Data Structures
+
 There are three types of structured fields:
 
-- Item - can be an Integer, Decimal, String, Token, Byte Sequence, or Boolean. It can have associated Parameters.
-- List - array of zero or more members, each of which can be an Item or an Inner List, both of which can be Parameterized.
-- Dictionary - ordered map of name-value pairs, where the names are short textual strings and the values are Items or arrays of Items (InnerList), both of which can be Parameterized. There can be zero or more members, and their names are unique in the scope of the Dictionary they occur within.
+- `Item` - can be an `Integer`, `Decimal`, `String`, `Token`, `Byte Sequence`, or `Boolean`. It can have associated `Parameters`.
+- `List` - array of zero or more members, each of which can be an `Item` or an `InnerList`, both of which can be `Parameterized`.
+- `Dictionary` - ordered map of name-value pairs, where the names are short textual strings and the values are `Items` or arrays of `Items` (represented with `InnerList`), both of which can be `Parameterized`. There can be zero or more members, and their names are unique in the scope of the `Dictionary` they occur within.
 
+There's a number of primitive types used to construct structured field values:
+- `BareItem` used as `Item`'s value or as a parameter value in `Parameters`.
+- `Parameters` are an ordered map of key-value pairs that are associated with an `Item` or `InnerList`. The keys are unique within the scope the `Parameters` they occur within, and the values are `BareItem`.
+- `InnerList` is an array of zero or more `Items`. Can have `Parameters`.
+- `ListEntry` represents either `Item` or `InnerList` as a member of `List` or as member-value in `Dictionary`.
+
+# Examples
+
+### Parsing
+
+```
+use sfv::Parser;
+
+// parsing structured field value of Item type
+let item_header_input = "12.445;foo=bar";
+let item = Parser::parse_item(item_header_input.as_bytes());
+assert!(item.is_ok());
+println!("{:#?}", item);
+
+// parsing structured field value of List type
+let list_header_input = "1;a=tok, (\"foo\" \"bar\");baz, ()";
+let list = Parser::parse_list(list_header_input.as_bytes());
+assert!(list.is_ok());
+println!("{:#?}", list);
+
+// parsing structured field value of Dictionary type
+let dict_header_input = "a=?0, b, c; foo=bar, rating=1.5, fruits=(apple pear)";
+let dict = Parser::parse_dictionary(dict_header_input.as_bytes());
+assert!(dict.is_ok());
+println!("{:#?}", dict);
+
+```
+
+### Structured Field Value Construction and Serialization
 */
 
 mod parser;
@@ -31,16 +67,16 @@ pub use serializer::SerializeValue;
 
 type SFVResult<T> = std::result::Result<T, &'static str>;
 
-/// Represents Dictionary type structured field.
+/// Represents Dictionary type structured field value.
 pub type Dictionary = IndexMap<String, ListEntry>;
 
-/// Represents List type structured field.
+/// Represents List type structured field value.
 pub type List = Vec<ListEntry>;
 
 /// Parameters of Item or InnerList.
 pub type Parameters = IndexMap<String, BareItem>;
 
-/// Represents a member of List or Dictionary structured field.
+/// Represents a member of List or Dictionary structured field value.
 #[derive(Debug, PartialEq, Clone)]
 pub enum ListEntry {
     /// Member of Item type.
@@ -81,7 +117,7 @@ impl InnerList {
     }
 }
 
-/// Represents List type structured field.
+/// Represents List type structured field value.
 /// Can be used as a member of List or Dictionary.
 #[derive(Debug, PartialEq, Clone)]
 pub struct Item {
@@ -111,7 +147,7 @@ pub enum Num {
     Integer(i64),
 }
 
-/// BareItem type is used to construct Items or Parameters values
+/// BareItem type is used to construct Items or Parameters values.
 #[derive(Debug, PartialEq, Clone)]
 pub enum BareItem {
     Number(Num),
