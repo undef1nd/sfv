@@ -33,6 +33,7 @@ impl SerializeValue for Item {
     }
 }
 
+/// Serialize structured field value
 pub(crate) struct Serializer;
 
 impl Serializer {

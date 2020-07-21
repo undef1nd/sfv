@@ -6,12 +6,15 @@ use crate::{
 use std::iter::Peekable;
 use std::str::{from_utf8, Chars};
 
+/// Parse input into structured field value
 pub trait ParseValue {
     fn parse(input_chars: &mut Peekable<Chars>) -> SFVResult<Self>
     where
         Self: Sized;
 }
 
+/// If structured field value of List or Dictionary type is split into multiple lines,
+/// allow to parse more lines and merge them in already parsed structure
 pub trait ParseMore {
     fn parse_more(&mut self, input_bytes: &[u8]) -> SFVResult<()>
     where
@@ -120,6 +123,7 @@ impl ParseMore for Dictionary {
     }
 }
 
+/// Exposes methods for parsing into structured field value.
 pub struct Parser;
 
 impl Parser {
