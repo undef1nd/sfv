@@ -5,7 +5,21 @@ use crate::{
 use data_encoding::BASE64;
 use rust_decimal::prelude::Zero;
 
+/// Serializes structured field value into String.
 pub trait SerializeValue {
+    /// Serializes structured field value into String.
+    /// # Examples
+    /// ```
+    /// use sfv::{Parser, SerializeValue, ParseValue};
+    ///
+    /// let parsed_list_field = Parser::parse_list("\"london\", \t\t\"berlin\"".as_bytes());
+    /// assert!(parsed_list_field.is_ok());
+    ///
+    /// assert_eq!(
+    ///     parsed_list_field.unwrap().serialize_value().unwrap(),
+    ///     "\"london\", \"berlin\""
+    /// );
+    /// ```
     fn serialize_value(&self) -> SFVResult<String>;
 }
 
