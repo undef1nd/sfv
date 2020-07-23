@@ -6,13 +6,28 @@ use crate::{
 use std::iter::Peekable;
 use std::str::{from_utf8, Chars};
 
+/// Implements parsing logic for each structured field value type.
 pub trait ParseValue {
+    /// This method should not be used for parsing input into structured field value.
+    /// Use `Parser::parse_item`, `Parser::parse_list` or `Parsers::parse_dictionary` for that.
     fn parse(input_chars: &mut Peekable<Chars>) -> SFVResult<Self>
     where
         Self: Sized;
 }
 
+/// If structured field value of List or Dictionary type is split into multiple lines,
+/// allows to parse more lines and merge them into already existing structure field value.
 pub trait ParseMore {
+    /// If structured field value is split across lines,
+    /// parses and merges next line into a single structured field value.
+    /// # Examples
+    /// ```
+    /// use sfv::{Parser, SerializeValue, ParseMore};
+    ///
+    /// let mut list_field = Parser::parse_list("11, (12 13)".as_bytes()).unwrap();
+    /// list_field.parse_more("\"foo\",        \"bar\"".as_bytes()).unwrap();
+    ///
+    /// assert_eq!(list_field.serialize_value().unwrap(), "11, (12 13), \"foo\", \"bar\"");
     fn parse_more(&mut self, input_bytes: &[u8]) -> SFVResult<()>
     where
         Self: Sized;
@@ -120,21 +135,27 @@ impl ParseMore for Dictionary {
     }
 }
 
+/// Exposes methods for parsing input into structured field value.
 pub struct Parser;
 
 impl Parser {
+    /// Parses input into structured field value of Dictionary type
     pub fn parse_dictionary(input_bytes: &[u8]) -> SFVResult<Dictionary> {
         Self::parse::<Dictionary>(input_bytes)
     }
 
+    /// Parses input into structured field value of List type
     pub fn parse_list(input_bytes: &[u8]) -> SFVResult<List> {
         Self::parse::<List>(input_bytes)
     }
 
+    /// Parses input into structured field value of Item type
     pub fn parse_item(input_bytes: &[u8]) -> SFVResult<Item> {
         Self::parse::<Item>(input_bytes)
     }
 
+    // Generic parse method for checking input before parsing
+    // and handling trailing text error
     fn parse<T: ParseValue>(input_bytes: &[u8]) -> SFVResult<T> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#text-parse
         if !input_bytes.is_ascii() {
