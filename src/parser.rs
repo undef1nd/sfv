@@ -22,7 +22,7 @@ pub trait ParseMore {
     /// parses and merges next line into a single structured field value.
     /// # Examples
     /// ```
-    /// use sfv::{Parser, SerializeValue, ParseMore};
+    /// # use sfv::{Parser, SerializeValue, ParseMore};
     ///
     /// let mut list_field = Parser::parse_list("11, (12 13)".as_bytes()).unwrap();
     /// list_field.parse_more("\"foo\",        \"bar\"".as_bytes()).unwrap();

@@ -8,24 +8,27 @@ fn test_report_to_header() -> Result<(), Box<dyn Error>> {
     let endpoints = br#"csp="https://example.com/csp-reports", hpkp="https://example.com/hpkp-reports", coep="https://example.com/coep""#;
 
     let coep_parsed = Parser::parse_item(coep)?;
-    let token = match coep_parsed.bare_item {
-        BareItem::Token(val) => val,
-        _ => return Err("can't unwrap bare_item".into()),
-    };
+    let token = coep_parsed
+        .bare_item
+        .as_token()
+        .ok_or("unexpected BareItem variant")?;
     assert_eq!(token, "require-corp");
 
-    let coep_endpoint = match coep_parsed.params.get("report-to") {
-        Some(BareItem::String(val)) => val,
-        _ => return Err("unexpected param value".into()),
-    };
+    let coep_endpoint = coep_parsed
+        .params
+        .get("report-to")
+        .ok_or("parameter does not exist")?
+        .as_str()
+        .ok_or("unexpected BareItem variant")?;
 
     let endpoints_parsed = Parser::parse_dictionary(endpoints)?;
-
-    if let Some(ListEntry::Item(itm)) = endpoints_parsed.get(coep_endpoint) {
-        if let BareItem::String(ref val) = itm.bare_item {
-            assert_eq!(val, "https://example.com/coep");
-            return Ok(());
-        }
+    if let Some(ListEntry::Item(item)) = endpoints_parsed.get(coep_endpoint) {
+        let item_value = item
+            .bare_item
+            .as_str()
+            .ok_or("unexpected BareItem variant")?;
+        assert_eq!(item_value, "https://example.com/coep");
+        return Ok(());
     }
     Err("unexpected endpoint value".into())
 }

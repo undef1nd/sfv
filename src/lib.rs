@@ -249,13 +249,103 @@ pub enum BareItem {
     Token(String),
 }
 
+impl BareItem {
+    /// If `BareItem` is a decimal `Number`, returns `Decimal`, otherwise returns `None`.
+    /// ```
+    /// # use sfv::{BareItem, Decimal, FromPrimitive};
+    /// let decimal_number = Decimal::from_f64(415.566).unwrap();
+    /// let bare_item: BareItem = decimal_number.into();
+    /// assert_eq!(bare_item.as_decimal().unwrap(), decimal_number);
+    /// ```
+    pub fn as_decimal(&self) -> Option<Decimal> {
+        match *self {
+            BareItem::Number(Num::Decimal(val)) => Some(val),
+            _ => None,
+        }
+    }
+    /// If `BareItem` is an integer `Number`, returns `i64`, otherwise returns `None`.
+    /// ```
+    /// # use sfv::BareItem;
+    /// let bare_item: BareItem = 100.into();
+    /// assert_eq!(bare_item.as_int().unwrap(), 100);
+    /// ```
+    pub fn as_int(&self) -> Option<i64> {
+        match *self {
+            BareItem::Number(Num::Integer(val)) => Some(val),
+            _ => None,
+        }
+    }
+    /// If `BareItem` is `String`, returns `&str`, otherwise returns `None`.
+    /// ```
+    /// # use sfv::BareItem;
+    /// let bare_item = BareItem::String("foo".into());
+    /// assert_eq!(bare_item.as_str().unwrap(), "foo");
+    /// ```
+    pub fn as_str(&self) -> Option<&str> {
+        match *self {
+            BareItem::String(ref val) => Some(val),
+            _ => None,
+        }
+    }
+    /// If `BareItem` is a `ByteSeq`, returns `&Vec<u8>`, otherwise returns `None`.
+    /// ```
+    /// # use sfv::BareItem;
+    /// let bare_item = BareItem::ByteSeq("foo".to_owned().into_bytes());
+    /// assert_eq!(bare_item.as_byte_seq().unwrap().as_slice(), "foo".as_bytes());
+    /// ```
+    pub fn as_byte_seq(&self) -> Option<&Vec<u8>> {
+        match *self {
+            BareItem::ByteSeq(ref val) => Some(val),
+            _ => None,
+        }
+    }
+    /// If `BareItem` is a `Boolean`, returns `bool`, otherwise returns `None`.
+    /// ```
+    /// # use sfv::{BareItem, Decimal, FromPrimitive};
+    /// let bare_item = BareItem::Boolean(true);
+    /// assert_eq!(bare_item.as_bool().unwrap(), true);
+    /// ```
+    pub fn as_bool(&self) -> Option<bool> {
+        match *self {
+            BareItem::Boolean(val) => Some(val),
+            _ => None,
+        }
+    }
+    /// If `BareItem` is a `Token`, returns `&str`, otherwise returns `None`.
+    /// ```
+    /// use sfv::BareItem;
+    ///
+    /// let bare_item = BareItem::Token("*bar".into());
+    /// assert_eq!(bare_item.as_token().unwrap(), "*bar");
+    /// ```
+    pub fn as_token(&self) -> Option<&str> {
+        match *self {
+            BareItem::Token(ref val) => Some(val),
+            _ => None,
+        }
+    }
+}
+
 impl From<i64> for BareItem {
+    /// Convert `i64` into `BareItem::Number`
+    /// ```
+    /// # use sfv::BareItem;
+    /// let bare_item: BareItem = 456.into();
+    /// assert_eq!(bare_item.as_int().unwrap(), 456);
+    /// ```
     fn from(item: i64) -> Self {
         BareItem::Number(Num::Integer(item))
     }
 }
 
 impl From<Decimal> for BareItem {
+    /// Convert `Decimal` into `BareItem::Number`
+    /// ```
+    /// # use sfv::{BareItem, Decimal, FromPrimitive};
+    /// let decimal_number = Decimal::from_f64(48.01).unwrap();
+    /// let bare_item: BareItem = decimal_number.into();
+    /// assert_eq!(bare_item.as_decimal().unwrap(), decimal_number);
+    /// ```
     fn from(item: Decimal) -> Self {
         BareItem::Number(Num::Decimal(item))
     }
