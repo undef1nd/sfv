@@ -104,7 +104,9 @@ fn parse_list_of_lists_with_param_and_spaces() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn parse_list_of_items_and_lists_with_param() -> Result<(), Box<dyn Error>> {
-    let mut input = "12, 14, (a  b); param=\"param_value_1\"".chars().peekable();
+    let mut input = "12, 14, (a  b); param=\"param_value_1\", ()"
+        .chars()
+        .peekable();
     let item1 = Item::new(12.into());
     let item2 = Item::new(14.into());
     let item3 = Item::new(BareItem::Token("a".to_owned()));
@@ -114,7 +116,13 @@ fn parse_list_of_items_and_lists_with_param() -> Result<(), Box<dyn Error>> {
         BareItem::String("param_value_1".to_owned()),
     )]);
     let inner_list = InnerList::with_params(vec![item3, item4], inner_list_param);
-    let expected_list: List = vec![item1.into(), item2.into(), inner_list.into()];
+    let empty_inner_list = InnerList::new(vec![]);
+    let expected_list: List = vec![
+        item1.into(),
+        item2.into(),
+        inner_list.into(),
+        empty_inner_list.into(),
+    ];
     assert_eq!(expected_list, List::parse(&mut input)?);
     Ok(())
 }
