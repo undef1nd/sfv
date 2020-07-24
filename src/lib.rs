@@ -11,7 +11,7 @@ There are three types of structured fields:
 - `List` - array of zero or more members, each of which can be an `Item` or an `InnerList`, both of which can be `Parameterized`.
 - `Dictionary` - ordered map of name-value pairs, where the names are short textual strings and the values are `Items` or arrays of `Items` (represented with `InnerList`), both of which can be `Parameterized`. There can be zero or more members, and their names are unique in the scope of the `Dictionary` they occur within.
 
-There's a number of primitive types used to construct structured field values:
+There's also a few primitive types used to construct structured field values:
 - `BareItem` used as `Item`'s value or as a parameter value in `Parameters`.
 - `Parameters` are an ordered map of key-value pairs that are associated with an `Item` or `InnerList`. The keys are unique within the scope the `Parameters` they occur within, and the values are `BareItem`.
 - `InnerList` is an array of zero or more `Items`. Can have `Parameters`.
