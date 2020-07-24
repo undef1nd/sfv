@@ -217,6 +217,7 @@ impl Serializer {
         let int_comp = decimal.trunc();
         let fract_comp = decimal.fract();
 
+        // TODO: Replace with > 999_999_999_999_u64
         if int_comp.abs().to_string().len() > integer_comp_length {
             return Err("serialize_decimal: integer component > 12 digits");
         }
