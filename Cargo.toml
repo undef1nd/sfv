@@ -21,3 +21,8 @@ data-encoding = "2.2.1"
 [dev-dependencies]
 serde_json = { version = "1.0", features = ["preserve_order"] }
 serde = { version = "1.0", features = ["derive"] }
+bencher = "0.1.5"
+
+[[bench]]
+name = "bench"
+harness = false
