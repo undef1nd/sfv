@@ -1,6 +1,7 @@
 use crate::utils;
 use crate::{
-    BareItem, Decimal, Dictionary, InnerList, Item, List, ListEntry, Parameters, SFVResult,
+    BareItem, Decimal, Dictionary, InnerList, Item, List, ListEntry, Parameters, RefBareItem,
+    SFVResult,
 };
 use data_encoding::BASE64;
 use rust_decimal::prelude::Zero;
@@ -47,15 +48,15 @@ impl SerializeValue for Item {
     }
 }
 
-/// Serialize structured field value
+/// Container serialization functions
 pub(crate) struct Serializer;
 
 impl Serializer {
     pub(crate) fn serialize_item(input_item: &Item, output: &mut String) -> SFVResult<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-item
 
-        Serializer::serialize_bare_item(&input_item.bare_item, output)?;
-        Serializer::serialize_parameters(&input_item.params, output)?;
+        Self::serialize_bare_item(&input_item.bare_item, output)?;
+        Self::serialize_parameters(&input_item.params, output)?;
         Ok(())
     }
 
@@ -69,10 +70,10 @@ impl Serializer {
         for (idx, member) in input_list.iter().enumerate() {
             match member {
                 ListEntry::Item(item) => {
-                    Serializer::serialize_item(item, output)?;
+                    Self::serialize_item(item, output)?;
                 }
                 ListEntry::InnerList(inner_list) => {
-                    Serializer::serialize_inner_list(inner_list, output)?;
+                    Self::serialize_inner_list(inner_list, output)?;
                 }
             };
 
@@ -100,15 +101,15 @@ impl Serializer {
                     // If dict member is boolean true, no need to serialize it: only its params must be serialized
                     // Otherwise serialize entire item with its params
                     if item.bare_item == BareItem::Boolean(true) {
-                        Serializer::serialize_parameters(&item.params, output)?;
+                        Self::serialize_parameters(&item.params, output)?;
                     } else {
                         output.push('=');
-                        Serializer::serialize_item(&item, output)?;
+                        Self::serialize_item(&item, output)?;
                     }
                 }
                 ListEntry::InnerList(inner_list) => {
                     output.push('=');
-                    Serializer::serialize_inner_list(&inner_list, output)?;
+                    Self::serialize_inner_list(&inner_list, output)?;
                 }
             }
 
@@ -130,7 +131,7 @@ impl Serializer {
 
         output.push('(');
         for (idx, item) in items.iter().enumerate() {
-            Serializer::serialize_item(item, output)?;
+            Self::serialize_item(item, output)?;
 
             // If more values remain in inner_list, append a single SP to output
             if idx < items.len() - 1 {
@@ -148,13 +149,21 @@ impl Serializer {
     ) -> SFVResult<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-bare-item
 
-        match input_bare_item {
-            BareItem::Boolean(value) => Self::serialize_bool(*value, output)?,
-            BareItem::String(value) => Self::serialize_string(value, output)?,
-            BareItem::ByteSeq(value) => Self::serialize_byte_sequence(value, output)?,
-            BareItem::Token(value) => Self::serialize_token(value, output)?,
-            BareItem::Integer(value) => Self::serialize_integer(*value, output)?,
-            BareItem::Decimal(value) => Self::serialize_decimal(*value, output)?,
+        let ref_bare_item = input_bare_item.to_ref_bare_item();
+        Self::serialize_ref_bare_item(&ref_bare_item, output)
+    }
+
+    pub(crate) fn serialize_ref_bare_item(
+        value: &RefBareItem,
+        output: &mut String,
+    ) -> SFVResult<()> {
+        match value {
+            RefBareItem::Boolean(value) => Self::serialize_bool(*value, output)?,
+            RefBareItem::String(value) => Self::serialize_string(value, output)?,
+            RefBareItem::ByteSeq(value) => Self::serialize_byte_sequence(value, output)?,
+            RefBareItem::Token(value) => Self::serialize_token(value, output)?,
+            RefBareItem::Integer(value) => Self::serialize_integer(*value, output)?,
+            RefBareItem::Decimal(value) => Self::serialize_decimal(*value, output)?,
         };
         Ok(())
     }
@@ -166,13 +175,22 @@ impl Serializer {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-params
 
         for (param_name, param_value) in input_params.iter() {
-            output.push(';');
-            Self::serialize_key(param_name, output)?;
+            Self::serialize_ref_parameter(param_name, &param_value.to_ref_bare_item(), output)?;
+        }
+        Ok(())
+    }
 
-            if param_value != &BareItem::Boolean(true) {
-                output.push('=');
-                Self::serialize_bare_item(param_value, output)?;
-            }
+    pub(crate) fn serialize_ref_parameter(
+        name: &str,
+        value: &RefBareItem,
+        output: &mut String,
+    ) -> SFVResult<()> {
+        output.push(';');
+        Self::serialize_key(name, output)?;
+
+        if value != &RefBareItem::Boolean(true) {
+            output.push('=');
+            Self::serialize_ref_bare_item(value, output)?;
         }
         Ok(())
     }

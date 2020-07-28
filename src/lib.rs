@@ -114,6 +114,7 @@ assert_eq!(
 */
 
 mod parser;
+mod ref_serializer;
 mod serializer;
 mod utils;
 
@@ -129,6 +130,7 @@ pub use rust_decimal::{
 };
 
 pub use parser::{ParseMore, ParseValue, Parser};
+pub use ref_serializer::{RefDictSerializer, RefItemSerializer, RefListSerializer};
 pub use serializer::SerializeValue;
 
 type SFVResult<T> = std::result::Result<T, &'static str>;
@@ -254,7 +256,7 @@ pub enum BareItem {
 }
 
 impl BareItem {
-    /// If `BareItem` is a decimal `Number`, returns `Decimal`, otherwise returns `None`.
+    /// If `BareItem` is a decimal, returns `Decimal`, otherwise returns `None`.
     /// ```
     /// # use sfv::{BareItem, Decimal, FromPrimitive};
     /// let decimal_number = Decimal::from_f64(415.566).unwrap();
@@ -267,7 +269,7 @@ impl BareItem {
             _ => None,
         }
     }
-    /// If `BareItem` is an integer `Number`, returns `i64`, otherwise returns `None`.
+    /// If `BareItem` is an integer, returns `i64`, otherwise returns `None`.
     /// ```
     /// # use sfv::BareItem;
     /// let bare_item: BareItem = 100.into();
@@ -331,7 +333,7 @@ impl BareItem {
 }
 
 impl From<i64> for BareItem {
-    /// Convert `i64` into `BareItem::Number`
+    /// Convert `i64` into `BareItem::Integer`
     /// ```
     /// # use sfv::BareItem;
     /// let bare_item: BareItem = 456.into();
@@ -343,7 +345,7 @@ impl From<i64> for BareItem {
 }
 
 impl From<Decimal> for BareItem {
-    /// Convert `Decimal` into `BareItem::Number`
+    /// Convert `Decimal` into `BareItem::Decimal`
     /// ```
     /// # use sfv::{BareItem, Decimal, FromPrimitive};
     /// let decimal_number = Decimal::from_f64(48.01).unwrap();
@@ -359,4 +361,27 @@ impl From<Decimal> for BareItem {
 pub(crate) enum Num {
     Decimal(Decimal),
     Integer(i64),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum RefBareItem<'a> {
+    Integer(i64),
+    Decimal(Decimal),
+    String(&'a str),
+    ByteSeq(&'a [u8]),
+    Boolean(bool),
+    Token(&'a str),
+}
+
+impl BareItem {
+    fn to_ref_bare_item(&self) -> RefBareItem {
+        match self {
+            BareItem::Integer(val) => RefBareItem::Integer(*val),
+            BareItem::Decimal(val) => RefBareItem::Decimal(*val),
+            BareItem::String(val) => RefBareItem::String(val),
+            BareItem::ByteSeq(val) => RefBareItem::ByteSeq(val.as_slice()),
+            BareItem::Boolean(val) => RefBareItem::Boolean(*val),
+            BareItem::Token(val) => RefBareItem::Token(val),
+        }
+    }
 }
