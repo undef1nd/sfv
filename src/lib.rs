@@ -60,8 +60,8 @@ use sfv::{Item, BareItem, SerializeValue, Parameters, Decimal, FromPrimitive};
 
 let mut params = Parameters::new();
 let decimal = Decimal::from_f64(13.45655).unwrap();
-params.insert("key".into(), decimal.into());
-let int_item = Item::with_params(99.into(), params);
+params.insert("key".into(), BareItem::Decimal(decimal));
+let int_item = Item::with_params(BareItem::Integer(99), params);
 assert_eq!(int_item.serialize_value().unwrap(), "99;key=13.457");
 ```
 
@@ -77,7 +77,7 @@ let str_item = Item::new(BareItem::String(String::from("foo")));
 
 let mut int_item_params = Parameters::new();
 int_item_params.insert("key".into(), BareItem::Boolean(false));
-let int_item = Item::with_params(99.into(), int_item_params);
+let int_item = Item::with_params(BareItem::Integer(99), int_item_params);
 
 // Create InnerList
 let mut inner_list_params = Parameters::new();
@@ -232,8 +232,12 @@ impl InnerList {
 /// `BareItem` type is used to construct `Items` or `Parameters` values.
 #[derive(Debug, PartialEq, Clone)]
 pub enum BareItem {
-    // Either Integer, or Decimal.
-    Number(Num),
+    /// Decimal number
+    // sf-decimal  = ["-"] 1*12DIGIT "." 1*3DIGIT
+    Decimal(Decimal),
+    /// Integer number
+    // sf-integer = ["-"] 1*15DIGIT
+    Integer(i64),
     // sf-string = DQUOTE *chr DQUOTE
     // chr       = unescaped / escaped
     // unescaped = %x20-21 / %x23-5B / %x5D-7E
@@ -259,7 +263,7 @@ impl BareItem {
     /// ```
     pub fn as_decimal(&self) -> Option<Decimal> {
         match *self {
-            BareItem::Number(Num::Decimal(val)) => Some(val),
+            BareItem::Decimal(val) => Some(val),
             _ => None,
         }
     }
@@ -271,7 +275,7 @@ impl BareItem {
     /// ```
     pub fn as_int(&self) -> Option<i64> {
         match *self {
-            BareItem::Number(Num::Integer(val)) => Some(val),
+            BareItem::Integer(val) => Some(val),
             _ => None,
         }
     }
@@ -334,7 +338,7 @@ impl From<i64> for BareItem {
     /// assert_eq!(bare_item.as_int().unwrap(), 456);
     /// ```
     fn from(item: i64) -> Self {
-        BareItem::Number(Num::Integer(item))
+        BareItem::Integer(item)
     }
 }
 
@@ -347,17 +351,12 @@ impl From<Decimal> for BareItem {
     /// assert_eq!(bare_item.as_decimal().unwrap(), decimal_number);
     /// ```
     fn from(item: Decimal) -> Self {
-        BareItem::Number(Num::Decimal(item))
+        BareItem::Decimal(item)
     }
 }
 
-/// Used to represent either `Decimal` or `Integer` as `Numeric` variant of `BareItem`.
-#[derive(Debug, PartialEq, Clone)]
-pub enum Num {
-    /// Decimal number
-    // sf-decimal  = ["-"] 1*12DIGIT "." 1*3DIGIT
+#[derive(Debug, PartialEq)]
+pub(crate) enum Num {
     Decimal(Decimal),
-    /// Integer number
-    // sf-integer = ["-"] 1*15DIGIT
     Integer(i64),
 }

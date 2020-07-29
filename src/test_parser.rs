@@ -339,7 +339,7 @@ fn parse_bare_item() -> Result<(), Box<dyn Error>> {
         Parser::parse_bare_item(&mut ":YmFzZV82NCBlbmNvZGluZyB0ZXN0:".chars().peekable())?
     );
     assert_eq!(
-        BareItem::Number(Num::Decimal(Decimal::from_str("-3.55")?)),
+        BareItem::Decimal(Decimal::from_str("-3.55")?),
         Parser::parse_bare_item(&mut "-3.55".chars().peekable())?
     );
     Ok(())
