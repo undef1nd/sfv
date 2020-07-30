@@ -243,7 +243,10 @@ impl Parser {
                 Ok(BareItem::Token(Self::parse_token(&mut input_chars)?))
             }
             Some(&c) if c == '-' || c.is_ascii_digit() => {
-                Ok(BareItem::Number(Self::parse_number(&mut input_chars)?))
+                match Self::parse_number(&mut input_chars)? {
+                    Num::Decimal(val) => Ok(BareItem::Decimal(val)),
+                    Num::Integer(val) => Ok(BareItem::Integer(val)),
+                }
             }
             _ => Err("parse_bare_item: item type can't be identified"),
         }

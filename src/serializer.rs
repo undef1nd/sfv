@@ -1,6 +1,6 @@
 use crate::utils;
 use crate::{
-    BareItem, Decimal, Dictionary, InnerList, Item, List, ListEntry, Num, Parameters, SFVResult,
+    BareItem, Decimal, Dictionary, InnerList, Item, List, ListEntry, Parameters, SFVResult,
 };
 use data_encoding::BASE64;
 use rust_decimal::prelude::Zero;
@@ -153,8 +153,8 @@ impl Serializer {
             BareItem::String(value) => Self::serialize_string(value, output)?,
             BareItem::ByteSeq(value) => Self::serialize_byte_sequence(value, output)?,
             BareItem::Token(value) => Self::serialize_token(value, output)?,
-            BareItem::Number(Num::Integer(value)) => Self::serialize_integer(*value, output)?,
-            BareItem::Number(Num::Decimal(value)) => Self::serialize_decimal(*value, output)?,
+            BareItem::Integer(value) => Self::serialize_integer(*value, output)?,
+            BareItem::Decimal(value) => Self::serialize_decimal(*value, output)?,
         };
         Ok(())
     }
