@@ -1,4 +1,4 @@
-use sfv::{BareItem, Dictionary, Item, ListEntry, Parser};
+use sfv::{ListEntry, Parser};
 use std::error::Error;
 
 #[test]

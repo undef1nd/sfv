@@ -24,19 +24,19 @@ There's also a few primitive types used to construct structured field values:
 ```
 use sfv::Parser;
 
-// Parsing structured field value of Item type
+// Parsing structured field value of Item type.
 let item_header_input = "12.445;foo=bar";
 let item = Parser::parse_item(item_header_input.as_bytes());
 assert!(item.is_ok());
 println!("{:#?}", item);
 
-// Parsing structured field value of List type
+// Parsing structured field value of List type.
 let list_header_input = "1;a=tok, (\"foo\" \"bar\");baz, ()";
 let list = Parser::parse_list(list_header_input.as_bytes());
 assert!(list.is_ok());
 println!("{:#?}", list);
 
-// Parsing structured field value of Dictionary type
+// Parsing structured field value of Dictionary type.
 let dict_header_input = "a=?0, b, c; foo=bar, rating=1.5, fruits=(apple pear)";
 let dict = Parser::parse_dictionary(dict_header_input.as_bytes());
 assert!(dict.is_ok());
@@ -45,7 +45,7 @@ println!("{:#?}", dict);
 ```
 
 ### Value Creation and Serialization
-Create `Item` with empty parameters:
+Creates `Item` with empty parameters:
 ```
 use sfv::{Item, BareItem, SerializeValue};
 
@@ -54,7 +54,7 @@ assert_eq!(str_item.serialize_value().unwrap(), "\"foo\"");
 ```
 
 
-Create `Item` field value with parameters:
+Creates `Item` field value with parameters:
 ```
 use sfv::{Item, BareItem, SerializeValue, Parameters, Decimal, FromPrimitive};
 
@@ -65,21 +65,21 @@ let int_item = Item::with_params(BareItem::Integer(99), params);
 assert_eq!(int_item.serialize_value().unwrap(), "99;key=13.457");
 ```
 
-Create `List` field value with `Item` and parametrized `InnerList` as members:
+Creates `List` field value with `Item` and parametrized `InnerList` as members:
 ```
 use sfv::{Item, BareItem, InnerList, List, SerializeValue, Parameters};
 
-// Create Item
 let tok_item = BareItem::Token("tok".into());
 
-// Create InnerList members
+// Creates Item.
 let str_item = Item::new(BareItem::String(String::from("foo")));
 
+// Creates InnerList members.
 let mut int_item_params = Parameters::new();
 int_item_params.insert("key".into(), BareItem::Boolean(false));
 let int_item = Item::with_params(BareItem::Integer(99), int_item_params);
 
-// Create InnerList
+// Creates InnerList.
 let mut inner_list_params = Parameters::new();
 inner_list_params.insert("bar".into(), BareItem::Boolean(true));
 let inner_list = InnerList::with_params(vec![int_item, str_item], inner_list_params);
@@ -92,7 +92,7 @@ assert_eq!(
 );
 ```
 
-Create `Dictionary` field value:
+Creates `Dictionary` field value:
 ```
 use sfv::{Parser, Item, BareItem, SerializeValue, ParseValue, Dictionary};
 
@@ -210,7 +210,7 @@ impl From<InnerList> for ListEntry {
 //                 parameters
 #[derive(Debug, PartialEq, Clone)]
 pub struct InnerList {
-    /// `Items` that `InnerList` contains. Can be empty
+    /// `Items` that `InnerList` contains. Can be empty.
     pub items: Vec<Item>,
     /// `InnerList`'s associated parameters. Can be empty.
     pub params: Parameters,
@@ -333,7 +333,7 @@ impl BareItem {
 }
 
 impl From<i64> for BareItem {
-    /// Convert `i64` into `BareItem::Integer`
+    /// Converts `i64` into `BareItem::Integer`.
     /// ```
     /// # use sfv::BareItem;
     /// let bare_item: BareItem = 456.into();
@@ -345,7 +345,7 @@ impl From<i64> for BareItem {
 }
 
 impl From<Decimal> for BareItem {
-    /// Convert `Decimal` into `BareItem::Decimal`
+    /// Converts `Decimal` into `BareItem::Decimal`.
     /// ```
     /// # use sfv::{BareItem, Decimal, FromPrimitive};
     /// let decimal_number = Decimal::from_f64(48.01).unwrap();
@@ -363,6 +363,7 @@ pub(crate) enum Num {
     Integer(i64),
 }
 
+/// Similar to `BareItem`, but used to serialize values via `RefItemSerializer`, `RefListSerializer`, `RefDictSerializer`.
 #[derive(Debug, PartialEq, Clone)]
 pub enum RefBareItem<'a> {
     Integer(i64),
@@ -374,6 +375,7 @@ pub enum RefBareItem<'a> {
 }
 
 impl BareItem {
+    /// Converts `BareItem` into `RefBareItem`.
     fn to_ref_bare_item(&self) -> RefBareItem {
         match self {
             BareItem::Integer(val) => RefBareItem::Integer(*val),

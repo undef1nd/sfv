@@ -1,7 +1,20 @@
 use crate::serializer::Serializer;
-use crate::{Decimal, List, Num, RefBareItem, SFVResult};
+use crate::{RefBareItem, SFVResult};
 use std::marker::PhantomData;
 
+/// Serializes `Item` field value components incrementally.
+/// ```
+/// use sfv::{RefBareItem, RefItemSerializer};
+///
+/// let mut serialized_item = String::new();
+/// let serializer = RefItemSerializer::new(&mut serialized_item);
+/// serializer
+/// .bare_item(&RefBareItem::Integer(11))
+/// .unwrap()
+/// .parameter("foo", &RefBareItem::Boolean(true))
+/// .unwrap();
+/// assert_eq!(serialized_item, "11;foo");
+/// ```
 #[derive(Debug)]
 pub struct RefItemSerializer<'a> {
     pub buffer: &'a mut String,
@@ -20,6 +33,7 @@ impl<'a> RefItemSerializer<'a> {
     }
 }
 
+/// Used by `RefItemSerializer`, `RefListSerializer`, `RefDictSerializer` to serialize a single `Parameter`.
 #[derive(Debug)]
 pub struct RefParameterSerializer<'a> {
     buffer: &'a mut String,
@@ -32,6 +46,32 @@ impl<'a> RefParameterSerializer<'a> {
     }
 }
 
+/// Serializes `List` field value components incrementally.
+/// ```
+/// use sfv::{RefBareItem, RefListSerializer};
+///
+/// let mut serialized_item = String::new();
+/// let serializer = RefListSerializer::new(&mut serialized_item);
+/// serializer
+///     .bare_item(&RefBareItem::Integer(11))
+///     .unwrap()
+///     .parameter("foo", &RefBareItem::Boolean(true))
+///     .unwrap()
+///     .open_inner_list()
+///     .inner_list_bare_item(&RefBareItem::Token("abc"))
+///     .unwrap()
+///     .inner_list_parameter("abc_param", &RefBareItem::Boolean(false))
+///     .unwrap()
+///     .inner_list_bare_item(&RefBareItem::Token("def"))
+///     .unwrap()
+///     .close_inner_list()
+///     .parameter("bar", &RefBareItem::String("val"))
+///     .unwrap();
+/// assert_eq!(
+///     serialized_item,
+///     "11;foo, (abc;abc_param=?0 def);bar=\"val\""
+/// );
+/// ```
 #[derive(Debug)]
 pub struct RefListSerializer<'a> {
     buffer: &'a mut String,
@@ -73,6 +113,38 @@ impl<'a> RefListSerializer<'a> {
     }
 }
 
+/// Serializes `Dictionary` field value components incrementally.
+/// ```
+/// use sfv::{RefBareItem, RefDictSerializer, Decimal, FromPrimitive};
+///
+/// let mut serialized_item = String::new();
+/// let serializer = RefDictSerializer::new(&mut serialized_item);
+/// serializer
+///    .bare_item_member("member1", &RefBareItem::Integer(11))
+///    .unwrap()
+///    .parameter("foo", &RefBareItem::Boolean(true))
+///    .unwrap()
+///    .open_inner_list("member2")
+///    .unwrap()
+///    .inner_list_bare_item(&RefBareItem::Token("abc"))
+///    .unwrap()
+///    .inner_list_parameter("abc_param", &RefBareItem::Boolean(false))
+///    .unwrap()
+///    .inner_list_bare_item(&RefBareItem::Token("def"))
+///    .unwrap()
+///    .close_inner_list()
+///    .parameter("bar", &RefBareItem::String("val"))
+///    .unwrap()
+///    .bare_item_member(
+///         "member3",
+///         &RefBareItem::Decimal(Decimal::from_f64(12.34566).unwrap()),
+///    )
+///    .unwrap();
+/// assert_eq!(
+///    serialized_item,
+///    "member1=11;foo, member2=(abc;abc_param=?0 def);bar=\"val\", member3=12.346"
+/// );
+/// ```
 #[derive(Debug)]
 pub struct RefDictSerializer<'a> {
     buffer: &'a mut String,
@@ -118,6 +190,7 @@ impl<'a> RefDictSerializer<'a> {
     }
 }
 
+/// Used by `RefItemSerializer`, `RefListSerializer`, `RefDictSerializer` to serialize `InnerList`.
 #[derive(Debug)]
 pub struct RefInnerListSerializer<'a, T> {
     buffer: &'a mut String,
@@ -172,7 +245,7 @@ impl<'a> Container<'a> for RefDictSerializer<'a> {
 #[cfg(test)]
 mod alternative_serializer_tests {
     use super::*;
-    use crate::{BareItem, FromPrimitive};
+    use crate::{Decimal, FromPrimitive};
 
     #[test]
     fn test_fast_serialize_item() -> SFVResult<()> {
