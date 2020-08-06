@@ -3,7 +3,7 @@
 
 # Structured Field Values for HTTP
 
-[Documentation](https://docs.rs/sfv/0.2.0/sfv/)
+[Documentation](https://docs.rs/sfv/)
 
 `sfv` crate is an implementation of IETF draft [Structured Field Values for HTTP](https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html) for parsing and serializing HTTP field values (also known as "structured headers" or "structured trailers").
 
