@@ -1,6 +1,6 @@
 [package]
 name = "sfv"
-version = "0.7.0"
+version = "0.8.0"
 authors = ["Tania Batieva <yalyna.ts@gmail.com>"]
 edition = "2018"
 license = "MIT/Apache-2.0"
@@ -14,7 +14,7 @@ exclude = ["tests/**", ".github/*"]
 
 
 [dependencies]
-indexmap="=1.2.0"
+indexmap="1.1.0"
 rust_decimal="1.6.0"
 data-encoding = "2.2.1"
 
