@@ -42,7 +42,7 @@ fn run_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
     let input = test_case
         .raw
         .as_ref()
-        .ok_or("raw value is not specified")?
+        .ok_or("run_test_case: raw value is not specified")?
         .join(", ");
 
     let actual_result = match test_case.header_type.as_str() {
@@ -51,7 +51,7 @@ fn run_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
         "dictionary" => {
             Parser::parse_dictionary(input.as_bytes()).map(|dict| FieldType::Dict(dict))
         }
-        _ => return Err("spec_tests: unexpected field value type in test case".into()),
+        _ => return Err("run_test_case: unexpected field value type in test case".into()),
     };
 
     // Check that actual result for must_fail tests is Err
@@ -113,7 +113,7 @@ fn build_expected_field_value(test_case: &TestData) -> Result<FieldType, Box<dyn
     let expected_value = test_case
         .expected
         .as_ref()
-        .ok_or("test expected value is not specified")?;
+        .ok_or("build_expected_field_value: test's expected value is not specified")?;
 
     // Build expected Structured Field Value from serde Value
     match test_case.header_type.as_str() {
@@ -134,7 +134,9 @@ fn build_expected_field_value(test_case: &TestData) -> Result<FieldType, Box<dyn
 }
 
 fn build_list_or_item(member: &Value) -> Result<ListEntry, Box<dyn Error>> {
-    let member_as_array = member.as_array().ok_or("list_or_item value is not array")?;
+    let member_as_array = member
+        .as_array()
+        .ok_or("build_list_or_item: list_or_item value is not an array")?;
 
     // If member is an array of arrays, then it represents InnerList, otherwise it's an Item
     let list_entry: ListEntry = if member_as_array[0].is_array() {
@@ -146,14 +148,26 @@ fn build_list_or_item(member: &Value) -> Result<ListEntry, Box<dyn Error>> {
 }
 
 fn build_dict(expected_value: &Value) -> Result<Dictionary, Box<dyn Error>> {
-    let expected_as_map = expected_value
-        .as_object()
-        .ok_or("expected value is not object")?;
+    let expected_array = expected_value
+        .as_array()
+        .ok_or("build_dict: expected value is not an array")?;
 
     let mut dict = Dictionary::new();
-    for (member_name, member_value) in expected_as_map.iter() {
+
+    if expected_array.is_empty() {
+        return Ok(dict);
+    }
+
+    for member in expected_array.iter() {
+        let member = member
+            .as_array()
+            .ok_or("build_dict: expected dict member is not an array")?;
+        let member_name = member[0]
+            .as_str()
+            .ok_or("build_dict: expected dict member name is not a str")?;
+        let member_value = &member[1];
         let item_or_inner_list: ListEntry = build_list_or_item(member_value)?;
-        dict.insert(member_name.clone(), item_or_inner_list);
+        dict.insert(member_name.to_owned(), item_or_inner_list);
     }
     Ok(dict)
 }
@@ -161,7 +175,7 @@ fn build_dict(expected_value: &Value) -> Result<Dictionary, Box<dyn Error>> {
 fn build_list(expected_value: &Value) -> Result<List, Box<dyn Error>> {
     let expected_as_array = expected_value
         .as_array()
-        .ok_or("expected value is not array")?;
+        .ok_or("build_list: expected value is not an array")?;
 
     let mut list_items: Vec<ListEntry> = vec![];
     for member in expected_as_array.iter() {
@@ -177,7 +191,7 @@ fn build_inner_list(inner_list_value: &Value) -> Result<InnerList, Box<dyn Error
     // each item is an array itself: item = [bare_item, {params}]
     let inner_list_as_array = inner_list_value
         .as_array()
-        .ok_or("inner list is not array")?;
+        .ok_or("build_inner_list: inner list is not an array")?;
 
     let inner_list_items = &inner_list_as_array[0];
     let inner_list_params = &inner_list_as_array[1];
@@ -185,7 +199,7 @@ fn build_inner_list(inner_list_value: &Value) -> Result<InnerList, Box<dyn Error
     let mut items = vec![];
     for item_value in inner_list_items
         .as_array()
-        .ok_or("inner list items value is not array")?
+        .ok_or("build_inner_list: inner list items value is not an array")?
         .iter()
     {
         items.push(build_item(item_value)?);
@@ -200,7 +214,7 @@ fn build_item(expected_value: &Value) -> Result<Item, Box<dyn Error>> {
     // item = [bare_item, {params}]
     let expected_array = expected_value
         .as_array()
-        .ok_or("expected value is not array")?;
+        .ok_or("build_item: expected value is not an array")?;
 
     // Item array must contain 2 members only
     if expected_array.len() != 2 {
@@ -218,19 +232,23 @@ fn build_item(expected_value: &Value) -> Result<Item, Box<dyn Error>> {
 fn build_bare_item(bare_item_value: &Value) -> Result<BareItem, Box<dyn Error>> {
     match bare_item_value {
         bare_item if bare_item.is_i64() => Ok(BareItem::Integer(
-            bare_item.as_i64().ok_or("bare_item value is not i64")?,
+            bare_item
+                .as_i64()
+                .ok_or("build_bare_item: bare_item value is not an i64")?,
         )),
         bare_item if bare_item.is_f64() => {
             let decimal = Decimal::from_str(&serde_json::to_string(bare_item)?)?;
             Ok(BareItem::Decimal(decimal))
         }
         bare_item if bare_item.is_boolean() => Ok(BareItem::Boolean(
-            bare_item.as_bool().ok_or("bare_item value is not bool")?,
+            bare_item
+                .as_bool()
+                .ok_or("build_bare_item: bare_item value is not a bool")?,
         )),
         bare_item if bare_item.is_string() => Ok(BareItem::String(
             bare_item
                 .as_str()
-                .ok_or("bare_item value is not str")?
+                .ok_or("build_bare_item: bare_item value is not a str")?
                 .clone()
                 .to_owned(),
         )),
@@ -238,7 +256,7 @@ fn build_bare_item(bare_item_value: &Value) -> Result<BareItem, Box<dyn Error>> 
             Ok(BareItem::Token(
                 bare_item["value"]
                     .as_str()
-                    .ok_or("bare_item value is not str")?
+                    .ok_or("build_bare_item: bare_item value is not a str")?
                     .clone()
                     .to_owned(),
             ))
@@ -246,22 +264,34 @@ fn build_bare_item(bare_item_value: &Value) -> Result<BareItem, Box<dyn Error>> 
         bare_item if (bare_item.is_object() && bare_item["__type"] == "binary") => {
             let str_val = bare_item["value"]
                 .as_str()
-                .ok_or("bare_item value is not str")?
+                .ok_or("build_bare_item: bare_item value is not a str")?
                 .clone();
             Ok(BareItem::ByteSeq(BASE32.decode(str_val.as_bytes())?))
         }
-        _ => Err("unknown bare_item value".into()),
+        _ => Err("build_bare_item: unknown bare_item value".into()),
     }
 }
 
 fn build_parameters(params_value: &Value) -> Result<Parameters, Box<dyn Error>> {
     let mut parameters = Parameters::new();
-    for (key, val) in params_value
-        .as_object()
-        .ok_or("params value is not object")?
-    {
-        let itm = build_bare_item(val)?;
-        parameters.insert(key.clone(), itm);
+
+    let parameters_array = params_value
+        .as_array()
+        .ok_or("build_parameters: params value is not an array")?;
+    if parameters_array.is_empty() {
+        return Ok(parameters);
+    };
+
+    for member in parameters_array.iter() {
+        let member = member
+            .as_array()
+            .ok_or("build_parameters: expected parameter is not an array")?;
+        let key = member[0]
+            .as_str()
+            .ok_or("build_parameters: expected parameter name is not a str")?;
+        let value = &member[1];
+        let itm = build_bare_item(value)?;
+        parameters.insert(key.to_owned(), itm);
     }
     Ok(parameters)
 }
