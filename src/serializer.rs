@@ -60,7 +60,7 @@ impl Serializer {
         Ok(())
     }
 
-    #[deny(clippy::ptr_arg)]
+    #[allow(clippy::ptr_arg)]
     pub(crate) fn serialize_list(input_list: &List, output: &mut String) -> SFVResult<()> {
         // https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html#ser-list
         if input_list.is_empty() {
