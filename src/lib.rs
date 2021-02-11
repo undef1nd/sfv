@@ -1,6 +1,5 @@
 /*!
-`sfv` crate is an implementation of IETF draft [Structured Field Values for HTTP](https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html)
-for parsing and serializing structured HTTP field values.
+`sfv` crate is an implementation of *Structured Field Values for HTTP* as specified in [RFC 8941](https://httpwg.org/specs/rfc8941.html) for parsing and serializing HTTP field values.
 It also exposes a set of types that might be useful for defining new structured fields.
 
 # Data Structures
