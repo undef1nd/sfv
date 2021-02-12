@@ -1,13 +1,13 @@
 [package]
 name = "sfv"
-version = "0.9.0"
+version = "0.9.1"
 authors = ["Tania Batieva <yalyna.ts@gmail.com>"]
 edition = "2018"
 license = "MIT/Apache-2.0"
 readme = "README.md"
 documentation = "https://docs.rs/sfv"
-description = """Structured HTTP field values parser.
-Implementation of IETF draft https://httpwg.org/http-extensions/draft-ietf-httpbis-header-structure.html"""
+description = """Structured Field Values for HTTP parser.
+Implementation of RFC 8941."""
 repository = "https://github.com/undef1nd/sfv"
 keywords = ["http-header", "structured-header", ]
 exclude = ["tests/**", ".github/*"]
