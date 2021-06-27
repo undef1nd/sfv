@@ -166,6 +166,7 @@ assert_eq!(
 
 mod parser;
 mod ref_serializer;
+mod ref_parser;
 mod serializer;
 mod utils;
 

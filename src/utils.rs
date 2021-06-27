@@ -1,6 +1,6 @@
 use data_encoding::{Encoding, Specification};
 use std::iter::Peekable;
-use std::str::Chars;
+use std::str::{Chars,CharIndices};
 
 pub(crate) fn base64() -> Result<Encoding, &'static str> {
     let mut spec = Specification::new();
@@ -35,6 +35,26 @@ pub(crate) fn consume_ows_chars(input_chars: &mut Peekable<Chars>) {
 
 pub(crate) fn consume_sp_chars(input_chars: &mut Peekable<Chars>) {
     while let Some(c) = input_chars.peek() {
+        if c == &' ' {
+            input_chars.next();
+        } else {
+            break;
+        }
+    }
+}
+
+pub(crate) fn consume_ows_chars_index(input_chars: &mut Peekable<CharIndices>) {
+    while let Some((_, c)) = input_chars.peek() {
+        if c == &' ' || c == &'\t' {
+            input_chars.next();
+        } else {
+            break;
+        }
+    }
+}
+
+pub(crate) fn consume_sp_chars_index(input_chars: &mut Peekable<CharIndices>) {
+    while let Some((_, c)) = input_chars.peek() {
         if c == &' ' {
             input_chars.next();
         } else {
