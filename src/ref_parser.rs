@@ -89,7 +89,7 @@ fn testRefIterator() {
 //         Self: Sized;
 // }
 
-pub struct MyPeek<'a> {
+pub(crate) struct MyPeek<'a> {
     content: &'a str,
     iterator: Peekable<CharIndices<'a>>,
 }
@@ -344,7 +344,7 @@ impl RefParser {
         }
 
         match input_chars.iterator.peek() {
-            Some((_, '?')) => Ok(BareItemRef::Boolean(Self::parse_bool(&mut input_chars)?)),
+            Some((_, '?')) => Self::parse_bool(&mut input_chars),
             Some((_, '"')) => Self::parse_string(&mut input_chars),
             Some((_, ':')) => Self::parse_byte_sequence(
                 &mut input_chars,
@@ -362,7 +362,7 @@ impl RefParser {
         }
     }
 
-    pub(crate) fn parse_bool(input_chars: &mut MyPeek) -> SFVResult<bool> {
+    pub(crate) fn parse_bool<'a>(input_chars: &mut MyPeek<'a>) -> SFVResult<BareItemRef<'a>> {
         // https://httpwg.org/specs/rfc8941.html#parse-boolean
 
         match input_chars.iterator.next() {
@@ -371,8 +371,8 @@ impl RefParser {
         }
 
         match input_chars.iterator.next() {
-            Some((_,'0')) => Ok(false),
-            Some((_,'1')) => Ok(true),
+            Some((_,'0')) => Ok(BareItemRef::Boolean(false)),
+            Some((_,'1')) => Ok(BareItemRef::Boolean(true)),
             _ => Err("parse_bool: invalid variant"),
         }
     }
@@ -437,16 +437,19 @@ impl RefParser {
             _ => return Err("parse_byte_seq: no closing ':'")
         };
 
-        Ok(BareItemRef::ByteSeq(&input_chars.content[start..end]))
-        // TODO: check if it's valid base64
-        // let b64_content = input_chars.iterator.take_while(|(_,c)| c != &':').collect::<String>();
-        // if !b64_content.chars().all(utils::is_allowed_b64_content) {
-        //     return Err("parse_byte_seq: invalid char in byte sequence");
-        // }
-        // match utils::base64()?.decode(b64_content.as_bytes()) {
-        //     Ok(content) => Ok(content),
-        //     Err(_) => Err("parse_byte_seq: decoding error"),
-        // }
+        let substring = &input_chars.content[start..end];
+
+        // Check if it's valid base64
+        if !substring.chars().all(utils::is_allowed_b64_content) {
+            return Err("parse_byte_seq: invalid char in byte sequence");
+        }
+
+        match utils::base64()?.decode(substring.as_bytes()) {
+            Err(_) => return Err("parse_byte_seq: decoding error"),
+            _ => {}
+        }
+
+        Ok(BareItemRef::ByteSeq(substring))
     }
 
     pub(crate) fn parse_number(input_chars: &mut MyPeek) -> SFVResult<Num> {
