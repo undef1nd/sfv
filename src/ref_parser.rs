@@ -37,17 +37,47 @@ struct ParamRef<'a> {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-struct ParamRefIterator<'a> {
-    content: &'a str,
-    index: u32,
+struct ParamRefIterator {
+    // it: SfvIterator<'a>,
 }
 
-impl<'a> Iterator for ParamRefIterator<'a> {
-    type Item = ParamRef<'a>;
-    fn next(&mut self) -> Option<ParamRef<'a>> {
-        None
-    }
-}
+    // pub(crate) fn parse_parameters(input: &mut SfvIterator) -> SFVResult<Parameters> {
+    //     // https://httpwg.org/specs/rfc8941.html#parse-param
+
+    //     // let mut params = Parameters::new();
+
+    //     while let Some((_,curr_char)) = input.chars.peek() {
+    //         if curr_char == &';' {
+    //             input.chars.next();
+    //         } else {
+    //             break;
+    //         }
+
+    //         utils::consume_sp_chars_index(input.chars);
+
+    //         let param_name = Self::parse_key(input)?;
+    //         let param_value = match input.chars.peek() {
+    //             Some((_,'=')) => {
+    //                 input.chars.next();
+    //                 Self::parse_bare_item(input)?
+    //             }
+    //             _ => BareItemRef::Boolean(true),
+    //         };
+    //         // params.insert(param_name, param_value);
+    //     }
+
+    //     // If parameters already contains a name param_name (comparing character-for-character), overwrite its value.
+    //     // Note that when duplicate Parameter keys are encountered, this has the effect of ignoring all but the last instance.
+    //     Ok(params)
+    // }
+
+
+// impl<'a> Iterator for ParamRefIterator<'a> {
+//     type Item = SFVResult<ParamRef<'a>>;
+//     fn next(&mut self) -> Option<SFVResult<ParamRef<'a>>> {
+//         None
+//     }
+// }
 
 #[test]
 fn testRefIterator() {
@@ -89,6 +119,7 @@ fn testRefIterator() {
 //         Self: Sized;
 // }
 
+#[derive(Clone)]
 pub(crate) struct SfvIterator<'a> {
     content: &'a str,
     chars: Peekable<CharIndices<'a>>,
@@ -115,7 +146,7 @@ pub(crate) struct SfvIterator<'a> {
 #[derive(Debug, PartialEq, Clone)]
 pub struct ItemRef<'a> {
     bare_item: BareItemRef<'a>,
-    params: ParamRefIterator<'a>,
+    // params: ParamRefIterator<'a>,
 }
 
 // impl<'a> RefParseValue for ItemRef<'a> {
@@ -251,11 +282,18 @@ impl RefParser {
 
         // TODO: Parse all params once. Then do it again and return first one.
 
-        let params = ParamRefIterator { content: input, index: 0}; // RefParser::parse_parameters(input)?;
+        // let nextIndex = if let Some((index, _)) = iter.chars.peek() {
+        //     *index
+        // } else {
+        //     input.len()
+        // };
+        // let params = ParamRefIterator { it: iter}; // RefParser::parse_parameters(input)?;
 
-        let result = Ok(ItemRef { bare_item, params });
+        let result = Ok(ItemRef { bare_item });
 
-        utils::consume_sp_chars_index(&mut iter.chars);
+        // TODO: iterate through params once, to make sure they're all valid
+        // Then make sure no characters are left
+        // utils::consume_sp_chars_index(&mut iter.chars);
 
         // if iter.chars.next().is_some() {
         //     return Err("parse: trailing characters after parsed value");
@@ -502,35 +540,40 @@ impl RefParser {
         }
     }
 
-    fn extract_digits(input: &mut SfvIterator) -> SFVResult<(bool, String)> {
+    // TODO: this allocates. Make an in-place version.
+    fn extract_digits<'a>(input: &mut SfvIterator<'a>) -> SFVResult<(bool, &'a str)> {
         let mut is_integer = true;
-        let mut input_number = String::from("");
-        while let Some((_,curr_char)) = input.chars.peek() {
+        let start = match input.chars.peek() {
+            Some((index,_)) => *index,
+            _ => 0,
+        };
+        let mut end = start;
+        while let Some((index,curr_char)) = input.chars.peek() {
             if curr_char.is_ascii_digit() {
-                input_number.push(*curr_char);
+                end = index + 1;
                 input.chars.next();
             } else if curr_char == &'.' && is_integer {
-                if input_number.len() > 12 {
+                if end - start > 12 {
                     return Err(
                         "parse_number: decimal too long, illegal position for decimal point",
                     );
                 }
-                input_number.push(*curr_char);
+                end = index + 1;
                 is_integer = false;
                 input.chars.next();
             } else {
                 break;
             }
 
-            if is_integer && input_number.len() > 15 {
+            if is_integer && end - start > 15 {
                 return Err("parse_number: integer too long, length > 15");
             }
 
-            if !is_integer && input_number.len() > 16 {
+            if !is_integer && end - start > 16 {
                 return Err("parse_number: decimal too long, length > 16");
             }
         }
-        Ok((is_integer, input_number))
+        Ok((is_integer, &input.content[start..end]))
     }
 
     // pub(crate) fn parse_parameters(input: &mut SfvIterator) -> SFVResult<Parameters> {
@@ -563,7 +606,7 @@ impl RefParser {
     //     Ok(params)
     // }
 
-    pub(crate) fn parse_key(input: &mut SfvIterator) -> SFVResult<String> {
+    pub(crate) fn parse_key<'a>(input: &mut SfvIterator<'a>) -> SFVResult<String> {
         match input.chars.peek() {
             Some((_,c)) if c == &'*' || c.is_ascii_lowercase() => (),
             _ => return Err("parse_key: first character is not lcalpha or '*'"),
