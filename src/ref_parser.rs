@@ -84,14 +84,14 @@ fn testRefIterator() {
 // pub trait RefParseValue<'a> {
 //     /// This method should not be used for parsing input into structured field value.
 //     /// Use `RefParser::parse_item`, `RefParser::parse_list` or `RefParsers::parse_dictionary` for that.
-//     fn parse(input_chars: &'a mut MyPeek) -> SFVResult<Self>
+//     fn parse(input: &'a mut SfvIterator) -> SFVResult<Self>
 //     where
 //         Self: Sized;
 // }
 
-pub(crate) struct MyPeek<'a> {
+pub(crate) struct SfvIterator<'a> {
     content: &'a str,
-    iterator: Peekable<CharIndices<'a>>,
+    chars: Peekable<CharIndices<'a>>,
 }
 
 /// If structured field value of List or Dictionary type is split into multiple lines,
@@ -119,40 +119,40 @@ pub struct ItemRef<'a> {
 }
 
 // impl<'a> RefParseValue for ItemRef<'a> {
-//     fn parse(input_chars: &'a mut MyPeek) -> SFVResult<ItemRef<'a>> {
+//     fn parse(input: &'a mut SfvIterator) -> SFVResult<ItemRef<'a>> {
 //         // https://httpwg.org/specs/rfc8941.html#parse-item
-//         let bare_item = RefParser::parse_bare_item(input_chars)?;
-//         let params = ParamRefIterator { content: "todo", index: 0}; // RefParser::parse_parameters(input_chars)?;
+//         let bare_item = RefParser::parse_bare_item(input)?;
+//         let params = ParamRefIterator { content: "todo", index: 0}; // RefParser::parse_parameters(input)?;
 
 //         Ok(ItemRef { bare_item, params })
 //     }
 // }
 
 // impl RefParseValue for List {
-//     fn parse(input_chars: &mut MyPeek) -> SFVResult<List> {
+//     fn parse(input: &mut SfvIterator) -> SFVResult<List> {
 //         // https://httpwg.org/specs/rfc8941.html#parse-list
 //         // List represents an array of (item_or_inner_list, parameters)
 
 //         let mut members = vec![];
 
-//         while input_chars.iterator.peek().is_some() {
-//             members.push(RefParser::parse_list_entry(input_chars)?);
+//         while input.chars.peek().is_some() {
+//             members.push(RefParser::parse_list_entry(input)?);
 
-//             utils::consume_ows_chars(input_chars);
+//             utils::consume_ows_chars(input);
 
-//             if input_chars.iterator.peek().is_none() {
+//             if input.chars.peek().is_none() {
 //                 return Ok(members);
 //             }
 
-//             if let Some(c) = input_chars.next() {
+//             if let Some(c) = input.next() {
 //                 if c != ',' {
 //                     return Err("parse_list: trailing characters after list member");
 //                 }
 //             }
 
-//             utils::consume_ows_chars(input_chars);
+//             utils::consume_ows_chars(input);
 
-//             if input_chars.iterator.peek().is_none() {
+//             if input.chars.peek().is_none() {
 //                 return Err("parse_list: trailing comma");
 //             }
 //         }
@@ -162,19 +162,19 @@ pub struct ItemRef<'a> {
 // }
 
 // impl RefParseValue for Dictionary {
-//     fn parse(input_chars: &mut MyPeek) -> SFVResult<Dictionary> {
+//     fn parse(input: &mut SfvIterator) -> SFVResult<Dictionary> {
 //         let mut dict = Dictionary::new();
 
-//         while input_chars.iterator.peek().is_some() {
-//             let this_key = RefParser::parse_key(input_chars)?;
+//         while input.chars.peek().is_some() {
+//             let this_key = RefParser::parse_key(input)?;
 
-//             if let Some('=') = input_chars.iterator.peek() {
-//                 input_chars.next();
-//                 let member = RefParser::parse_list_entry(input_chars)?;
+//             if let Some('=') = input.chars.peek() {
+//                 input.next();
+//                 let member = RefParser::parse_list_entry(input)?;
 //                 dict.insert(this_key, member);
 //             } else {
 //                 let value = true;
-//                 let params = RefParser::parse_parameters(input_chars)?;
+//                 let params = RefParser::parse_parameters(input)?;
 //                 let member = Item {
 //                     bare_item: BareItem::Boolean(value),
 //                     params,
@@ -182,21 +182,21 @@ pub struct ItemRef<'a> {
 //                 dict.insert(this_key, member.into());
 //             }
 
-//             utils::consume_ows_chars(input_chars);
+//             utils::consume_ows_chars(input);
 
-//             if input_chars.iterator.peek().is_none() {
+//             if input.chars.peek().is_none() {
 //                 return Ok(dict);
 //             }
 
-//             if let Some(c) = input_chars.next() {
+//             if let Some(c) = input.next() {
 //                 if c != ',' {
 //                     return Err("parse_dict: trailing characters after dictionary member");
 //                 }
 //             }
 
-//             utils::consume_ows_chars(input_chars);
+//             utils::consume_ows_chars(input);
 
-//             if input_chars.iterator.peek().is_none() {
+//             if input.chars.peek().is_none() {
 //                 return Err("parse_dict: trailing comma");
 //             }
 //         }
@@ -242,23 +242,22 @@ impl RefParser {
             return Err("parse: non-ascii characters in input");
         }
 
-        let mut input_chars = from_utf8(input_bytes)
+        let mut input = from_utf8(input_bytes)
             .map_err(|_| "parse: conversion from bytes to str failed")?;
-        let mut mypeek = MyPeek{content: &input_chars, iterator: input_chars.char_indices().peekable()};
-        utils::consume_sp_chars_index(&mut mypeek.iterator);
+        let mut iter = SfvIterator{content: &input, chars: input.char_indices().peekable()};
+        utils::consume_sp_chars_index(&mut iter.chars);
 
-        let bare_item = RefParser::parse_bare_item(&mut mypeek)?;
+        let bare_item = RefParser::parse_bare_item(&mut iter)?;
 
         // TODO: Parse all params once. Then do it again and return first one.
 
-        let params = ParamRefIterator { content: input_chars, index: 0}; // RefParser::parse_parameters(input_chars)?;
+        let params = ParamRefIterator { content: input, index: 0}; // RefParser::parse_parameters(input)?;
 
         let result = Ok(ItemRef { bare_item, params });
 
+        utils::consume_sp_chars_index(&mut iter.chars);
 
-        utils::consume_sp_chars_index(&mut mypeek.iterator);
-
-        // if mypeek.iterator.next().is_some() {
+        // if iter.chars.next().is_some() {
         //     return Err("parse: trailing characters after parsed value");
         // };
 
@@ -273,61 +272,61 @@ impl RefParser {
     //         return Err("parse: non-ascii characters in input");
     //     }
 
-    //     let mut input_chars = from_utf8(input_bytes)
+    //     let mut input = from_utf8(input_bytes)
     //         .map_err(|_| "parse: conversion from bytes to str failed")?;
-    //     let mut mypeek = MyPeek{content: &input_chars, iterator: &mut input_chars.char_indices().peekable()};
-    //     utils::consume_sp_chars_index(&mut mypeek.iterator);
+    //     let mut mypeek = SfvIterator{content: &input, iterator: &mut input.char_indices().peekable()};
+    //     utils::consume_sp_chars_index(&mut mypeek.chars);
 
     //     let output = T::parse(&mut mypeek)?;
 
-    //     utils::consume_sp_chars_index(&mut mypeek.iterator);
+    //     utils::consume_sp_chars_index(&mut mypeek.chars);
 
-    //     if mypeek.iterator.next().is_some() {
+    //     if mypeek.chars.next().is_some() {
     //         return Err("parse: trailing characters after parsed value");
     //     };
     //     Ok(output)
     // }
 
-    // fn parse_list_entry(input_chars: &mut MyPeek) -> SFVResult<ListEntry> {
+    // fn parse_list_entry(input: &mut SfvIterator) -> SFVResult<ListEntry> {
     //     // https://httpwg.org/specs/rfc8941.html#parse-item-or-list
     //     // ListEntry represents a tuple (item_or_inner_list, parameters)
 
-    //     match input_chars.iterator.peek() {
+    //     match input.chars.peek() {
     //         Some((index,'(')) => {
-    //             let parsed = Self::parse_inner_list(input_chars)?;
+    //             let parsed = Self::parse_inner_list(input)?;
     //             Ok(ListEntry::InnerList(parsed))
     //         }
     //         _ => {
-    //             let parsed = Item::parse(input_chars)?;
+    //             let parsed = Item::parse(input)?;
     //             Ok(ListEntry::Item(parsed))
     //         }
     //     }
     // }
 
-    // pub(crate) fn parse_inner_list(input_chars: &mut MyPeek) -> SFVResult<InnerList> {
+    // pub(crate) fn parse_inner_list(input: &mut SfvIterator) -> SFVResult<InnerList> {
     //     // https://httpwg.org/specs/rfc8941.html#parse-innerlist
 
-    //     if Some('(') != input_chars.next() {
+    //     if Some('(') != input.next() {
     //         return Err("parse_inner_list: input does not start with '('");
     //     }
 
     //     let mut inner_list = Vec::new();
-    //     while input_chars.iterator.peek().is_some() {
-    //         utils::consume_sp_chars_index(input_chars);
+    //     while input.chars.peek().is_some() {
+    //         utils::consume_sp_chars_index(input);
 
-    //         if Some(&')') == input_chars.iterator.peek() {
-    //             input_chars.next();
-    //             let params = Self::parse_parameters(input_chars)?;
+    //         if Some(&')') == input.chars.peek() {
+    //             input.next();
+    //             let params = Self::parse_parameters(input)?;
     //             return Ok(InnerList {
     //                 items: inner_list,
     //                 params,
     //             });
     //         }
 
-    //         let parsed_item = Item::parse(input_chars)?;
+    //         let parsed_item = Item::parse(input)?;
     //         inner_list.push(parsed_item);
 
-    //         if let Some(c) = input_chars.iterator.peek() {
+    //         if let Some(c) = input.chars.peek() {
     //             if c != &' ' && c != &')' {
     //                 return Err("parse_inner_list: bad delimitation");
     //             }
@@ -337,59 +336,54 @@ impl RefParser {
     //     Err("parse_inner_list: the end of the inner list was not found")
     // }
 
-    pub(crate) fn parse_bare_item<'a>(mut input_chars: &mut MyPeek<'a>) -> SFVResult<BareItemRef<'a>> {
+    pub(crate) fn parse_bare_item<'a>(mut input: &mut SfvIterator<'a>) -> SFVResult<BareItemRef<'a>> {
         // https://httpwg.org/specs/rfc8941.html#parse-bare-item
-        if input_chars.iterator.peek().is_none() {
+        if input.chars.peek().is_none() {
             return Err("parse_bare_item: empty item");
         }
 
-        match input_chars.iterator.peek() {
-            Some((_, '?')) => Self::parse_bool(&mut input_chars),
-            Some((_, '"')) => Self::parse_string(&mut input_chars),
+        match input.chars.peek() {
+            Some((_, '?')) => Self::parse_bool(&mut input),
+            Some((_, '"')) => Self::parse_string(&mut input),
             Some((_, ':')) => Self::parse_byte_sequence(
-                &mut input_chars,
+                &mut input,
             ),
             Some((_,c)) if *c == '*' || c.is_ascii_alphabetic() => {
-                Self::parse_token(&mut input_chars)
+                Self::parse_token(&mut input)
             }
-            Some((_,c)) if c == &'-' || c.is_ascii_digit() => {
-                match Self::parse_number(&mut input_chars)? {
-                    Num::Decimal(val) => Ok(BareItemRef::Decimal(val)),
-                    Num::Integer(val) => Ok(BareItemRef::Integer(val)),
-                }
-            }
+            Some((_,c)) if c == &'-' || c.is_ascii_digit() =>  Self::parse_number(&mut input),
             _ => Err("parse_bare_item: item type can't be identified"),
         }
     }
 
-    pub(crate) fn parse_bool<'a>(input_chars: &mut MyPeek<'a>) -> SFVResult<BareItemRef<'a>> {
+    pub(crate) fn parse_bool<'a>(input: &mut SfvIterator<'a>) -> SFVResult<BareItemRef<'a>> {
         // https://httpwg.org/specs/rfc8941.html#parse-boolean
 
-        match input_chars.iterator.next() {
+        match input.chars.next() {
             Some((_, '?')) => {},
             _ => { return Err("parse_bool: first character is not '?'"); }
         }
 
-        match input_chars.iterator.next() {
+        match input.chars.next() {
             Some((_,'0')) => Ok(BareItemRef::Boolean(false)),
             Some((_,'1')) => Ok(BareItemRef::Boolean(true)),
             _ => Err("parse_bool: invalid variant"),
         }
     }
 
-    pub(crate) fn parse_string<'a>(input_chars: &mut MyPeek<'a>) -> SFVResult<BareItemRef<'a>> {
+    pub(crate) fn parse_string<'a>(input: &mut SfvIterator<'a>) -> SFVResult<BareItemRef<'a>> {
         // https://httpwg.org/specs/rfc8941.html#parse-string
 
-        let start = match input_chars.iterator.next() {
+        let start = match input.chars.next() {
             Some((index,'\"')) => index + 1,
             _ => {return Err("parse_string: first character is not '\"'");}
         };
 
-        while let Some((index, curr_char)) = input_chars.iterator.next() {
+        while let Some((index, curr_char)) = input.chars.next() {
             match curr_char {
-                '\"' => { return Ok(BareItemRef::String(&input_chars.content[start..index]));},
+                '\"' => { return Ok(BareItemRef::String(&input.content[start..index]));},
                 '\x7f' | '\x00'..='\x1f' => return Err("parse_string: not a visible character"),
-                '\\' => match input_chars.iterator.next() {
+                '\\' => match input.chars.next() {
                     Some((_,c)) if c == '\\' || c == '\"' => {
                     }
                     None => return Err("parse_string: last input character is '\\'"),
@@ -401,43 +395,43 @@ impl RefParser {
         Err("parse_string: no closing '\"'")
     }
 
-    pub(crate) fn parse_token<'a>(input_chars: &mut MyPeek<'a>) -> SFVResult<BareItemRef<'a>> {
+    pub(crate) fn parse_token<'a>(input: &mut SfvIterator<'a>) -> SFVResult<BareItemRef<'a>> {
         // https://httpwg.org/specs/rfc8941.html#parse-token
 
 
-        let start : usize = match input_chars.iterator.peek() {
+        let start : usize = match input.chars.peek() {
             None => return Err("parse_token: empty input string"),
             Some((index, c)) if !c.is_ascii_alphabetic() && c != &'*' => return Err("parse_token: first character is not ALPHA or '*'"),
             Some((index, _)) => *index,
         };
 
-        while let Some((index, curr_char)) = input_chars.iterator.peek() {
+        while let Some((index, curr_char)) = input.chars.peek() {
             if !utils::is_tchar(*curr_char) && curr_char != &':' && curr_char != &'/' {
-                return Ok(BareItemRef::Token(&input_chars.content[start..*index]));
+                return Ok(BareItemRef::Token(&input.content[start..*index]));
             }
 
-            match input_chars.iterator.next() {
+            match input.chars.next() {
                 Some(c) => {},
                 None => return Err("parse_token: end of the string"),
             }
         }
-        Ok(BareItemRef::Token(&input_chars.content[start..]))
+        Ok(BareItemRef::Token(&input.content[start..]))
     }
 
-    pub(crate) fn parse_byte_sequence<'a>(input_chars: &mut MyPeek<'a>) -> SFVResult<BareItemRef<'a>> {
+    pub(crate) fn parse_byte_sequence<'a>(input: &mut SfvIterator<'a>) -> SFVResult<BareItemRef<'a>> {
         // https://httpwg.org/specs/rfc8941.html#parse-binary
 
-        let start = match input_chars.iterator.next() {
+        let start = match input.chars.next() {
             Some((index, ':')) => index + 1,
             _ => return Err("parse_byte_seq: first char is not ':'")
         };
 
-        let end = match input_chars.iterator.clone().find(|(_, c)| c == &':') {
+        let end = match input.chars.clone().find(|(_, c)| c == &':') {
             Some((index, ':')) => index,
             _ => return Err("parse_byte_seq: no closing ':'")
         };
 
-        let substring = &input_chars.content[start..end];
+        let substring = &input.content[start..end];
 
         // Check if it's valid base64
         if !substring.chars().all(utils::is_allowed_b64_content) {
@@ -452,16 +446,16 @@ impl RefParser {
         Ok(BareItemRef::ByteSeq(substring))
     }
 
-    pub(crate) fn parse_number(input_chars: &mut MyPeek) -> SFVResult<Num> {
+    pub(crate) fn parse_number<'a>(input: &mut SfvIterator<'a>) -> SFVResult<BareItemRef<'a>> {
         // https://httpwg.org/specs/rfc8941.html#parse-number
 
         let mut sign = 1;
-        if let Some((_,'-')) = input_chars.iterator.peek() {
+        if let Some((_,'-')) = input.chars.peek() {
             sign = -1;
-            input_chars.iterator.next();
+            input.chars.next();
         }
 
-        match input_chars.iterator.peek() {
+        match input.chars.peek() {
             Some((_,c)) if !c.is_ascii_digit() => {
                 return Err("parse_number: input number does not start with a digit")
             }
@@ -470,7 +464,7 @@ impl RefParser {
         }
 
         // Get number from input as a string and identify whether it's a decimal or integer
-        let (is_integer, input_number) = Self::extract_digits(input_chars)?;
+        let (is_integer, input_number) = Self::extract_digits(input)?;
 
         // Parse input_number from string into integer
         if is_integer {
@@ -484,7 +478,7 @@ impl RefParser {
                 return Err("parse_number: integer number is out of range");
             }
 
-            return Ok(Num::Integer(output_number));
+            return Ok(BareItemRef::Integer(output_number));
         }
 
         // Parse input_number from string into decimal
@@ -502,19 +496,19 @@ impl RefParser {
                     output_number.set_sign_negative(true)
                 }
 
-                Ok(Num::Decimal(output_number))
+                Ok(BareItemRef::Decimal(output_number))
             }
             _ => Err("parse_number: invalid decimal fraction length"),
         }
     }
 
-    fn extract_digits(input_chars: &mut MyPeek) -> SFVResult<(bool, String)> {
+    fn extract_digits(input: &mut SfvIterator) -> SFVResult<(bool, String)> {
         let mut is_integer = true;
         let mut input_number = String::from("");
-        while let Some((_,curr_char)) = input_chars.iterator.peek() {
+        while let Some((_,curr_char)) = input.chars.peek() {
             if curr_char.is_ascii_digit() {
                 input_number.push(*curr_char);
-                input_chars.iterator.next();
+                input.chars.next();
             } else if curr_char == &'.' && is_integer {
                 if input_number.len() > 12 {
                     return Err(
@@ -523,7 +517,7 @@ impl RefParser {
                 }
                 input_number.push(*curr_char);
                 is_integer = false;
-                input_chars.iterator.next();
+                input.chars.next();
             } else {
                 break;
             }
@@ -539,25 +533,25 @@ impl RefParser {
         Ok((is_integer, input_number))
     }
 
-    // pub(crate) fn parse_parameters(input_chars: &mut MyPeek) -> SFVResult<Parameters> {
+    // pub(crate) fn parse_parameters(input: &mut SfvIterator) -> SFVResult<Parameters> {
     //     // https://httpwg.org/specs/rfc8941.html#parse-param
 
     //     // let mut params = Parameters::new();
 
-    //     while let Some((_,curr_char)) = input_chars.iterator.peek() {
+    //     while let Some((_,curr_char)) = input.chars.peek() {
     //         if curr_char == &';' {
-    //             input_chars.iterator.next();
+    //             input.chars.next();
     //         } else {
     //             break;
     //         }
 
-    //         utils::consume_sp_chars_index(input_chars.iterator);
+    //         utils::consume_sp_chars_index(input.chars);
 
-    //         let param_name = Self::parse_key(input_chars)?;
-    //         let param_value = match input_chars.iterator.peek() {
+    //         let param_name = Self::parse_key(input)?;
+    //         let param_value = match input.chars.peek() {
     //             Some((_,'=')) => {
-    //                 input_chars.iterator.next();
-    //                 Self::parse_bare_item(input_chars)?
+    //                 input.chars.next();
+    //                 Self::parse_bare_item(input)?
     //             }
     //             _ => BareItemRef::Boolean(true),
     //         };
@@ -569,14 +563,14 @@ impl RefParser {
     //     Ok(params)
     // }
 
-    pub(crate) fn parse_key(input_chars: &mut MyPeek) -> SFVResult<String> {
-        match input_chars.iterator.peek() {
+    pub(crate) fn parse_key(input: &mut SfvIterator) -> SFVResult<String> {
+        match input.chars.peek() {
             Some((_,c)) if c == &'*' || c.is_ascii_lowercase() => (),
             _ => return Err("parse_key: first character is not lcalpha or '*'"),
         }
 
         let mut output = String::new();
-        while let Some((_,curr_char)) = input_chars.iterator.peek() {
+        while let Some((_,curr_char)) = input.chars.peek() {
             if !curr_char.is_ascii_lowercase()
                 && !curr_char.is_ascii_digit()
                 && !"_-*.".contains(*curr_char)
@@ -585,7 +579,7 @@ impl RefParser {
             }
 
             output.push(*curr_char);
-            input_chars.iterator.next();
+            input.chars.next();
         }
         Ok(output)
     }
