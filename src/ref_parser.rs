@@ -33,33 +33,33 @@ pub enum BareItemRef<'a> {
 #[derive(Debug, PartialEq, Clone)]
 struct ParamRef<'a> {
     key: &'a str,
-    value: &'a BareItemRef<'a>,
+    value: BareItemRef<'a>,
 }
 
-#[derive(Debug, PartialEq, Clone)]
-struct ParamRefIterator {
-    // it: SfvIterator<'a>,
+#[derive(Debug, Clone)]
+struct ParamRefIterator<'a> {
+    it: SfvIterator<'a>,
 }
 
-    // pub(crate) fn parse_parameters(input: &mut SfvIterator) -> SFVResult<Parameters> {
+    // pub(crate) fn parse_parameters(self.it: &mut SfvIterator) -> SFVResult<Parameters> {
     //     // https://httpwg.org/specs/rfc8941.html#parse-param
 
     //     // let mut params = Parameters::new();
 
-    //     while let Some((_,curr_char)) = input.chars.peek() {
+    //     while let Some((_,curr_char)) = self.it.chars.peek() {
     //         if curr_char == &';' {
-    //             input.chars.next();
+    //             self.it.chars.next();
     //         } else {
     //             break;
     //         }
 
-    //         utils::consume_sp_chars_index(input.chars);
+    //         utils::consume_sp_chars_index(self.it.chars);
 
-    //         let param_name = Self::parse_key(input)?;
-    //         let param_value = match input.chars.peek() {
+    //         let param_name = Self::parse_key(self.it)?;
+    //         let param_value = match self.it.chars.peek() {
     //             Some((_,'=')) => {
-    //                 input.chars.next();
-    //                 Self::parse_bare_item(input)?
+    //                 self.it.chars.next();
+    //                 Self::parse_bare_item(self.it)?
     //             }
     //             _ => BareItemRef::Boolean(true),
     //         };
@@ -72,16 +72,55 @@ struct ParamRefIterator {
     // }
 
 
-// impl<'a> Iterator for ParamRefIterator<'a> {
-//     type Item = SFVResult<ParamRef<'a>>;
-//     fn next(&mut self) -> Option<SFVResult<ParamRef<'a>>> {
-//         None
-//     }
-// }
+impl<'a> Iterator for ParamRefIterator<'a> {
+    type Item = SFVResult<ParamRef<'a>>;
+    fn next(&mut self) -> Option<SFVResult<ParamRef<'a>>> {
+        if self.it.chars.peek() == None {
+            return None;
+        }
+
+        match self.it.chars.peek() {
+            Some((index, ';')) => { self.it.chars.next(); },
+            _ => return Some(Err("unexpectec char in params")),
+        }
+
+        utils::consume_sp_chars_index(&mut self.it.chars);
+
+        let param_name = match RefParser::parse_key(&mut self.it) {
+            Err(e) => return Some(Err(e)),
+            Ok(name) => name,
+        };
+        let param_value = match self.it.chars.peek() {
+            Some((_,'=')) => {
+                self.it.chars.next();
+                match RefParser::parse_bare_item(&mut self.it) {
+                    Err(e) => return Some(Err(e)),
+                    Ok(value) => value,
+                }
+            }
+            _ => BareItemRef::Boolean(true),
+        };
+
+        Some(Ok(ParamRef{ key: param_name, value: param_value }))
+    }
+}
 
 #[test]
 fn testRefIterator() {
-    assert_eq!(RefParser::parse_item(b"?1;foo=bar;baz=fooz").unwrap().bare_item, BareItemRef::Boolean(true));
+    let mut item = RefParser::parse_item(b"?1;foo=bar;baz=fooz").unwrap();
+    assert_eq!(item.bare_item, BareItemRef::Boolean(true));
+    assert_eq!(item.params.next(), Some(Ok(ParamRef{key: "foo", value: BareItemRef::Token("bar")})));
+    assert_eq!(item.params.next(), Some(Ok(ParamRef{key: "baz", value: BareItemRef::Token("fooz")})));
+    assert_eq!(item.params.next(), None);
+    
+
+    let mut item = RefParser::parse_item(b"?1;foo=bar;baz=\"fooz").unwrap();
+    assert_eq!(item.bare_item, BareItemRef::Boolean(true));
+    assert_eq!(item.params.next(), Some(Ok(ParamRef{key: "foo", value: BareItemRef::Token("bar")})));
+    assert_eq!(item.params.next(), Some(Err("parse_string: no closing '\"'")));
+    assert_eq!(item.params.next(), None);
+
+
     assert_eq!(RefParser::parse_item(b"?0;foo=bar;baz=fooz").unwrap().bare_item, BareItemRef::Boolean(false));
     assert_eq!(RefParser::parse_item(b"123;foo=bar;baz=fooz").unwrap().bare_item, BareItemRef::Integer(123));
     assert_eq!(RefParser::parse_item(b"123.123;foo=bar;baz=fooz").unwrap().bare_item, BareItemRef::Decimal(Decimal::from_str("123.123").unwrap().into()));
@@ -119,7 +158,7 @@ fn testRefIterator() {
 //         Self: Sized;
 // }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub(crate) struct SfvIterator<'a> {
     content: &'a str,
     chars: Peekable<CharIndices<'a>>,
@@ -143,10 +182,10 @@ pub(crate) struct SfvIterator<'a> {
 //         Self: Sized;
 // }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone)]
 pub struct ItemRef<'a> {
     bare_item: BareItemRef<'a>,
-    // params: ParamRefIterator<'a>,
+    params: ParamRefIterator<'a>,
 }
 
 // impl<'a> RefParseValue for ItemRef<'a> {
@@ -287,9 +326,9 @@ impl RefParser {
         // } else {
         //     input.len()
         // };
-        // let params = ParamRefIterator { it: iter}; // RefParser::parse_parameters(input)?;
+        let params = ParamRefIterator { it: iter}; // RefParser::parse_parameters(input)?;
 
-        let result = Ok(ItemRef { bare_item });
+        let result = Ok(ItemRef { bare_item, params });
 
         // TODO: iterate through params once, to make sure they're all valid
         // Then make sure no characters are left
@@ -606,24 +645,22 @@ impl RefParser {
     //     Ok(params)
     // }
 
-    pub(crate) fn parse_key<'a>(input: &mut SfvIterator<'a>) -> SFVResult<String> {
-        match input.chars.peek() {
-            Some((_,c)) if c == &'*' || c.is_ascii_lowercase() => (),
+    pub(crate) fn parse_key<'a>(input: &mut SfvIterator<'a>) -> SFVResult<&'a str> {
+        let start = match input.chars.peek() {
+            Some((index,c)) if c == &'*' || c.is_ascii_lowercase() => *index,
             _ => return Err("parse_key: first character is not lcalpha or '*'"),
-        }
+        };
 
-        let mut output = String::new();
-        while let Some((_,curr_char)) = input.chars.peek() {
+        while let Some((index,curr_char)) = input.chars.peek() {
             if !curr_char.is_ascii_lowercase()
                 && !curr_char.is_ascii_digit()
                 && !"_-*.".contains(*curr_char)
             {
-                return Ok(output);
+                return Ok(&input.content[start..*index]);
             }
 
-            output.push(*curr_char);
             input.chars.next();
         }
-        Ok(output)
+        Ok(&input.content[start..])
     }
 }
