@@ -41,37 +41,6 @@ struct ParamRefIterator<'a> {
     it: SfvIterator<'a>,
 }
 
-    // pub(crate) fn parse_parameters(self.it: &mut SfvIterator) -> SFVResult<Parameters> {
-    //     // https://httpwg.org/specs/rfc8941.html#parse-param
-
-    //     // let mut params = Parameters::new();
-
-    //     while let Some((_,curr_char)) = self.it.chars.peek() {
-    //         if curr_char == &';' {
-    //             self.it.chars.next();
-    //         } else {
-    //             break;
-    //         }
-
-    //         utils::consume_sp_chars_index(self.it.chars);
-
-    //         let param_name = Self::parse_key(self.it)?;
-    //         let param_value = match self.it.chars.peek() {
-    //             Some((_,'=')) => {
-    //                 self.it.chars.next();
-    //                 Self::parse_bare_item(self.it)?
-    //             }
-    //             _ => BareItemRef::Boolean(true),
-    //         };
-    //         // params.insert(param_name, param_value);
-    //     }
-
-    //     // If parameters already contains a name param_name (comparing character-for-character), overwrite its value.
-    //     // Note that when duplicate Parameter keys are encountered, this has the effect of ignoring all but the last instance.
-    //     Ok(params)
-    // }
-
-
 impl<'a> Iterator for ParamRefIterator<'a> {
     type Item = SFVResult<ParamRef<'a>>;
     fn next(&mut self) -> Option<SFVResult<ParamRef<'a>>> {
@@ -106,13 +75,12 @@ impl<'a> Iterator for ParamRefIterator<'a> {
 }
 
 #[test]
-fn testRefIterator() {
+fn test_ref_iterator() {
     let mut item = RefParser::parse_item(b"?1;foo=bar;baz=fooz").unwrap();
     assert_eq!(item.bare_item, BareItemRef::Boolean(true));
     assert_eq!(item.params.next(), Some(Ok(ParamRef{key: "foo", value: BareItemRef::Token("bar")})));
     assert_eq!(item.params.next(), Some(Ok(ParamRef{key: "baz", value: BareItemRef::Token("fooz")})));
     assert_eq!(item.params.next(), None);
-    
 
     let mut item = RefParser::parse_item(b"?1;foo=bar;baz=\"fooz").unwrap();
     assert_eq!(item.bare_item, BareItemRef::Boolean(true));
@@ -150,13 +118,13 @@ fn testRefIterator() {
 // use std::str::{from_utf8, Chars};
 
 /// Implements parsing logic for each structured field value type.
-// pub trait RefParseValue<'a> {
-//     /// This method should not be used for parsing input into structured field value.
-//     /// Use `RefParser::parse_item`, `RefParser::parse_list` or `RefParsers::parse_dictionary` for that.
-//     fn parse(input: &'a mut SfvIterator) -> SFVResult<Self>
-//     where
-//         Self: Sized;
-// }
+pub(crate) trait RefParseValue<'a> {
+    /// This method should not be used for parsing input into structured field value.
+    /// Use `RefParser::parse_item`, `RefParser::parse_list` or `RefParsers::parse_dictionary` for that.
+    fn parse(input_bytes: &'a [u8]) -> SFVResult<Self>
+    where
+        Self: Sized;
+}
 
 #[derive(Debug, Clone)]
 pub(crate) struct SfvIterator<'a> {
@@ -188,15 +156,12 @@ pub struct ItemRef<'a> {
     params: ParamRefIterator<'a>,
 }
 
-// impl<'a> RefParseValue for ItemRef<'a> {
-//     fn parse(input: &'a mut SfvIterator) -> SFVResult<ItemRef<'a>> {
-//         // https://httpwg.org/specs/rfc8941.html#parse-item
-//         let bare_item = RefParser::parse_bare_item(input)?;
-//         let params = ParamRefIterator { content: "todo", index: 0}; // RefParser::parse_parameters(input)?;
-
-//         Ok(ItemRef { bare_item, params })
-//     }
-// }
+impl<'a> RefParseValue<'a> for ItemRef<'a> {
+    fn parse(input_bytes: &'a [u8]) -> SFVResult<ItemRef<'a>> {
+        // https://httpwg.org/specs/rfc8941.html#parse-item
+        RefParser::parse_item(input_bytes)
+    }
+}
 
 // impl RefParseValue for List {
 //     fn parse(input: &mut SfvIterator) -> SFVResult<List> {
@@ -475,7 +440,6 @@ impl RefParser {
     pub(crate) fn parse_token<'a>(input: &mut SfvIterator<'a>) -> SFVResult<BareItemRef<'a>> {
         // https://httpwg.org/specs/rfc8941.html#parse-token
 
-
         let start : usize = match input.chars.peek() {
             None => return Err("parse_token: empty input string"),
             Some((index, c)) if !c.is_ascii_alphabetic() && c != &'*' => return Err("parse_token: first character is not ALPHA or '*'"),
@@ -515,9 +479,9 @@ impl RefParser {
             return Err("parse_byte_seq: invalid char in byte sequence");
         }
 
-        match utils::base64()?.decode(substring.as_bytes()) {
-            Err(_) => return Err("parse_byte_seq: decoding error"),
-            _ => {}
+        // TODO: this allocates. Maybe find a way to do this in place?
+        if let Err(_) = utils::base64()?.decode(substring.as_bytes()) {
+            return Err("parse_byte_seq: decoding error")
         }
 
         Ok(BareItemRef::ByteSeq(substring))
@@ -579,7 +543,6 @@ impl RefParser {
         }
     }
 
-    // TODO: this allocates. Make an in-place version.
     fn extract_digits<'a>(input: &mut SfvIterator<'a>) -> SFVResult<(bool, &'a str)> {
         let mut is_integer = true;
         let start = match input.chars.peek() {
@@ -614,36 +577,6 @@ impl RefParser {
         }
         Ok((is_integer, &input.content[start..end]))
     }
-
-    // pub(crate) fn parse_parameters(input: &mut SfvIterator) -> SFVResult<Parameters> {
-    //     // https://httpwg.org/specs/rfc8941.html#parse-param
-
-    //     // let mut params = Parameters::new();
-
-    //     while let Some((_,curr_char)) = input.chars.peek() {
-    //         if curr_char == &';' {
-    //             input.chars.next();
-    //         } else {
-    //             break;
-    //         }
-
-    //         utils::consume_sp_chars_index(input.chars);
-
-    //         let param_name = Self::parse_key(input)?;
-    //         let param_value = match input.chars.peek() {
-    //             Some((_,'=')) => {
-    //                 input.chars.next();
-    //                 Self::parse_bare_item(input)?
-    //             }
-    //             _ => BareItemRef::Boolean(true),
-    //         };
-    //         // params.insert(param_name, param_value);
-    //     }
-
-    //     // If parameters already contains a name param_name (comparing character-for-character), overwrite its value.
-    //     // Note that when duplicate Parameter keys are encountered, this has the effect of ignoring all but the last instance.
-    //     Ok(params)
-    // }
 
     pub(crate) fn parse_key<'a>(input: &mut SfvIterator<'a>) -> SFVResult<&'a str> {
         let start = match input.chars.peek() {
