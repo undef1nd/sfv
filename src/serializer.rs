@@ -135,7 +135,7 @@ impl Serializer {
 
             // If more values remain in inner_list, append a single SP to output
             if idx < items.len() - 1 {
-                output.push_str(" ");
+                output.push(' ');
             }
         }
         output.push(')');
