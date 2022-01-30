@@ -104,12 +104,12 @@ impl Serializer {
                         Self::serialize_parameters(&item.params, output)?;
                     } else {
                         output.push('=');
-                        Self::serialize_item(&item, output)?;
+                        Self::serialize_item(item, output)?;
                     }
                 }
                 ListEntry::InnerList(inner_list) => {
                     output.push('=');
-                    Self::serialize_inner_list(&inner_list, output)?;
+                    Self::serialize_inner_list(inner_list, output)?;
                 }
             }
 
