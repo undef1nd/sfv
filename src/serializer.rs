@@ -258,7 +258,7 @@ impl Serializer {
             return Err("serialize_string: non-ascii character");
         }
 
-        let vchar_or_sp = |char| char == '\x7f' || (char >= '\x00' && char <= '\x1f');
+        let vchar_or_sp = |char| char == '\x7f' || ('\x00'..='\x1f').contains(&char);
         if value.chars().any(vchar_or_sp) {
             return Err("serialize_string: not a visible character");
         }
