@@ -328,7 +328,13 @@ fn run_spec_serialize_only_tests() -> Result<(), Box<dyn Error>> {
         .join("tests")
         .join("spec_tests")
         .join("serialisation-tests");
-    let json_files = fs::read_dir(test_suites_dir)?
+    let read_dir = match fs::read_dir(test_suites_dir) {
+        Ok(dir) => dir,
+
+        _ => panic!("Test suite directory not found! Check that the spec_tests git submodule has been retrieved.")
+    };
+
+    let json_files = read_dir
         .filter_map(Result::ok)
         .filter(|fp| fp.path().extension().unwrap_or_default() == "json");
 
