@@ -4,7 +4,6 @@ use crate::{
     SFVResult,
 };
 use data_encoding::BASE64;
-use rust_decimal::prelude::Zero;
 
 /// Serializes structured field value into String.
 pub trait SerializeValue {
