@@ -236,18 +236,14 @@ impl Parser {
         match input_chars.peek() {
             Some(&'?') => Ok(BareItem::Boolean(Self::parse_bool(input_chars)?)),
             Some(&'"') => Ok(BareItem::String(Self::parse_string(input_chars)?)),
-            Some(&':') => Ok(BareItem::ByteSeq(Self::parse_byte_sequence(
-                input_chars,
-            )?)),
+            Some(&':') => Ok(BareItem::ByteSeq(Self::parse_byte_sequence(input_chars)?)),
             Some(&c) if c == '*' || c.is_ascii_alphabetic() => {
                 Ok(BareItem::Token(Self::parse_token(input_chars)?))
             }
-            Some(&c) if c == '-' || c.is_ascii_digit() => {
-                match Self::parse_number(input_chars)? {
-                    Num::Decimal(val) => Ok(BareItem::Decimal(val)),
-                    Num::Integer(val) => Ok(BareItem::Integer(val)),
-                }
-            }
+            Some(&c) if c == '-' || c.is_ascii_digit() => match Self::parse_number(input_chars)? {
+                Num::Decimal(val) => Ok(BareItem::Decimal(val)),
+                Num::Integer(val) => Ok(BareItem::Integer(val)),
+            },
             _ => Err("parse_bare_item: item type can't be identified"),
         }
     }
