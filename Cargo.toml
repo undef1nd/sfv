@@ -14,7 +14,7 @@ exclude = ["tests/**", ".github/*"]
 
 
 [dependencies]
-indexmap="1.1.0"
+indexmap="1.8.0"
 rust_decimal= { version = "1.8.0", features = ["std"] }
 data-encoding = "2.2.1"
 
