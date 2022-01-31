@@ -330,7 +330,6 @@ fn run_spec_serialize_only_tests() -> Result<(), Box<dyn Error>> {
         .join("serialisation-tests");
     let read_dir = match fs::read_dir(test_suites_dir) {
         Ok(dir) => dir,
-
         _ => panic!("Test suite directory not found! Check that the spec_tests git submodule has been retrieved.")
     };
 
