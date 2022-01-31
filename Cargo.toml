@@ -14,9 +14,9 @@ exclude = ["tests/**", ".github/*"]
 
 
 [dependencies]
-indexmap="1.1.0"
+indexmap="1.8.0"
 rust_decimal= { version = "1.20.0", features = ["std"] }
-data-encoding = "2.2.1"
+data-encoding = "2.3.2"
 
 [dev-dependencies]
 serde_json = { version = "1.0", features = ["preserve_order"] }
