@@ -86,6 +86,26 @@ let dict_header = "u=2, n=(* foo 2)";
                 // do something if it's a ByteSeq
                 println!("{:?}", val);
             }
+            BareItem::ValidatedToken(val) => {
+                // do something if it's a Token
+                println!("{}", val);
+            }
+            BareItem::ValidatedInteger(val) => {
+                // do something if it's an Integer
+                println!("{}", val);
+            }
+            BareItem::ValidatedBoolean(val) => {
+                // do something if it's a Boolean
+                println!("{}", val);
+            }
+            BareItem::ValidatedString(val) => {
+                // do something if it's a String
+                println!("{}", val);
+            }
+            BareItem::ValidatedByteSeq(val) => {
+                // do something if it's a ByteSeq
+                println!("{:?}", val);
+            }
         },
         Some(ListEntry::InnerList(inner_list)) => {
             // do something if it's an InnerList
@@ -164,6 +184,7 @@ assert_eq!(
 ```
 */
 
+mod bare_item;
 mod parser;
 mod ref_serializer;
 mod serializer;
@@ -183,6 +204,8 @@ pub use rust_decimal::{
 pub use parser::{ParseMore, ParseValue, Parser};
 pub use ref_serializer::{RefDictSerializer, RefItemSerializer, RefListSerializer};
 pub use serializer::SerializeValue;
+
+pub use bare_item::{BareItemString, Boolean, ByteSeq, Integer, Token};
 
 type SFVResult<T> = std::result::Result<T, &'static str>;
 
@@ -304,6 +327,14 @@ pub enum BareItem {
     Boolean(bool),
     // sf-token = ( ALPHA / "*" ) *( tchar / ":" / "/" )
     Token(String),
+
+    // TODO: needed?
+    // ValidatedDecimal(Decimal),
+    ValidatedInteger(Integer),
+    ValidatedString(BareItemString),
+    ValidatedByteSeq(ByteSeq),
+    ValidatedBoolean(Boolean),
+    ValidatedToken(Token),
 }
 
 impl BareItem {
@@ -435,6 +466,13 @@ impl BareItem {
             BareItem::ByteSeq(val) => RefBareItem::ByteSeq(val.as_slice()),
             BareItem::Boolean(val) => RefBareItem::Boolean(*val),
             BareItem::Token(val) => RefBareItem::Token(val),
+
+            BareItem::ValidatedInteger(val) => RefBareItem::Integer(**val),
+            // TODO: Decimal case
+            BareItem::ValidatedString(val) => RefBareItem::String(val),
+            BareItem::ValidatedByteSeq(val) => RefBareItem::ByteSeq(val),
+            BareItem::ValidatedBoolean(val) => RefBareItem::Boolean(**val),
+            BareItem::ValidatedToken(val) => RefBareItem::Token(&val),
         }
     }
 }

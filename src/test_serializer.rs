@@ -2,6 +2,7 @@ use crate::serializer::Serializer;
 use crate::FromStr;
 use crate::SerializeValue;
 use crate::{BareItem, Decimal, Dictionary, InnerList, Item, List, Parameters};
+use std::convert::TryInto;
 use std::error::Error;
 use std::iter::FromIterator;
 
@@ -84,6 +85,24 @@ fn serialize_item_byteseq_with_param() -> Result<(), Box<dyn Error>> {
     let item_param = ("a".to_owned(), BareItem::Token("*ab_1".into()));
     let item_param = Parameters::from_iter(vec![item_param]);
     let item = Item::with_params(BareItem::ByteSeq("parser".as_bytes().to_vec()), item_param);
+    Serializer::serialize_item(&item, &mut buf)?;
+    assert_eq!(":cGFyc2Vy:;a=*ab_1", &buf);
+    Ok(())
+}
+
+#[test]
+fn serialize_validated_item_byteseq_with_param() -> Result<(), Box<dyn Error>> {
+    let mut buf = String::new();
+
+    let item_param = (
+        "a".to_owned(),
+        BareItem::ValidatedToken("*ab_1".try_into()?),
+    );
+    let item_param = Parameters::from_iter(vec![item_param]);
+    let item = Item::with_params(
+        BareItem::ValidatedByteSeq("parser".as_bytes().try_into()?),
+        item_param,
+    );
     Serializer::serialize_item(&item, &mut buf)?;
     assert_eq!(":cGFyc2Vy:;a=*ab_1", &buf);
     Ok(())
