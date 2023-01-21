@@ -1,14 +1,26 @@
 #[macro_use]
 extern crate criterion;
 
+use std::convert::{TryFrom, TryInto};
+
 use criterion::{BenchmarkId, Criterion};
 use rust_decimal::prelude::FromPrimitive;
-use sfv::{BareItem, Decimal, Parser, SerializeValue};
+use sfv::{BareItem, Decimal, Parser, SerializeValue, Token};
 use sfv::{RefBareItem, RefDictSerializer, RefItemSerializer, RefListSerializer};
 
 criterion_main!(parsing, serializing, ref_serializing);
 
 criterion_group!(parsing, parsing_item, parsing_list, parsing_dict);
+
+fn _trying_validation() -> Result<(), &'static str> {
+    let _token_try_from = Token::try_from("foo");
+    let _str_try_into: Token = "bar".try_into()?;
+    let _direct_construction = BareItem::ValidatedToken("foo".try_into()?);
+
+    // let should_fail = Item::new(BareItem::ValidatedToken(Token("foo".to_owned())));
+
+    Ok(())
+}
 
 fn parsing_item(c: &mut Criterion) {
     let fixture =
