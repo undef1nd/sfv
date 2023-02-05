@@ -1,4 +1,4 @@
-use crate::utils;
+use crate::{bare_item, utils};
 use crate::{
     BareItem, Decimal, Dictionary, FromStr, InnerList, Item, List, ListEntry, Num, Parameters,
     SFVResult,
@@ -242,7 +242,7 @@ impl Parser {
             }
             Some(&c) if c == '-' || c.is_ascii_digit() => match Self::parse_number(input_chars)? {
                 Num::Decimal(val) => Ok(BareItem::Decimal(val)),
-                Num::Integer(val) => Ok(BareItem::Integer(val)),
+                Num::Integer(val) => Ok(BareItem::Integer(bare_item::Integer(val))),
             },
             _ => Err("parse_bare_item: item type can't be identified"),
         }

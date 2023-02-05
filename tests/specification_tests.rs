@@ -5,6 +5,7 @@ use sfv::FromStr;
 use sfv::Parser;
 use sfv::SerializeValue;
 use sfv::{BareItem, Decimal, Dictionary, InnerList, Item, List, ListEntry, Parameters};
+use std::convert::TryInto;
 use std::error::Error;
 use std::path::PathBuf;
 use std::{env, fs};
@@ -89,13 +90,21 @@ fn run_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
 }
 
 fn run_test_case_serialization_only(test_case: &TestData) -> Result<(), Box<dyn Error>> {
-    let expected_field_value = build_expected_field_value(test_case)?;
-    let actual_result = expected_field_value.serialize();
+    let expected_field_value = build_expected_field_value(test_case);
 
+    // TODO: must_fail has to always fail on creation
+    // As not all cases are moved yet, we take a two-step approach here:
+    // Either creation fails or serialization fails
     if let Some(true) = test_case.must_fail {
+        if expected_field_value.is_err() {
+            return Ok(());
+        }
+        let actual_result = expected_field_value?.serialize();
         assert!(actual_result.is_err());
         return Ok(());
     }
+
+    let actual_result = expected_field_value?.serialize();
 
     // Test serialization
     if let Some(canonical_val) = &test_case.canonical {
@@ -234,7 +243,8 @@ fn build_bare_item(bare_item_value: &Value) -> Result<BareItem, Box<dyn Error>> 
         bare_item if bare_item.is_i64() => Ok(BareItem::Integer(
             bare_item
                 .as_i64()
-                .ok_or("build_bare_item: bare_item value is not an i64")?,
+                .ok_or("build_bare_item: bare_item value is not an i64")?
+                .try_into()?,
         )),
         bare_item if bare_item.is_f64() => {
             let decimal = Decimal::from_str(&serde_json::to_string(bare_item)?)?;
@@ -299,6 +309,7 @@ fn build_parameters(params_value: &Value) -> Result<Parameters, Box<dyn Error>> 
 fn run_test_suite(tests_file: PathBuf, is_serialization: bool) -> Result<(), Box<dyn Error>> {
     let test_cases: Vec<TestData> = serde_json::from_reader(fs::File::open(tests_file)?)?;
     for test_data in test_cases.iter() {
+        dbg!(&test_data.name);
         if is_serialization {
             run_test_case_serialization_only(test_data)?;
         } else {

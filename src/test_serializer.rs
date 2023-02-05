@@ -30,7 +30,7 @@ fn serialize_value_empty_list() -> Result<(), Box<dyn Error>> {
 fn serialize_value_list_mixed_members_with_params() -> Result<(), Box<dyn Error>> {
     let item1 = Item::new(Decimal::from_str("42.4568")?.into());
     let item2_param = Parameters::from_iter(vec![("itm2_p".to_owned(), BareItem::Boolean(true))]);
-    let item2 = Item::with_params(17.into(), item2_param);
+    let item2 = Item::with_params(17.try_into()?, item2_param);
 
     let inner_list_item1_param =
         Parameters::from_iter(vec![("in1_p".to_owned(), BareItem::Boolean(false))]);
@@ -69,8 +69,9 @@ fn serialize_value_errors() -> Result<(), Box<dyn Error>> {
         disallowed_item.serialize_value()
     );
 
-    let param_with_disallowed_key = Parameters::from_iter(vec![("_key".to_owned(), 13.into())]);
-    let disallowed_item = Item::with_params(12.into(), param_with_disallowed_key);
+    let param_with_disallowed_key =
+        Parameters::from_iter(vec![("_key".to_owned(), 13.try_into()?)]);
+    let disallowed_item = Item::with_params(12.try_into()?, param_with_disallowed_key);
     assert_eq!(
         Err("serialize_key: first character is not lcalpha or '*'"),
         disallowed_item.serialize_value()
@@ -111,7 +112,7 @@ fn serialize_validated_item_byteseq_with_param() -> Result<(), Box<dyn Error>> {
 #[test]
 fn serialize_item_without_params() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
-    let item = Item::new(1.into());
+    let item = Item::new(1.try_into()?);
     Serializer::serialize_item(&item, &mut buf)?;
     assert_eq!("1", &buf);
     Ok(())
@@ -395,7 +396,7 @@ fn serialize_params_numbers() -> Result<(), Box<dyn Error>> {
 
     let input = Parameters::from_iter(vec![
         ("key1".to_owned(), Decimal::from_str("746.15")?.into()),
-        ("key2".to_owned(), 11111.into()),
+        ("key2".to_owned(), 11111.try_into()?),
     ]);
     Serializer::serialize_parameters(&input, &mut buf)?;
     assert_eq!(";key1=746.15;key2=11111", &buf);
@@ -459,8 +460,8 @@ fn serialize_key_erros() -> Result<(), Box<dyn Error>> {
 fn serialize_list_of_items_and_inner_list() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
 
-    let item1 = Item::new(12.into());
-    let item2 = Item::new(14.into());
+    let item1 = Item::new(12.try_into()?);
+    let item2 = Item::new(14.try_into()?);
     let item3 = Item::new(BareItem::Token("a".to_owned()));
     let item4 = Item::new(BareItem::Token("b".to_owned()));
     let inner_list_param = Parameters::from_iter(vec![(
@@ -479,10 +480,10 @@ fn serialize_list_of_items_and_inner_list() -> Result<(), Box<dyn Error>> {
 fn serialize_list_of_lists() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
 
-    let item1 = Item::new(1.into());
-    let item2 = Item::new(2.into());
-    let item3 = Item::new(42.into());
-    let item4 = Item::new(43.into());
+    let item1 = Item::new(1.try_into()?);
+    let item2 = Item::new(2.try_into()?);
+    let item3 = Item::new(42.try_into()?);
+    let item4 = Item::new(43.try_into()?);
     let inner_list_1 = InnerList::new(vec![item1, item2]);
     let inner_list_2 = InnerList::new(vec![item3, item4]);
     let input: List = vec![inner_list_1.into(), inner_list_2.into()];
@@ -514,7 +515,7 @@ fn serialize_dictionary_with_params() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
 
     let item1_params = Parameters::from_iter(vec![
-        ("a".to_owned(), 1.into()),
+        ("a".to_owned(), 1.try_into()?),
         ("b".to_owned(), BareItem::Boolean(true)),
     ]);
     let item2_params = Parameters::new();
@@ -523,9 +524,9 @@ fn serialize_dictionary_with_params() -> Result<(), Box<dyn Error>> {
         ("r".to_owned(), BareItem::String("+w".to_owned())),
     ]);
 
-    let item1 = Item::with_params(123.into(), item1_params);
-    let item2 = Item::with_params(456.into(), item2_params);
-    let item3 = Item::with_params(789.into(), item3_params);
+    let item1 = Item::with_params(123.try_into()?, item1_params);
+    let item2 = Item::with_params(456.try_into()?, item2_params);
+    let item3 = Item::with_params(789.try_into()?, item3_params);
 
     let input = Dictionary::from_iter(vec![
         ("abc".to_owned(), item1.into()),

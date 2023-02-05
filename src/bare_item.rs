@@ -11,7 +11,7 @@ use std::{convert::TryFrom, fmt, ops::Deref};
 /// sf-integer = ["-"] 1*15DIGIT
 /// ```
 #[derive(Debug, PartialEq, Clone)]
-pub struct Integer(i64);
+pub struct Integer(pub(crate) i64);
 
 impl Deref for Integer {
     type Target = i64;
