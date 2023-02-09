@@ -4,7 +4,7 @@ use serde_json::Value;
 use sfv::FromStr;
 use sfv::Parser;
 use sfv::SerializeValue;
-use sfv::{BareItem, Decimal, Dictionary, InnerList, Item, List, ListEntry, Parameters};
+use sfv::{BareItem, Dictionary, InnerList, Item, List, ListEntry, Parameters};
 use std::convert::TryInto;
 use std::error::Error;
 use std::path::PathBuf;
@@ -247,8 +247,8 @@ fn build_bare_item(bare_item_value: &Value) -> Result<BareItem, Box<dyn Error>> 
                 .try_into()?,
         )),
         bare_item if bare_item.is_f64() => {
-            let decimal = Decimal::from_str(&serde_json::to_string(bare_item)?)?;
-            Ok(BareItem::Decimal(decimal))
+            let decimal = rust_decimal::Decimal::from_str(&serde_json::to_string(bare_item)?)?;
+            Ok(BareItem::Decimal(decimal.try_into()?))
         }
         bare_item if bare_item.is_boolean() => Ok(BareItem::Boolean(
             bare_item

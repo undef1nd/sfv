@@ -122,13 +122,14 @@ assert_eq!(str_item.serialize_value().unwrap(), "\"foo\"");
 
 Creates `Item` field value with parameters:
 ```
-use sfv::{Item, BareItem, SerializeValue, Parameters, Decimal, FromPrimitive};
+use sfv::{Item, BareItem, SerializeValue, Parameters, FromPrimitive};
+use rust_decimal::Decimal;
 
 # use std::convert::TryInto;
 # fn main() -> Result<(), &'static str> {
 let mut params = Parameters::new();
 let decimal = Decimal::from_f64(13.45655).unwrap();
-params.insert("key".into(), BareItem::Decimal(decimal));
+params.insert("key".into(), BareItem::Decimal(decimal.try_into()?));
 let int_item = Item::with_params(BareItem::Integer(99_i64.try_into()?), params);
 assert_eq!(int_item.serialize_value().unwrap(), "99;key=13.457");
 # Ok(())
@@ -209,16 +210,13 @@ use std::convert::{TryFrom, TryInto};
 
 use indexmap::IndexMap;
 
-pub use rust_decimal::{
-    prelude::{FromPrimitive, FromStr},
-    Decimal,
-};
+pub use rust_decimal::prelude::{FromPrimitive, FromStr};
 
 pub use parser::{ParseMore, ParseValue, Parser};
 pub use ref_serializer::{RefDictSerializer, RefItemSerializer, RefListSerializer};
 pub use serializer::SerializeValue;
 
-pub use bare_item::{BareItemString, Boolean, ByteSeq, Integer, Token};
+pub use bare_item::{BareItemString, Boolean, ByteSeq, Decimal, Integer, Token};
 
 type SFVResult<T> = std::result::Result<T, &'static str>;
 
@@ -341,8 +339,6 @@ pub enum BareItem {
     // sf-token = ( ALPHA / "*" ) *( tchar / ":" / "/" )
     Token(String),
 
-    // TODO: needed?
-    // ValidatedDecimal(Decimal),
     ValidatedByteSeq(ByteSeq),
     ValidatedBoolean(Boolean),
     ValidatedToken(Token),
@@ -351,14 +347,19 @@ pub enum BareItem {
 impl BareItem {
     /// If `BareItem` is a decimal, returns `Decimal`, otherwise returns `None`.
     /// ```
-    /// # use sfv::{BareItem, Decimal, FromPrimitive};
+    /// # use sfv::{BareItem, FromPrimitive};
+    /// use rust_decimal::Decimal;
+    /// # use std::convert::TryInto;
+    /// # fn main() -> Result<(), &'static str> {
     /// let decimal_number = Decimal::from_f64(415.566).unwrap();
-    /// let bare_item: BareItem = decimal_number.into();
+    /// let bare_item: BareItem = decimal_number.try_into()?;
     /// assert_eq!(bare_item.as_decimal().unwrap(), decimal_number);
+    /// # Ok(())
+    /// # }
     /// ```
-    pub fn as_decimal(&self) -> Option<Decimal> {
-        match *self {
-            BareItem::Decimal(val) => Some(val),
+    pub fn as_decimal(&self) -> Option<rust_decimal::Decimal> {
+        match self {
+            BareItem::Decimal(val) => Some(val.0),
             _ => None,
         }
     }
@@ -450,16 +451,22 @@ impl TryFrom<i64> for BareItem {
     }
 }
 
-impl From<Decimal> for BareItem {
-    /// Converts `Decimal` into `BareItem::Decimal`.
+impl TryFrom<rust_decimal::Decimal> for BareItem {
+    type Error = &'static str;
+    /// Converts `rust_decimal::Decimal` into `BareItem::Decimal`.
     /// ```
-    /// # use sfv::{BareItem, Decimal, FromPrimitive};
+    /// # use sfv::{BareItem, FromPrimitive};
+    /// # use std::convert::TryInto;
+    /// use rust_decimal::Decimal;
+    /// # fn main() -> Result<(), &'static str> {
     /// let decimal_number = Decimal::from_f64(48.01).unwrap();
-    /// let bare_item: BareItem = decimal_number.into();
+    /// let bare_item: BareItem = decimal_number.try_into()?;
     /// assert_eq!(bare_item.as_decimal().unwrap(), decimal_number);
+    /// # Ok(())
+    /// # }
     /// ```
-    fn from(item: Decimal) -> Self {
-        BareItem::Decimal(item)
+    fn try_from(item: rust_decimal::Decimal) -> Result<Self, Self::Error> {
+        Ok(BareItem::Decimal(item.try_into()?))
     }
 }
 
@@ -473,7 +480,7 @@ pub(crate) enum Num {
 #[derive(Debug, PartialEq, Clone)]
 pub enum RefBareItem<'a> {
     Integer(i64),
-    Decimal(Decimal),
+    Decimal(rust_decimal::Decimal),
     String(&'a str),
     ByteSeq(&'a [u8]),
     Boolean(bool),
@@ -485,13 +492,12 @@ impl BareItem {
     fn to_ref_bare_item(&self) -> RefBareItem {
         match self {
             BareItem::Integer(val) => RefBareItem::Integer(**val),
-            BareItem::Decimal(val) => RefBareItem::Decimal(*val),
+            BareItem::Decimal(val) => RefBareItem::Decimal(**val),
             BareItem::String(val) => RefBareItem::String(val),
             BareItem::ByteSeq(val) => RefBareItem::ByteSeq(val.as_slice()),
             BareItem::Boolean(val) => RefBareItem::Boolean(*val),
             BareItem::Token(val) => RefBareItem::Token(val),
 
-            // TODO: Decimal case
             BareItem::ValidatedByteSeq(val) => RefBareItem::ByteSeq(val),
             BareItem::ValidatedBoolean(val) => RefBareItem::Boolean(**val),
             BareItem::ValidatedToken(val) => RefBareItem::Token(&val),

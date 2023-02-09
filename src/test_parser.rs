@@ -1,6 +1,7 @@
 use crate::FromStr;
-use crate::{BareItem, Decimal, Dictionary, InnerList, Item, List, Num, Parameters};
+use crate::{BareItem, Dictionary, InnerList, Item, List, Num, Parameters};
 use crate::{ParseMore, ParseValue, Parser};
+use rust_decimal::Decimal;
 use std::convert::TryInto;
 use std::error::Error;
 use std::iter::FromIterator;
@@ -14,7 +15,7 @@ fn parse() -> Result<(), Box<dyn Error>> {
 
     let input = "12.35;a ".as_bytes();
     let params = Parameters::from_iter(vec![("a".to_owned(), BareItem::Boolean(true))]);
-    let expected = Item::with_params(Decimal::from_str("12.35")?.into(), params);
+    let expected = Item::with_params(Decimal::from_str("12.35")?.try_into()?, params);
 
     assert_eq!(expected, Parser::parse_item(input)?);
     Ok(())
@@ -200,7 +201,7 @@ fn parse_item_decimal_with_bool_param_and_space() -> Result<(), Box<dyn Error>> 
     let mut input = "12.35;a ".chars().peekable();
     let param = Parameters::from_iter(vec![("a".to_owned(), BareItem::Boolean(true))]);
     assert_eq!(
-        Item::with_params(Decimal::from_str("12.35")?.into(), param),
+        Item::with_params(Decimal::from_str("12.35")?.try_into()?, param),
         Item::parse(&mut input)?
     );
     Ok(())
@@ -345,7 +346,7 @@ fn parse_bare_item() -> Result<(), Box<dyn Error>> {
         Parser::parse_bare_item(&mut ":YmFzZV82NCBlbmNvZGluZyB0ZXN0:".chars().peekable())?
     );
     assert_eq!(
-        BareItem::Decimal(Decimal::from_str("-3.55")?),
+        BareItem::Decimal(Decimal::from_str("-3.55")?.try_into()?),
         Parser::parse_bare_item(&mut "-3.55".chars().peekable())?
     );
     Ok(())
@@ -606,37 +607,37 @@ fn parse_number_int() -> Result<(), Box<dyn Error>> {
 fn parse_number_decimal() -> Result<(), Box<dyn Error>> {
     let mut input = "00.42 test string".chars().peekable();
     assert_eq!(
-        Num::Decimal(Decimal::from_str("0.42")?),
+        Num::Decimal(Decimal::from_str("0.42")?.try_into()?),
         Parser::parse_number(&mut input)?
     );
     assert_eq!(" test string", input.collect::<String>());
 
     assert_eq!(
-        Num::Decimal(Decimal::from_str("1.5")?),
+        Num::Decimal(Decimal::from_str("1.5")?.try_into()?),
         Parser::parse_number(&mut "1.5.4.".chars().peekable())?
     );
     assert_eq!(
-        Num::Decimal(Decimal::from_str("1.8")?),
+        Num::Decimal(Decimal::from_str("1.8")?.try_into()?),
         Parser::parse_number(&mut "1.8.".chars().peekable())?
     );
     assert_eq!(
-        Num::Decimal(Decimal::from_str("1.7")?),
+        Num::Decimal(Decimal::from_str("1.7")?.try_into()?),
         Parser::parse_number(&mut "1.7.0".chars().peekable())?
     );
     assert_eq!(
-        Num::Decimal(Decimal::from_str("3.14")?),
+        Num::Decimal(Decimal::from_str("3.14")?.try_into()?),
         Parser::parse_number(&mut "3.14".chars().peekable())?
     );
     assert_eq!(
-        Num::Decimal(Decimal::from_str("-3.14")?),
+        Num::Decimal(Decimal::from_str("-3.14")?.try_into()?),
         Parser::parse_number(&mut "-3.14".chars().peekable())?
     );
     assert_eq!(
-        Num::Decimal(Decimal::from_str("123456789012.1")?),
+        Num::Decimal(Decimal::from_str("123456789012.1")?.try_into()?),
         Parser::parse_number(&mut "123456789012.1".chars().peekable())?
     );
     assert_eq!(
-        Num::Decimal(Decimal::from_str("1234567890.112")?),
+        Num::Decimal(Decimal::from_str("1234567890.112")?.try_into()?),
         Parser::parse_number(&mut "1234567890.112".chars().peekable())?
     );
 
@@ -742,7 +743,7 @@ fn parse_params_mixed_types() -> Result<(), Box<dyn Error>> {
     let mut input = ";key1=?0;key2=746.15".chars().peekable();
     let expected = Parameters::from_iter(vec![
         ("key1".to_owned(), BareItem::Boolean(false)),
-        ("key2".to_owned(), Decimal::from_str("746.15")?.into()),
+        ("key2".to_owned(), Decimal::from_str("746.15")?.try_into()?),
     ]);
     assert_eq!(expected, Parser::parse_parameters(&mut input)?);
     Ok(())

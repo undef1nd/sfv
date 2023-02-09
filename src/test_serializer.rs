@@ -1,7 +1,8 @@
 use crate::serializer::Serializer;
 use crate::FromStr;
 use crate::SerializeValue;
-use crate::{BareItem, Decimal, Dictionary, InnerList, Item, List, Parameters};
+use crate::{BareItem, Dictionary, InnerList, Item, List, Parameters};
+use rust_decimal::Decimal;
 use std::convert::TryInto;
 use std::error::Error;
 use std::iter::FromIterator;
@@ -28,7 +29,7 @@ fn serialize_value_empty_list() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn serialize_value_list_mixed_members_with_params() -> Result<(), Box<dyn Error>> {
-    let item1 = Item::new(Decimal::from_str("42.4568")?.into());
+    let item1 = Item::new(Decimal::from_str("42.4568")?.try_into()?);
     let item2_param = Parameters::from_iter(vec![("itm2_p".to_owned(), BareItem::Boolean(true))]);
     let item2 = Item::with_params(17.try_into()?, item2_param);
 
@@ -67,7 +68,7 @@ fn serialize_value_errors() -> Result<(), Box<dyn Error>> {
         disallowed_item.serialize_value()
     );
 
-    let disallowed_item = Item::new(Decimal::from_str("12345678912345.123")?.into());
+    let disallowed_item = Item::new(Decimal::from_str("12345678912345.123")?.try_into()?);
     assert_eq!(
         Err("serialize_decimal: integer component > 12 digits"),
         disallowed_item.serialize_value()
@@ -126,7 +127,7 @@ fn serialize_item_without_params() -> Result<(), Box<dyn Error>> {
 fn serialize_item_with_bool_true_param() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
     let param = Parameters::from_iter(vec![("a".to_owned(), BareItem::Boolean(true))]);
-    let item = Item::with_params(Decimal::from_str("12.35")?.into(), param);
+    let item = Item::with_params(Decimal::from_str("12.35")?.try_into()?, param);
     Serializer::serialize_item(&item, &mut buf)?;
     assert_eq!("12.35;a", &buf);
     Ok(())
@@ -399,7 +400,7 @@ fn serialize_params_numbers() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
 
     let input = Parameters::from_iter(vec![
-        ("key1".to_owned(), Decimal::from_str("746.15")?.into()),
+        ("key1".to_owned(), Decimal::from_str("746.15")?.try_into()?),
         ("key2".to_owned(), 11111.try_into()?),
     ]);
     Serializer::serialize_parameters(&input, &mut buf)?;
@@ -413,7 +414,10 @@ fn serialize_params_mixed_types() -> Result<(), Box<dyn Error>> {
 
     let input = Parameters::from_iter(vec![
         ("key1".to_owned(), BareItem::Boolean(false)),
-        ("key2".to_owned(), Decimal::from_str("1354.091878")?.into()),
+        (
+            "key2".to_owned(),
+            Decimal::from_str("1354.091878")?.try_into()?,
+        ),
     ]);
     Serializer::serialize_parameters(&input, &mut buf)?;
     assert_eq!(";key1=?0;key2=1354.092", &buf);

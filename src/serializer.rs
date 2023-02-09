@@ -1,7 +1,6 @@
 use crate::utils;
 use crate::{
-    BareItem, Decimal, Dictionary, InnerList, Item, List, ListEntry, Parameters, RefBareItem,
-    SFVResult,
+    BareItem, Dictionary, InnerList, Item, List, ListEntry, Parameters, RefBareItem, SFVResult,
 };
 use data_encoding::BASE64;
 
@@ -224,7 +223,10 @@ impl Serializer {
         Ok(())
     }
 
-    pub(crate) fn serialize_decimal(value: Decimal, output: &mut String) -> SFVResult<()> {
+    pub(crate) fn serialize_decimal(
+        value: rust_decimal::Decimal,
+        output: &mut String,
+    ) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc8941.html#ser-decimal
 
         let integer_comp_length = 12;

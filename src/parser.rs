@@ -378,14 +378,14 @@ impl Parser {
         match chars_after_dot {
             Some(0) => Err("parse_number: decimal ends with '.'"),
             Some(1..=3) => {
-                let mut output_number = Decimal::from_str(&input_number)
+                let mut output_number = rust_decimal::Decimal::from_str(&input_number)
                     .map_err(|_err| "parse_number: parsing f64 failed")?;
 
                 if sign == -1 {
                     output_number.set_sign_negative(true)
                 }
 
-                Ok(Num::Decimal(output_number))
+                Ok(Num::Decimal(Decimal(output_number)))
             }
             _ => Err("parse_number: invalid decimal fraction length"),
         }

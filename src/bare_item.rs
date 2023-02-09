@@ -1,8 +1,31 @@
 use crate::{serializer::Serializer, Num, Parser};
 use std::{convert::TryFrom, fmt, ops::Deref};
 
-// TODO: Necessary? rust_decimal seems to validate already
-// pub struct Decimal(rust_decimal::Decimal);
+#[derive(Debug, PartialEq, Clone)]
+pub struct Decimal(pub(crate) rust_decimal::Decimal);
+
+impl TryFrom<rust_decimal::Decimal> for Decimal {
+    type Error = &'static str;
+    fn try_from(value: rust_decimal::Decimal) -> Result<Self, Self::Error> {
+        let mut output = String::new();
+        Serializer::serialize_decimal(value, &mut output)?;
+
+        Ok(Decimal(value))
+    }
+}
+
+impl Deref for Decimal {
+    type Target = rust_decimal::Decimal;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl fmt::Display for Decimal {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 /// Integers have a range of -999,999,999,999,999 to 999,999,999,999,999 inclusive (i.e., up to fifteen digits, signed), for IEEE 754 compatibility.
 ///
