@@ -61,22 +61,8 @@ fn serialize_value_list_mixed_members_with_params() -> Result<(), Box<dyn Error>
     Ok(())
 }
 
-// TODO: serializing a value should never fail as now the construction of a value
-#[ignore = "Moved to bare_item::create_non_ascii_string_errors"]
 #[test]
 fn serialize_value_errors() -> Result<(), Box<dyn Error>> {
-    let disallowed_item = Item::new(BareItem::String("non-ascii text 🐹".to_owned().try_into()?));
-    assert_eq!(
-        Err("serialize_string: non-ascii character"),
-        disallowed_item.serialize_value()
-    );
-
-    let disallowed_item = Item::new(Decimal::from_str("12345678912345.123")?.try_into()?);
-    assert_eq!(
-        Err("serialize_decimal: integer component > 12 digits"),
-        disallowed_item.serialize_value()
-    );
-
     let param_with_disallowed_key =
         Parameters::from_iter(vec![("_key".to_owned(), 13.try_into()?)]);
     let disallowed_item = Item::with_params(12.try_into()?, param_with_disallowed_key);

@@ -243,17 +243,30 @@ impl fmt::Display for Token {
 mod tests {
     use std::convert::TryInto;
     use std::error::Error;
+    use std::str::FromStr;
 
     use super::*;
 
     #[test]
     fn create_non_ascii_string_errors() -> Result<(), Box<dyn Error>> {
-        let disallowed_bare_item: Result<BareItemString, &str> =
+        let disallowed_value: Result<BareItemString, &str> =
             "non-ascii text 🐹".to_owned().try_into();
 
         assert_eq!(
             Err("serialize_string: non-ascii character"),
-            disallowed_bare_item
+            disallowed_value
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn create_too_long_decimal_errors() -> Result<(), Box<dyn Error>> {
+        let disallowed_value: Result<Decimal, &str> =
+            rust_decimal::Decimal::from_str("12345678912345.123")?.try_into();
+        assert_eq!(
+            Err("serialize_decimal: integer component > 12 digits"),
+            disallowed_value
         );
 
         Ok(())
