@@ -96,8 +96,10 @@ fn parse_list_of_lists_with_param_and_spaces() -> Result<(), Box<dyn Error>> {
     let mut input = "(  1  42  ); k=*".chars().peekable();
     let item1 = Item::new(1.try_into()?);
     let item2 = Item::new(42.try_into()?);
-    let inner_list_param =
-        Parameters::from_iter(vec![("k".to_owned(), BareItem::Token("*".to_owned()))]);
+    let inner_list_param = Parameters::from_iter(vec![(
+        "k".to_owned(),
+        BareItem::Token("*".to_owned().try_into()?),
+    )]);
     let inner_list = InnerList::with_params(vec![item1, item2], inner_list_param);
     let expected_list: List = vec![inner_list.into()];
     assert_eq!(expected_list, List::parse(&mut input)?);
@@ -111,8 +113,8 @@ fn parse_list_of_items_and_lists_with_param() -> Result<(), Box<dyn Error>> {
         .peekable();
     let item1 = Item::new(12.try_into()?);
     let item2 = Item::new(14.try_into()?);
-    let item3 = Item::new(BareItem::Token("a".to_owned()));
-    let item4 = Item::new(BareItem::Token("b".to_owned()));
+    let item3 = Item::new(BareItem::Token("a".to_owned().try_into()?));
+    let item4 = Item::new(BareItem::Token("b".to_owned().try_into()?));
     let inner_list_param = Parameters::from_iter(vec![(
         "param".to_owned(),
         BareItem::String("param_value_1".to_owned().try_into()?),
@@ -182,8 +184,8 @@ fn parse_inner_list_with_param_and_spaces() -> Result<(), Box<dyn Error>> {
     let mut input = "(c b); a=1".chars().peekable();
     let inner_list_param = Parameters::from_iter(vec![("a".to_owned(), 1.try_into()?)]);
 
-    let item1 = Item::new(BareItem::Token("c".to_owned()));
-    let item2 = Item::new(BareItem::Token("b".to_owned()));
+    let item1 = Item::new(BareItem::Token("c".to_owned().try_into()?));
+    let item2 = Item::new(BareItem::Token("b".to_owned().try_into()?));
     let expected = InnerList::with_params(vec![item1, item2], inner_list_param);
     assert_eq!(expected, Parser::parse_inner_list(&mut input)?);
     Ok(())
@@ -209,7 +211,10 @@ fn parse_item_decimal_with_bool_param_and_space() -> Result<(), Box<dyn Error>> 
 
 #[test]
 fn parse_item_number_with_param() -> Result<(), Box<dyn Error>> {
-    let param = Parameters::from_iter(vec![("a1".to_owned(), BareItem::Token("*".to_owned()))]);
+    let param = Parameters::from_iter(vec![(
+        "a1".to_owned(),
+        BareItem::Token("*".to_owned().try_into()?),
+    )]);
     assert_eq!(
         Item::with_params(BareItem::String("12.35".to_owned().try_into()?), param),
         Item::parse(&mut "\"12.35\";a1=*".chars().peekable())?
@@ -293,8 +298,10 @@ fn parse_dict_empty_value() -> Result<(), Box<dyn Error>> {
 #[test]
 fn parse_dict_with_token_param() -> Result<(), Box<dyn Error>> {
     let mut input = "a=1, b;foo=*, c=3".chars().peekable();
-    let item2_params =
-        Parameters::from_iter(vec![("foo".to_owned(), BareItem::Token("*".to_owned()))]);
+    let item2_params = Parameters::from_iter(vec![(
+        "foo".to_owned(),
+        BareItem::Token("*".to_owned().try_into()?),
+    )]);
     let item1 = Item::new(1.try_into()?);
     let item2 = Item::with_params(BareItem::Boolean(true), item2_params);
     let item3 = Item::new(3.try_into()?);
@@ -338,7 +345,7 @@ fn parse_bare_item() -> Result<(), Box<dyn Error>> {
         Parser::parse_bare_item(&mut "\"test string\"".chars().peekable())?
     );
     assert_eq!(
-        BareItem::Token("*token".to_owned()),
+        BareItem::Token("*token".to_owned().try_into()?),
         Parser::parse_bare_item(&mut "*token".chars().peekable())?
     );
     assert_eq!(
@@ -827,8 +834,10 @@ fn parse_more_list() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn parse_more_dict() -> Result<(), Box<dyn Error>> {
-    let item2_params =
-        Parameters::from_iter(vec![("foo".to_owned(), BareItem::Token("*".to_owned()))]);
+    let item2_params = Parameters::from_iter(vec![(
+        "foo".to_owned(),
+        BareItem::Token("*".to_owned().try_into()?),
+    )]);
     let item1 = Item::new(1.try_into()?);
     let item2 = Item::with_params(BareItem::Boolean(true), item2_params);
     let item3 = Item::new(3.try_into()?);

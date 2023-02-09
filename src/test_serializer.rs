@@ -43,8 +43,10 @@ fn serialize_value_list_mixed_members_with_params() -> Result<(), Box<dyn Error>
         "in2_p".to_owned(),
         BareItem::String("valu\\e".to_owned().try_into()?),
     )]);
-    let inner_list_item2 =
-        Item::with_params(BareItem::Token("str2".to_owned()), inner_list_item2_param);
+    let inner_list_item2 = Item::with_params(
+        BareItem::Token("str2".to_owned().try_into()?),
+        inner_list_item2_param,
+    );
     let inner_list_param = Parameters::from_iter(vec![(
         "inner_list_param".to_owned(),
         BareItem::ByteSeq("weather".as_bytes().to_vec()),
@@ -88,7 +90,7 @@ fn serialize_value_errors() -> Result<(), Box<dyn Error>> {
 fn serialize_item_byteseq_with_param() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
 
-    let item_param = ("a".to_owned(), BareItem::Token("*ab_1".into()));
+    let item_param = ("a".to_owned(), BareItem::Token("*ab_1".try_into()?));
     let item_param = Parameters::from_iter(vec![item_param]);
     let item = Item::with_params(BareItem::ByteSeq("parser".as_bytes().to_vec()), item_param);
     Serializer::serialize_item(&item, &mut buf)?;
@@ -100,10 +102,7 @@ fn serialize_item_byteseq_with_param() -> Result<(), Box<dyn Error>> {
 fn serialize_validated_item_byteseq_with_param() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
 
-    let item_param = (
-        "a".to_owned(),
-        BareItem::ValidatedToken("*ab_1".try_into()?),
-    );
+    let item_param = ("a".to_owned(), BareItem::Token("*ab_1".try_into()?));
     let item_param = Parameters::from_iter(vec![item_param]);
     let item = Item::with_params(
         BareItem::ValidatedByteSeq("parser".as_bytes().try_into()?),
@@ -136,7 +135,10 @@ fn serialize_item_with_bool_true_param() -> Result<(), Box<dyn Error>> {
 #[test]
 fn serialize_item_with_token_param() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
-    let param = Parameters::from_iter(vec![("a1".to_owned(), BareItem::Token("*tok".to_owned()))]);
+    let param = Parameters::from_iter(vec![(
+        "a1".to_owned(),
+        BareItem::Token("*tok".to_owned().try_into()?),
+    )]);
     let item = Item::with_params(BareItem::String("12.35".to_owned().try_into()?), param);
     Serializer::serialize_item(&item, &mut buf)?;
     assert_eq!("\"12.35\";a1=*tok", &buf);
@@ -470,8 +472,8 @@ fn serialize_list_of_items_and_inner_list() -> Result<(), Box<dyn Error>> {
 
     let item1 = Item::new(12.try_into()?);
     let item2 = Item::new(14.try_into()?);
-    let item3 = Item::new(BareItem::Token("a".to_owned()));
-    let item4 = Item::new(BareItem::Token("b".to_owned()));
+    let item3 = Item::new(BareItem::Token("a".to_owned().try_into()?));
+    let item4 = Item::new(BareItem::Token("b".to_owned().try_into()?));
     let inner_list_param = Parameters::from_iter(vec![(
         "param".to_owned(),
         BareItem::String("param_value_1".to_owned().try_into()?),
@@ -510,7 +512,7 @@ fn serialize_list_with_bool_item_and_bool_params() -> Result<(), Box<dyn Error>>
         ("b".to_owned(), BareItem::Boolean(false)),
     ]);
     let item1 = Item::with_params(BareItem::Boolean(false), item1_params);
-    let item2 = Item::new(BareItem::Token("cde_456".to_owned()));
+    let item2 = Item::new(BareItem::Token("cde_456".to_owned().try_into()?));
 
     let input: List = vec![item1.into(), item2.into()];
     Serializer::serialize_list(&input, &mut buf)?;

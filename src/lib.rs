@@ -86,10 +86,6 @@ let dict_header = "u=2, n=(* foo 2)";
                 // do something if it's a ByteSeq
                 println!("{:?}", val);
             }
-            BareItem::ValidatedToken(val) => {
-                // do something if it's a Token
-                println!("{}", val);
-            }
             BareItem::ValidatedBoolean(val) => {
                 // do something if it's a Boolean
                 println!("{}", val);
@@ -143,7 +139,7 @@ use sfv::{Item, BareItem, InnerList, List, SerializeValue, Parameters};
 # use std::convert::TryInto;
 # fn main() -> Result<(), &'static str> {
 
-let tok_item = BareItem::Token("tok".into());
+let tok_item = BareItem::Token("tok".try_into()?);
 
 // Creates Item.
 let str_item = Item::new(BareItem::String(String::from("foo").try_into()?));
@@ -337,11 +333,10 @@ pub enum BareItem {
     // boolean    = "0" / "1"
     Boolean(bool),
     // sf-token = ( ALPHA / "*" ) *( tchar / ":" / "/" )
-    Token(String),
+    Token(Token),
 
     ValidatedByteSeq(ByteSeq),
     ValidatedBoolean(Boolean),
-    ValidatedToken(Token),
 }
 
 impl BareItem {
@@ -422,9 +417,13 @@ impl BareItem {
     /// If `BareItem` is a `Token`, returns `&str`, otherwise returns `None`.
     /// ```
     /// use sfv::BareItem;
+    /// # use std::convert::TryInto;
+    /// # fn main() -> Result<(), &'static str> {
     ///
-    /// let bare_item = BareItem::Token("*bar".into());
+    /// let bare_item = BareItem::Token("*bar".try_into()?);
     /// assert_eq!(bare_item.as_token().unwrap(), "*bar");
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn as_token(&self) -> Option<&str> {
         match *self {
@@ -496,11 +495,10 @@ impl BareItem {
             BareItem::String(val) => RefBareItem::String(val),
             BareItem::ByteSeq(val) => RefBareItem::ByteSeq(val.as_slice()),
             BareItem::Boolean(val) => RefBareItem::Boolean(*val),
-            BareItem::Token(val) => RefBareItem::Token(val),
+            BareItem::Token(val) => RefBareItem::Token(&val),
 
             BareItem::ValidatedByteSeq(val) => RefBareItem::ByteSeq(val),
             BareItem::ValidatedBoolean(val) => RefBareItem::Boolean(**val),
-            BareItem::ValidatedToken(val) => RefBareItem::Token(&val),
         }
     }
 }

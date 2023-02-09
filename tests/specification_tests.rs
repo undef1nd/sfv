@@ -270,7 +270,8 @@ fn build_bare_item(bare_item_value: &Value) -> Result<BareItem, Box<dyn Error>> 
                     .as_str()
                     .ok_or("build_bare_item: bare_item value is not a str")?
                     .clone()
-                    .to_owned(),
+                    .to_owned()
+                    .try_into()?,
             ))
         }
         bare_item if (bare_item.is_object() && bare_item["__type"] == "binary") => {

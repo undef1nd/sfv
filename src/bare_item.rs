@@ -184,12 +184,12 @@ impl fmt::Display for Boolean {
 ///
 /// # fn main() -> Result<(), &'static str> {
 /// let token_try_from = Token::try_from("foo")?;
-/// let item = BareItem::ValidatedToken(token_try_from);
+/// let item = BareItem::Token(token_try_from);
 ///
 /// let str_try_into: Token = "bar".try_into()?;
-/// let item = BareItem::ValidatedToken(str_try_into);
+/// let item = BareItem::Token(str_try_into);
 ///
-/// let direct_item_construction = BareItem::ValidatedToken("baz".try_into()?);
+/// let direct_item_construction = BareItem::Token("baz".try_into()?);
 /// # Ok(())
 /// # }
 /// ```
@@ -198,7 +198,7 @@ impl fmt::Display for Boolean {
 /// Token("foo"); // A Token can not be constructed directly
 /// ```
 #[derive(Debug, PartialEq, Clone)]
-pub struct Token(String);
+pub struct Token(pub(crate) String);
 
 impl Deref for Token {
     type Target = String;
@@ -211,9 +211,10 @@ impl Deref for Token {
 impl TryFrom<String> for Token {
     type Error = &'static str;
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        let mut input_chars = value.chars().peekable();
-        let validated = Parser::parse_token(&mut input_chars)?;
-        Ok(Token(validated))
+        let mut output = String::new();
+        Serializer::serialize_token(&value, &mut output)?;
+
+        Ok(Token(value))
     }
 }
 

@@ -16,9 +16,9 @@ criterion_group!(parsing, parsing_item, parsing_list, parsing_dict);
 fn _trying_validation() -> Result<(), &'static str> {
     let _token_try_from = Token::try_from("foo");
     let _str_try_into: Token = "bar".try_into()?;
-    let _direct_construction = BareItem::ValidatedToken("foo".try_into()?);
+    let _direct_construction = BareItem::Token("foo".try_into()?);
 
-    // let should_fail = Item::new(BareItem::ValidatedToken(Token("foo".to_owned())));
+    // let should_fail = Item::new(BareItem::Token(Token("foo".to_owned())));
 
     Ok(())
 }
