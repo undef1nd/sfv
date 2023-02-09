@@ -49,7 +49,7 @@ fn serialize_value_list_mixed_members_with_params() -> Result<(), Box<dyn Error>
     );
     let inner_list_param = Parameters::from_iter(vec![(
         "inner_list_param".to_owned(),
-        BareItem::ByteSeq("weather".as_bytes().to_vec()),
+        BareItem::ByteSeq("weather".as_bytes().into()),
     )]);
     let inner_list =
         InnerList::with_params(vec![inner_list_item1, inner_list_item2], inner_list_param);
@@ -92,7 +92,7 @@ fn serialize_item_byteseq_with_param() -> Result<(), Box<dyn Error>> {
 
     let item_param = ("a".to_owned(), BareItem::Token("*ab_1".try_into()?));
     let item_param = Parameters::from_iter(vec![item_param]);
-    let item = Item::with_params(BareItem::ByteSeq("parser".as_bytes().to_vec()), item_param);
+    let item = Item::with_params(BareItem::ByteSeq("parser".as_bytes().into()), item_param);
     Serializer::serialize_item(&item, &mut buf)?;
     assert_eq!(":cGFyc2Vy:;a=*ab_1", &buf);
     Ok(())
@@ -105,7 +105,7 @@ fn serialize_validated_item_byteseq_with_param() -> Result<(), Box<dyn Error>> {
     let item_param = ("a".to_owned(), BareItem::Token("*ab_1".try_into()?));
     let item_param = Parameters::from_iter(vec![item_param]);
     let item = Item::with_params(
-        BareItem::ValidatedByteSeq("parser".as_bytes().try_into()?),
+        BareItem::ByteSeq("parser".as_bytes().try_into()?),
         item_param,
     );
     Serializer::serialize_item(&item, &mut buf)?;

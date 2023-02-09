@@ -108,11 +108,17 @@ impl fmt::Display for BareItemString {
 /// base64    = ALPHA / DIGIT / "+" / "/" / "="
 /// ```
 #[derive(Debug, PartialEq, Clone)]
-pub struct ByteSeq(Vec<u8>);
+pub struct ByteSeq(pub(crate) Vec<u8>);
 
 impl From<&[u8]> for ByteSeq {
     fn from(value: &[u8]) -> Self {
         ByteSeq(value.to_vec())
+    }
+}
+
+impl From<Vec<u8>> for ByteSeq {
+    fn from(value: Vec<u8>) -> Self {
+        ByteSeq(value)
     }
 }
 

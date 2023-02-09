@@ -279,7 +279,7 @@ fn build_bare_item(bare_item_value: &Value) -> Result<BareItem, Box<dyn Error>> 
                 .as_str()
                 .ok_or("build_bare_item: bare_item value is not a str")?
                 .clone();
-            Ok(BareItem::ByteSeq(BASE32.decode(str_val.as_bytes())?))
+            Ok(BareItem::ByteSeq(BASE32.decode(str_val.as_bytes())?.into()))
         }
         _ => Err("build_bare_item: unknown bare_item value".into()),
     }

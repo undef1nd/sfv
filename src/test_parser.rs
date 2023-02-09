@@ -349,7 +349,7 @@ fn parse_bare_item() -> Result<(), Box<dyn Error>> {
         Parser::parse_bare_item(&mut "*token".chars().peekable())?
     );
     assert_eq!(
-        BareItem::ByteSeq("base_64 encoding test".to_owned().into_bytes()),
+        BareItem::ByteSeq("base_64 encoding test".to_owned().into_bytes().into()),
         Parser::parse_bare_item(&mut ":YmFzZV82NCBlbmNvZGluZyB0ZXN0:".chars().peekable())?
     );
     assert_eq!(

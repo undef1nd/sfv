@@ -1,7 +1,7 @@
 use crate::{bare_item, utils};
 use crate::{
-    BareItem, Decimal, Dictionary, FromStr, InnerList, Item, List, ListEntry, Num, Parameters,
-    SFVResult, Token,
+    BareItem, ByteSeq, Decimal, Dictionary, FromStr, InnerList, Item, List, ListEntry, Num,
+    Parameters, SFVResult, Token,
 };
 use std::iter::Peekable;
 use std::str::{from_utf8, Chars};
@@ -238,7 +238,9 @@ impl Parser {
             Some(&'"') => Ok(BareItem::String(bare_item::BareItemString(
                 Self::parse_string(input_chars)?,
             ))),
-            Some(&':') => Ok(BareItem::ByteSeq(Self::parse_byte_sequence(input_chars)?)),
+            Some(&':') => Ok(BareItem::ByteSeq(ByteSeq(Self::parse_byte_sequence(
+                input_chars,
+            )?))),
             Some(&c) if c == '*' || c.is_ascii_alphabetic() => {
                 Ok(BareItem::Token(Token(Self::parse_token(input_chars)?)))
             }

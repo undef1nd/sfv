@@ -90,10 +90,6 @@ let dict_header = "u=2, n=(* foo 2)";
                 // do something if it's a Boolean
                 println!("{}", val);
             }
-            BareItem::ValidatedByteSeq(val) => {
-                // do something if it's a ByteSeq
-                println!("{:?}", val);
-            }
         },
         Some(ListEntry::InnerList(inner_list)) => {
             // do something if it's an InnerList
@@ -328,14 +324,13 @@ pub enum BareItem {
     String(BareItemString),
     // ":" *(base64) ":"
     // base64    = ALPHA / DIGIT / "+" / "/" / "="
-    ByteSeq(Vec<u8>),
+    ByteSeq(ByteSeq),
     // sf-boolean = "?" boolean
     // boolean    = "0" / "1"
     Boolean(bool),
     // sf-token = ( ALPHA / "*" ) *( tchar / ":" / "/" )
     Token(Token),
 
-    ValidatedByteSeq(ByteSeq),
     ValidatedBoolean(Boolean),
 }
 
@@ -393,12 +388,12 @@ impl BareItem {
     /// If `BareItem` is a `ByteSeq`, returns `&Vec<u8>`, otherwise returns `None`.
     /// ```
     /// # use sfv::BareItem;
-    /// let bare_item = BareItem::ByteSeq("foo".to_owned().into_bytes());
+    /// let bare_item = BareItem::ByteSeq("foo".to_owned().into_bytes().into());
     /// assert_eq!(bare_item.as_byte_seq().unwrap().as_slice(), "foo".as_bytes());
     /// ```
     pub fn as_byte_seq(&self) -> Option<&Vec<u8>> {
         match *self {
-            BareItem::ByteSeq(ref val) => Some(val),
+            BareItem::ByteSeq(ref val) => Some(&val.0),
             _ => None,
         }
     }
@@ -493,11 +488,10 @@ impl BareItem {
             BareItem::Integer(val) => RefBareItem::Integer(**val),
             BareItem::Decimal(val) => RefBareItem::Decimal(**val),
             BareItem::String(val) => RefBareItem::String(val),
-            BareItem::ByteSeq(val) => RefBareItem::ByteSeq(val.as_slice()),
+            BareItem::ByteSeq(val) => RefBareItem::ByteSeq(val),
             BareItem::Boolean(val) => RefBareItem::Boolean(*val),
             BareItem::Token(val) => RefBareItem::Token(&val),
 
-            BareItem::ValidatedByteSeq(val) => RefBareItem::ByteSeq(val),
             BareItem::ValidatedBoolean(val) => RefBareItem::Boolean(**val),
         }
     }
