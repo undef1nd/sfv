@@ -146,7 +146,7 @@ impl Deref for ByteSeq {
 /// boolean    = "0" / "1"
 /// ```
 #[derive(Debug, PartialEq, Clone)]
-pub struct Boolean(bool);
+pub struct Boolean(pub(crate) bool);
 
 impl From<bool> for Boolean {
     fn from(value: bool) -> Self {

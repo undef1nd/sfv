@@ -98,7 +98,7 @@ impl Serializer {
                 ListEntry::Item(ref item) => {
                     // If dict member is boolean true, no need to serialize it: only its params must be serialized
                     // Otherwise serialize entire item with its params
-                    if item.bare_item == BareItem::Boolean(true) {
+                    if item.bare_item == BareItem::Boolean(true.into()) {
                         Self::serialize_parameters(&item.params, output)?;
                     } else {
                         output.push('=');

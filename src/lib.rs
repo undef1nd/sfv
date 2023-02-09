@@ -86,10 +86,6 @@ let dict_header = "u=2, n=(* foo 2)";
                 // do something if it's a ByteSeq
                 println!("{:?}", val);
             }
-            BareItem::ValidatedBoolean(val) => {
-                // do something if it's a Boolean
-                println!("{}", val);
-            }
         },
         Some(ListEntry::InnerList(inner_list)) => {
             // do something if it's an InnerList
@@ -142,12 +138,12 @@ let str_item = Item::new(BareItem::String(String::from("foo").try_into()?));
 
 // Creates InnerList members.
 let mut int_item_params = Parameters::new();
-int_item_params.insert("key".into(), BareItem::Boolean(false));
+int_item_params.insert("key".into(), BareItem::Boolean(false.into()));
 let int_item = Item::with_params(BareItem::Integer(99_i64.try_into()?), int_item_params);
 
 // Creates InnerList.
 let mut inner_list_params = Parameters::new();
-inner_list_params.insert("bar".into(), BareItem::Boolean(true));
+inner_list_params.insert("bar".into(), BareItem::Boolean(true.into()));
 let inner_list = InnerList::with_params(vec![int_item, str_item], inner_list_params);
 
 
@@ -169,8 +165,8 @@ use sfv::{Parser, Item, BareItem, SerializeValue, ParseValue, Dictionary};
 # fn main() -> Result<(), &'static str> {
 
 let member_value1 = Item::new(BareItem::String(String::from("apple").try_into()?));
-let member_value2 = Item::new(BareItem::Boolean(true));
-let member_value3 = Item::new(BareItem::Boolean(false));
+let member_value2 = Item::new(BareItem::Boolean(true.into()));
+let member_value3 = Item::new(BareItem::Boolean(false.into()));
 
 let mut dict = Dictionary::new();
 dict.insert("key1".into(), member_value1.into());
@@ -327,11 +323,9 @@ pub enum BareItem {
     ByteSeq(ByteSeq),
     // sf-boolean = "?" boolean
     // boolean    = "0" / "1"
-    Boolean(bool),
+    Boolean(Boolean),
     // sf-token = ( ALPHA / "*" ) *( tchar / ":" / "/" )
     Token(Token),
-
-    ValidatedBoolean(Boolean),
 }
 
 impl BareItem {
@@ -400,12 +394,12 @@ impl BareItem {
     /// If `BareItem` is a `Boolean`, returns `bool`, otherwise returns `None`.
     /// ```
     /// # use sfv::{BareItem, Decimal, FromPrimitive};
-    /// let bare_item = BareItem::Boolean(true);
+    /// let bare_item = BareItem::Boolean(true.into());
     /// assert_eq!(bare_item.as_bool().unwrap(), true);
     /// ```
     pub fn as_bool(&self) -> Option<bool> {
-        match *self {
-            BareItem::Boolean(val) => Some(val),
+        match self {
+            BareItem::Boolean(val) => Some(val.0),
             _ => None,
         }
     }
@@ -489,10 +483,8 @@ impl BareItem {
             BareItem::Decimal(val) => RefBareItem::Decimal(**val),
             BareItem::String(val) => RefBareItem::String(val),
             BareItem::ByteSeq(val) => RefBareItem::ByteSeq(val),
-            BareItem::Boolean(val) => RefBareItem::Boolean(*val),
+            BareItem::Boolean(val) => RefBareItem::Boolean(**val),
             BareItem::Token(val) => RefBareItem::Token(&val),
-
-            BareItem::ValidatedBoolean(val) => RefBareItem::Boolean(**val),
         }
     }
 }

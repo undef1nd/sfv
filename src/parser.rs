@@ -1,7 +1,7 @@
 use crate::{bare_item, utils};
 use crate::{
-    BareItem, ByteSeq, Decimal, Dictionary, FromStr, InnerList, Item, List, ListEntry, Num,
-    Parameters, SFVResult, Token,
+    BareItem, Boolean, ByteSeq, Decimal, Dictionary, FromStr, InnerList, Item, List, ListEntry,
+    Num, Parameters, SFVResult, Token,
 };
 use std::iter::Peekable;
 use std::str::{from_utf8, Chars};
@@ -91,7 +91,7 @@ impl ParseValue for Dictionary {
                 let value = true;
                 let params = Parser::parse_parameters(input_chars)?;
                 let member = Item {
-                    bare_item: BareItem::Boolean(value),
+                    bare_item: BareItem::Boolean(value.into()),
                     params,
                 };
                 dict.insert(this_key, member.into());
@@ -234,7 +234,7 @@ impl Parser {
         }
 
         match input_chars.peek() {
-            Some(&'?') => Ok(BareItem::Boolean(Self::parse_bool(input_chars)?)),
+            Some(&'?') => Ok(BareItem::Boolean(Boolean(Self::parse_bool(input_chars)?))),
             Some(&'"') => Ok(BareItem::String(bare_item::BareItemString(
                 Self::parse_string(input_chars)?,
             ))),
@@ -444,7 +444,7 @@ impl Parser {
                     input_chars.next();
                     Self::parse_bare_item(input_chars)?
                 }
-                _ => BareItem::Boolean(true),
+                _ => BareItem::Boolean(true.into()),
             };
             params.insert(param_name, param_value);
         }

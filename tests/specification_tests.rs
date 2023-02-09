@@ -253,7 +253,8 @@ fn build_bare_item(bare_item_value: &Value) -> Result<BareItem, Box<dyn Error>> 
         bare_item if bare_item.is_boolean() => Ok(BareItem::Boolean(
             bare_item
                 .as_bool()
-                .ok_or("build_bare_item: bare_item value is not a bool")?,
+                .ok_or("build_bare_item: bare_item value is not a bool")?
+                .into(),
         )),
         bare_item if bare_item.is_string() => {
             let converted = bare_item

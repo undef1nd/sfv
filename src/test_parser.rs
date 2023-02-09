@@ -14,7 +14,7 @@ fn parse() -> Result<(), Box<dyn Error>> {
     assert_eq!(expected, Parser::parse_item(input)?);
 
     let input = "12.35;a ".as_bytes();
-    let params = Parameters::from_iter(vec![("a".to_owned(), BareItem::Boolean(true))]);
+    let params = Parameters::from_iter(vec![("a".to_owned(), BareItem::Boolean(true.into()))]);
     let expected = Item::with_params(Decimal::from_str("12.35")?.try_into()?, params);
 
     assert_eq!(expected, Parser::parse_item(input)?);
@@ -201,7 +201,7 @@ fn parse_item_int_with_space() -> Result<(), Box<dyn Error>> {
 #[test]
 fn parse_item_decimal_with_bool_param_and_space() -> Result<(), Box<dyn Error>> {
     let mut input = "12.35;a ".chars().peekable();
-    let param = Parameters::from_iter(vec![("a".to_owned(), BareItem::Boolean(true))]);
+    let param = Parameters::from_iter(vec![("a".to_owned(), BareItem::Boolean(true.into()))]);
     assert_eq!(
         Item::with_params(Decimal::from_str("12.35")?.try_into()?, param),
         Item::parse(&mut input)?
@@ -303,7 +303,7 @@ fn parse_dict_with_token_param() -> Result<(), Box<dyn Error>> {
         BareItem::Token("*".to_owned().try_into()?),
     )]);
     let item1 = Item::new(1.try_into()?);
-    let item2 = Item::with_params(BareItem::Boolean(true), item2_params);
+    let item2 = Item::with_params(BareItem::Boolean(true.into()), item2_params);
     let item3 = Item::new(3.try_into()?);
     let expected_dict = Dictionary::from_iter(vec![
         ("a".to_owned(), item1.into()),
@@ -337,7 +337,7 @@ fn parse_dict_multiple_spaces() -> Result<(), Box<dyn Error>> {
 #[test]
 fn parse_bare_item() -> Result<(), Box<dyn Error>> {
     assert_eq!(
-        BareItem::Boolean(false),
+        BareItem::Boolean(false.into()),
         Parser::parse_bare_item(&mut "?0".chars().peekable())?
     );
     assert_eq!(
@@ -738,8 +738,8 @@ fn parse_params_string() -> Result<(), Box<dyn Error>> {
 fn parse_params_bool() -> Result<(), Box<dyn Error>> {
     let mut input = ";b;a".chars().peekable();
     let expected = Parameters::from_iter(vec![
-        ("b".to_owned(), BareItem::Boolean(true)),
-        ("a".to_owned(), BareItem::Boolean(true)),
+        ("b".to_owned(), BareItem::Boolean(true.into())),
+        ("a".to_owned(), BareItem::Boolean(true.into())),
     ]);
     assert_eq!(expected, Parser::parse_parameters(&mut input)?);
     Ok(())
@@ -749,7 +749,7 @@ fn parse_params_bool() -> Result<(), Box<dyn Error>> {
 fn parse_params_mixed_types() -> Result<(), Box<dyn Error>> {
     let mut input = ";key1=?0;key2=746.15".chars().peekable();
     let expected = Parameters::from_iter(vec![
-        ("key1".to_owned(), BareItem::Boolean(false)),
+        ("key1".to_owned(), BareItem::Boolean(false.into())),
         ("key2".to_owned(), Decimal::from_str("746.15")?.try_into()?),
     ]);
     assert_eq!(expected, Parser::parse_parameters(&mut input)?);
@@ -760,7 +760,7 @@ fn parse_params_mixed_types() -> Result<(), Box<dyn Error>> {
 fn parse_params_with_spaces() -> Result<(), Box<dyn Error>> {
     let mut input = "; key1=?0; key2=11111".chars().peekable();
     let expected = Parameters::from_iter(vec![
-        ("key1".to_owned(), BareItem::Boolean(false)),
+        ("key1".to_owned(), BareItem::Boolean(false.into())),
         ("key2".to_owned(), 11111.try_into()?),
     ]);
     assert_eq!(expected, Parser::parse_parameters(&mut input)?);
@@ -839,7 +839,7 @@ fn parse_more_dict() -> Result<(), Box<dyn Error>> {
         BareItem::Token("*".to_owned().try_into()?),
     )]);
     let item1 = Item::new(1.try_into()?);
-    let item2 = Item::with_params(BareItem::Boolean(true), item2_params);
+    let item2 = Item::with_params(BareItem::Boolean(true.into()), item2_params);
     let item3 = Item::new(3.try_into()?);
     let expected_dict = Dictionary::from_iter(vec![
         ("a".to_owned(), item1.into()),
