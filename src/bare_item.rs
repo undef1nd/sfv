@@ -1,4 +1,4 @@
-use crate::{serializer::Serializer, Num, Parser};
+use crate::serializer::Serializer;
 use std::{convert::TryFrom, fmt, ops::Deref};
 
 #[derive(Debug, PartialEq, Clone)]
@@ -47,13 +47,9 @@ impl TryFrom<i64> for Integer {
     type Error = &'static str;
 
     fn try_from(value: i64) -> Result<Self, Self::Error> {
-        let input_string = value.to_string();
-        let mut input_chars = input_string.chars().peekable();
-        let validated = Parser::parse_number(&mut input_chars)?;
-        match validated {
-            Num::Integer(val) => Ok(Integer(val)),
-            Num::Decimal(_) => Err("Input is Decimal, expected Integer"),
-        }
+        let mut output = String::new();
+        Serializer::serialize_integer(value, &mut output)?;
+        Ok(Integer(value))
     }
 }
 
