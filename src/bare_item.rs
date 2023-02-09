@@ -122,15 +122,6 @@ impl From<Vec<u8>> for ByteSeq {
     }
 }
 
-impl TryFrom<String> for ByteSeq {
-    type Error = &'static str;
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        let mut input_chars = value.chars().peekable();
-        let validated = Parser::parse_byte_sequence(&mut input_chars)?;
-        Ok(ByteSeq(validated))
-    }
-}
-
 impl Deref for ByteSeq {
     type Target = [u8];
     fn deref(&self) -> &Self::Target {
@@ -158,15 +149,6 @@ impl Deref for Boolean {
     type Target = bool;
     fn deref(&self) -> &Self::Target {
         &self.0
-    }
-}
-
-impl TryFrom<String> for Boolean {
-    type Error = &'static str;
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        let mut input_chars = value.chars().peekable();
-        let validated = Parser::parse_bool(&mut input_chars)?;
-        Ok(Boolean(validated))
     }
 }
 
@@ -227,9 +209,9 @@ impl TryFrom<String> for Token {
 impl TryFrom<&str> for Token {
     type Error = &'static str;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let mut input_chars = value.chars().peekable();
-        let validated = Parser::parse_token(&mut input_chars)?;
-        Ok(Token(validated))
+        let mut output = String::new();
+        Serializer::serialize_token(&value, &mut output)?;
+        Ok(Token(value.to_owned()))
     }
 }
 
