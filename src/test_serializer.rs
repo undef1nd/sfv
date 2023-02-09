@@ -34,11 +34,13 @@ fn serialize_value_list_mixed_members_with_params() -> Result<(), Box<dyn Error>
 
     let inner_list_item1_param =
         Parameters::from_iter(vec![("in1_p".to_owned(), BareItem::Boolean(false))]);
-    let inner_list_item1 =
-        Item::with_params(BareItem::String("str1".to_owned()), inner_list_item1_param);
+    let inner_list_item1 = Item::with_params(
+        BareItem::String("str1".to_owned().try_into()?),
+        inner_list_item1_param,
+    );
     let inner_list_item2_param = Parameters::from_iter(vec![(
         "in2_p".to_owned(),
-        BareItem::String("valu\\e".to_owned()),
+        BareItem::String("valu\\e".to_owned().try_into()?),
     )]);
     let inner_list_item2 =
         Item::with_params(BareItem::Token("str2".to_owned()), inner_list_item2_param);
@@ -55,9 +57,11 @@ fn serialize_value_list_mixed_members_with_params() -> Result<(), Box<dyn Error>
     Ok(())
 }
 
+// TODO: serializing a value should never fail as now the construction of a value
+#[ignore = "Moved to bare_item::create_non_ascii_string_errors"]
 #[test]
 fn serialize_value_errors() -> Result<(), Box<dyn Error>> {
-    let disallowed_item = Item::new(BareItem::String("non-ascii text 🐹".into()));
+    let disallowed_item = Item::new(BareItem::String("non-ascii text 🐹".to_owned().try_into()?));
     assert_eq!(
         Err("serialize_string: non-ascii character"),
         disallowed_item.serialize_value()
@@ -132,7 +136,7 @@ fn serialize_item_with_bool_true_param() -> Result<(), Box<dyn Error>> {
 fn serialize_item_with_token_param() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
     let param = Parameters::from_iter(vec![("a1".to_owned(), BareItem::Token("*tok".to_owned()))]);
-    let item = Item::with_params(BareItem::String("12.35".to_owned()), param);
+    let item = Item::with_params(BareItem::String("12.35".to_owned().try_into()?), param);
     Serializer::serialize_item(&item, &mut buf)?;
     assert_eq!("\"12.35\";a1=*tok", &buf);
     Ok(())
@@ -383,7 +387,7 @@ fn serialize_params_string() -> Result<(), Box<dyn Error>> {
 
     let input = Parameters::from_iter(vec![(
         "b".to_owned(),
-        BareItem::String("param_val".to_owned()),
+        BareItem::String("param_val".to_owned().try_into()?),
     )]);
     Serializer::serialize_parameters(&input, &mut buf)?;
     assert_eq!(";b=\"param_val\"", &buf);
@@ -466,7 +470,7 @@ fn serialize_list_of_items_and_inner_list() -> Result<(), Box<dyn Error>> {
     let item4 = Item::new(BareItem::Token("b".to_owned()));
     let inner_list_param = Parameters::from_iter(vec![(
         "param".to_owned(),
-        BareItem::String("param_value_1".to_owned()),
+        BareItem::String("param_value_1".to_owned().try_into()?),
     )]);
     let inner_list = InnerList::with_params(vec![item3, item4], inner_list_param);
     let input: List = vec![item1.into(), item2.into(), inner_list.into()];
@@ -521,7 +525,10 @@ fn serialize_dictionary_with_params() -> Result<(), Box<dyn Error>> {
     let item2_params = Parameters::new();
     let item3_params = Parameters::from_iter(vec![
         ("q".to_owned(), BareItem::Boolean(false)),
-        ("r".to_owned(), BareItem::String("+w".to_owned())),
+        (
+            "r".to_owned(),
+            BareItem::String("+w".to_owned().try_into()?),
+        ),
     ]);
 
     let item1 = Item::with_params(123.try_into()?, item1_params);

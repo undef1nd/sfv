@@ -8,7 +8,7 @@ use std::iter::FromIterator;
 #[test]
 fn parse() -> Result<(), Box<dyn Error>> {
     let input = "\"some_value\"".as_bytes();
-    let parsed_item = Item::new(BareItem::String("some_value".to_owned()));
+    let parsed_item = Item::new(BareItem::String("some_value".to_owned().try_into()?));
     let expected = parsed_item;
     assert_eq!(expected, Parser::parse_item(input)?);
 
@@ -114,7 +114,7 @@ fn parse_list_of_items_and_lists_with_param() -> Result<(), Box<dyn Error>> {
     let item4 = Item::new(BareItem::Token("b".to_owned()));
     let inner_list_param = Parameters::from_iter(vec![(
         "param".to_owned(),
-        BareItem::String("param_value_1".to_owned()),
+        BareItem::String("param_value_1".to_owned().try_into()?),
     )]);
     let inner_list = InnerList::with_params(vec![item3, item4], inner_list_param);
     let empty_inner_list = InnerList::new(vec![]);
@@ -210,7 +210,7 @@ fn parse_item_decimal_with_bool_param_and_space() -> Result<(), Box<dyn Error>> 
 fn parse_item_number_with_param() -> Result<(), Box<dyn Error>> {
     let param = Parameters::from_iter(vec![("a1".to_owned(), BareItem::Token("*".to_owned()))]);
     assert_eq!(
-        Item::with_params(BareItem::String("12.35".to_owned()), param),
+        Item::with_params(BareItem::String("12.35".to_owned().try_into()?), param),
         Item::parse(&mut "\"12.35\";a1=*".chars().peekable())?
     );
     Ok(())
@@ -260,7 +260,10 @@ fn parse_dict_with_spaces_and_params() -> Result<(), Box<dyn Error>> {
     ]);
     let item3_params = Parameters::from_iter(vec![
         ("q".to_owned(), 9.try_into()?),
-        ("r".to_owned(), BareItem::String("+w".to_owned())),
+        (
+            "r".to_owned(),
+            BareItem::String("+w".to_owned().try_into()?),
+        ),
     ]);
 
     let item1 = Item::with_params(123.try_into()?, item1_params);
@@ -330,7 +333,7 @@ fn parse_bare_item() -> Result<(), Box<dyn Error>> {
         Parser::parse_bare_item(&mut "?0".chars().peekable())?
     );
     assert_eq!(
-        BareItem::String("test string".to_owned()),
+        BareItem::String("test string".to_owned().try_into()?),
         Parser::parse_bare_item(&mut "\"test string\"".chars().peekable())?
     );
     assert_eq!(
@@ -717,7 +720,7 @@ fn parse_params_string() -> Result<(), Box<dyn Error>> {
     let mut input = ";b=\"param_val\"".chars().peekable();
     let expected = Parameters::from_iter(vec![(
         "b".to_owned(),
-        BareItem::String("param_val".to_owned()),
+        BareItem::String("param_val".to_owned().try_into()?),
     )]);
     assert_eq!(expected, Parser::parse_parameters(&mut input)?);
     Ok(())

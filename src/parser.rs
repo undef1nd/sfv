@@ -235,7 +235,9 @@ impl Parser {
 
         match input_chars.peek() {
             Some(&'?') => Ok(BareItem::Boolean(Self::parse_bool(input_chars)?)),
-            Some(&'"') => Ok(BareItem::String(Self::parse_string(input_chars)?)),
+            Some(&'"') => Ok(BareItem::String(bare_item::BareItemString(
+                Self::parse_string(input_chars)?,
+            ))),
             Some(&':') => Ok(BareItem::ByteSeq(Self::parse_byte_sequence(input_chars)?)),
             Some(&c) if c == '*' || c.is_ascii_alphabetic() => {
                 Ok(BareItem::Token(Self::parse_token(input_chars)?))

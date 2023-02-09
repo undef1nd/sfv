@@ -1,4 +1,4 @@
-use crate::{Num, Parser};
+use crate::{serializer::Serializer, Num, Parser};
 use std::{convert::TryFrom, fmt, ops::Deref};
 
 // TODO: Necessary? rust_decimal seems to validate already
@@ -51,7 +51,7 @@ impl fmt::Display for Integer {
 /// escaped   = "\" ( DQUOTE / "\" )
 /// ```
 #[derive(Debug, PartialEq, Clone)]
-pub struct BareItemString(std::string::String);
+pub struct BareItemString(pub(crate) std::string::String);
 
 impl Deref for BareItemString {
     type Target = String;
@@ -64,9 +64,10 @@ impl Deref for BareItemString {
 impl TryFrom<String> for BareItemString {
     type Error = &'static str;
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        let mut input_chars = value.chars().peekable();
-        let validated = Parser::parse_string(&mut input_chars)?;
-        Ok(BareItemString(validated))
+        let mut output = String::new();
+        Serializer::serialize_string(&value, &mut output)?;
+
+        Ok(BareItemString(value))
     }
 }
 
@@ -205,5 +206,26 @@ impl TryFrom<&str> for Token {
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::convert::TryInto;
+    use std::error::Error;
+
+    use super::*;
+
+    #[test]
+    fn create_non_ascii_string_errors() -> Result<(), Box<dyn Error>> {
+        let disallowed_bare_item: Result<BareItemString, &str> =
+            "non-ascii text 🐹".to_owned().try_into();
+
+        assert_eq!(
+            Err("serialize_string: non-ascii character"),
+            disallowed_bare_item
+        );
+
+        Ok(())
     }
 }

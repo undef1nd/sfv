@@ -255,13 +255,15 @@ fn build_bare_item(bare_item_value: &Value) -> Result<BareItem, Box<dyn Error>> 
                 .as_bool()
                 .ok_or("build_bare_item: bare_item value is not a bool")?,
         )),
-        bare_item if bare_item.is_string() => Ok(BareItem::String(
-            bare_item
+        bare_item if bare_item.is_string() => {
+            let converted = bare_item
                 .as_str()
                 .ok_or("build_bare_item: bare_item value is not a str")?
                 .clone()
-                .to_owned(),
-        )),
+                .to_owned()
+                .try_into();
+            Ok(BareItem::String(converted?))
+        }
         bare_item if (bare_item.is_object() && bare_item["__type"] == "token") => {
             Ok(BareItem::Token(
                 bare_item["value"]
@@ -309,7 +311,6 @@ fn build_parameters(params_value: &Value) -> Result<Parameters, Box<dyn Error>> 
 fn run_test_suite(tests_file: PathBuf, is_serialization: bool) -> Result<(), Box<dyn Error>> {
     let test_cases: Vec<TestData> = serde_json::from_reader(fs::File::open(tests_file)?)?;
     for test_data in test_cases.iter() {
-        dbg!(&test_data.name);
         if is_serialization {
             run_test_case_serialization_only(test_data)?;
         } else {

@@ -94,10 +94,6 @@ let dict_header = "u=2, n=(* foo 2)";
                 // do something if it's a Boolean
                 println!("{}", val);
             }
-            BareItem::ValidatedString(val) => {
-                // do something if it's a String
-                println!("{}", val);
-            }
             BareItem::ValidatedByteSeq(val) => {
                 // do something if it's a ByteSeq
                 println!("{:?}", val);
@@ -115,9 +111,12 @@ let dict_header = "u=2, n=(* foo 2)";
 Creates `Item` with empty parameters:
 ```
 use sfv::{Item, BareItem, SerializeValue};
-
-let str_item = Item::new(BareItem::String(String::from("foo")));
+# use std::convert::TryInto;
+# fn main() -> Result<(), &'static str> {
+let str_item = Item::new(BareItem::String(String::from("foo").try_into()?));
 assert_eq!(str_item.serialize_value().unwrap(), "\"foo\"");
+# Ok(())
+# }
 ```
 
 
@@ -146,7 +145,7 @@ use sfv::{Item, BareItem, InnerList, List, SerializeValue, Parameters};
 let tok_item = BareItem::Token("tok".into());
 
 // Creates Item.
-let str_item = Item::new(BareItem::String(String::from("foo")));
+let str_item = Item::new(BareItem::String(String::from("foo").try_into()?));
 
 // Creates InnerList members.
 let mut int_item_params = Parameters::new();
@@ -173,7 +172,10 @@ Creates `Dictionary` field value:
 ```
 use sfv::{Parser, Item, BareItem, SerializeValue, ParseValue, Dictionary};
 
-let member_value1 = Item::new(BareItem::String(String::from("apple")));
+# use std::convert::TryInto;
+# fn main() -> Result<(), &'static str> {
+
+let member_value1 = Item::new(BareItem::String(String::from("apple").try_into()?));
 let member_value2 = Item::new(BareItem::Boolean(true));
 let member_value3 = Item::new(BareItem::Boolean(false));
 
@@ -186,6 +188,9 @@ assert_eq!(
     dict.serialize_value().unwrap(),
     "key1=\"apple\", key2, key3=?0"
 );
+
+# Ok(())
+# }
 
 ```
 */
@@ -326,7 +331,7 @@ pub enum BareItem {
     // chr       = unescaped / escaped
     // unescaped = %x20-21 / %x23-5B / %x5D-7E
     // escaped   = "\" ( DQUOTE / "\" )
-    String(String),
+    String(BareItemString),
     // ":" *(base64) ":"
     // base64    = ALPHA / DIGIT / "+" / "/" / "="
     ByteSeq(Vec<u8>),
@@ -338,7 +343,6 @@ pub enum BareItem {
 
     // TODO: needed?
     // ValidatedDecimal(Decimal),
-    ValidatedString(BareItemString),
     ValidatedByteSeq(ByteSeq),
     ValidatedBoolean(Boolean),
     ValidatedToken(Token),
@@ -377,8 +381,12 @@ impl BareItem {
     /// If `BareItem` is `String`, returns `&str`, otherwise returns `None`.
     /// ```
     /// # use sfv::BareItem;
-    /// let bare_item = BareItem::String("foo".into());
+    /// # use std::convert::TryInto;
+    /// # fn main() -> Result<(), &'static str> {
+    /// let bare_item = BareItem::String("foo".to_owned().try_into()?);
     /// assert_eq!(bare_item.as_str().unwrap(), "foo");
+    /// Ok(())
+    /// # }
     /// ```
     pub fn as_str(&self) -> Option<&str> {
         match *self {
@@ -484,7 +492,6 @@ impl BareItem {
             BareItem::Token(val) => RefBareItem::Token(val),
 
             // TODO: Decimal case
-            BareItem::ValidatedString(val) => RefBareItem::String(val),
             BareItem::ValidatedByteSeq(val) => RefBareItem::ByteSeq(val),
             BareItem::ValidatedBoolean(val) => RefBareItem::Boolean(**val),
             BareItem::ValidatedToken(val) => RefBareItem::Token(&val),
