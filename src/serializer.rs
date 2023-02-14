@@ -162,6 +162,8 @@ impl Serializer {
             RefBareItem::Token(value) => Self::serialize_token(value, output)?,
             RefBareItem::Integer(value) => Self::serialize_integer(*value, output)?,
             RefBareItem::Decimal(value) => Self::serialize_decimal(*value, output)?,
+            #[cfg(feature = "sf-date-item")]
+            RefBareItem::Date(value) => Self::serialize_date(*value, output)?,
         };
         Ok(())
     }
@@ -209,6 +211,19 @@ impl Serializer {
             }
         }
         output.push_str(input_key);
+        Ok(())
+    }
+
+    #[cfg(feature = "sf-date-item")]
+    pub(crate) fn serialize_date(
+        value: chrono::NaiveDateTime,
+        output: &mut String,
+    ) -> SFVResult<()> {
+        let mut integer_output = String::new();
+        Self::serialize_integer(value.timestamp(), &mut integer_output)
+            .map_err(|_| "serialize_date: date is out of range")?;
+        output.push('@');
+        output.push_str(&integer_output);
         Ok(())
     }
 

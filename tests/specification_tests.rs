@@ -282,6 +282,15 @@ fn build_bare_item(bare_item_value: &Value) -> Result<BareItem, Box<dyn Error>> 
                 .clone();
             Ok(BareItem::ByteSeq(BASE32.decode(str_val.as_bytes())?.into()))
         }
+        #[cfg(feature = "sf-date-item")]
+        bare_item if (bare_item.is_object() && bare_item["__type"] == "date") => {
+            let timestamp = bare_item["value"]
+                .as_i64()
+                .ok_or("build_bare_item: bare_item value is not an i64")?;
+            let datetime = chrono::NaiveDateTime::from_timestamp_opt(timestamp, 0)
+                .ok_or("build_bare_item: expected date value out of range")?;
+            Ok(BareItem::Date(datetime.try_into()?))
+        }
         _ => Err("build_bare_item: unknown bare_item value".into()),
     }
 }
@@ -331,6 +340,13 @@ fn run_spec_parse_serialize_tests() -> Result<(), Box<dyn Error>> {
 
     for file_path in json_files {
         println!("\n## Test suite file: {:?}\n", &file_path.file_name());
+
+        #[cfg(not(feature = "sf-date-item"))]
+        if &file_path.file_name() == "date.json" {
+            println!("Skipped: `sf-date-item` feature not activated");
+            continue;
+        }
+
         run_test_suite(file_path.path(), false)?
     }
     Ok(())

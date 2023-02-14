@@ -5,7 +5,11 @@ use std::{
     ops::Deref,
 };
 
+#[cfg(feature = "sf-date-item")]
+use chrono::NaiveDateTime;
+
 /// `BareItem` type is used to construct `Items` or `Parameters` values.
+#[non_exhaustive]
 #[derive(Debug, PartialEq, Clone)]
 pub enum BareItem {
     /// Decimal number
@@ -27,6 +31,8 @@ pub enum BareItem {
     Boolean(Boolean),
     // sf-token = ( ALPHA / "*" ) *( tchar / ":" / "/" )
     Token(Token),
+    #[cfg(feature = "sf-date-item")]
+    Date(Date),
 }
 
 impl BareItem {
@@ -212,6 +218,42 @@ impl TryFrom<i64> for Integer {
 }
 
 impl fmt::Display for Integer {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+#[cfg(feature = "sf-date-item")]
+/// Dates have a data model that is similar to Integers, representing a (possibly negative) delta in seconds from January 1, 1970 00:00:00 UTC, excluding leap seconds.
+///
+/// The ABNF for Dates is:
+/// ```abnf,ignore,no_run
+/// sf-date = "@" ["-"] 1*15DIGIT
+/// ```
+#[derive(Debug, PartialEq, Clone)]
+pub struct Date(pub(crate) NaiveDateTime);
+
+#[cfg(feature = "sf-date-item")]
+impl TryFrom<NaiveDateTime> for Date {
+    type Error = &'static str;
+    fn try_from(value: NaiveDateTime) -> Result<Self, Self::Error> {
+        let mut output = String::new();
+        Serializer::serialize_date(value, &mut output)?;
+
+        Ok(Date(value))
+    }
+}
+
+#[cfg(feature = "sf-date-item")]
+impl Deref for Date {
+    type Target = NaiveDateTime;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[cfg(feature = "sf-date-item")]
+impl fmt::Display for Date {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
     }

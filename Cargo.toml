@@ -17,12 +17,16 @@ exclude = ["tests/**", ".github/*"]
 indexmap="1.8.0"
 rust_decimal= { version = "1.20.0", default-features = false }
 data-encoding = "2.3.2"
+chrono = { version = "0.4.23", optional = true }
 
 [dev-dependencies]
 rust_decimal= { version = "1.20.0", default-features = false, features = ["std"] }
 serde_json = { version = "1.0" }
 serde = { version = "1.0", features = ["derive"] }
 criterion = "0.4.0"
+
+[features]
+sf-date-item = ["dep:chrono"]
 
 [[bench]]
 name = "bench"

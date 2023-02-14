@@ -86,6 +86,7 @@ let dict_header = "u=2, n=(* foo 2)";
                 // do something if it's a ByteSeq
                 println!("{:?}", val);
             }
+             &_ => todo!("Placeholder for any other bare item to come")
         },
         Some(ListEntry::InnerList(inner_list)) => {
             // do something if it's an InnerList
@@ -318,6 +319,8 @@ pub enum RefBareItem<'a> {
     ByteSeq(&'a [u8]),
     Boolean(bool),
     Token(&'a str),
+    #[cfg(feature = "sf-date-item")]
+    Date(chrono::NaiveDateTime),
 }
 
 impl BareItem {
@@ -330,6 +333,8 @@ impl BareItem {
             BareItem::ByteSeq(val) => RefBareItem::ByteSeq(val),
             BareItem::Boolean(val) => RefBareItem::Boolean(**val),
             BareItem::Token(val) => RefBareItem::Token(&val),
+            #[cfg(feature = "sf-date-item")]
+            BareItem::Date(val) => RefBareItem::Date(**val),
         }
     }
 }

@@ -1,3 +1,6 @@
+#[cfg(feature = "sf-date-item")]
+pub use crate::bare_item::Date;
+
 use crate::{bare_item, utils};
 use crate::{
     BareItem, Boolean, ByteSeq, Decimal, Dictionary, FromStr, InnerList, Item, List, ListEntry,
@@ -244,6 +247,8 @@ impl Parser {
             Some(&c) if c == '*' || c.is_ascii_alphabetic() => {
                 Ok(BareItem::Token(Token(Self::parse_token(input_chars)?)))
             }
+            #[cfg(feature = "sf-date-item")]
+            Some(&'@') => Ok(BareItem::Date(Date(Self::parse_date(input_chars)?))),
             Some(&c) if c == '-' || c.is_ascii_digit() => match Self::parse_number(input_chars)? {
                 Num::Decimal(val) => Ok(BareItem::Decimal(val)),
                 Num::Integer(val) => Ok(BareItem::Integer(bare_item::Integer(val))),
@@ -422,6 +427,24 @@ impl Parser {
             }
         }
         Ok((is_integer, input_number))
+    }
+
+    #[cfg(feature = "sf-date-item")]
+    pub(crate) fn parse_date(
+        input_chars: &mut Peekable<Chars>,
+    ) -> SFVResult<chrono::NaiveDateTime> {
+        if input_chars.next() != Some('@') {
+            return Err("parse_date: first char is not '@'");
+        }
+
+        let number =
+            Self::parse_number(input_chars).map_err(|_| "parse_date: invalid numerical input")?;
+
+        match number {
+            Num::Decimal(_) => Err("parse_date: value must be integer"),
+            Num::Integer(val) => chrono::NaiveDateTime::from_timestamp_opt(val, 0)
+                .ok_or("parse_date: value out of range"),
+        }
     }
 
     pub(crate) fn parse_parameters(input_chars: &mut Peekable<Chars>) -> SFVResult<Parameters> {
