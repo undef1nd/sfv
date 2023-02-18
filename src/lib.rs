@@ -203,7 +203,10 @@ pub use parser::{ParseMore, ParseValue, Parser};
 pub use ref_serializer::{RefDictSerializer, RefItemSerializer, RefListSerializer};
 pub use serializer::SerializeValue;
 
-pub use bare_item::{BareItem, BareItemString, Boolean, ByteSeq, Decimal, Integer, Token};
+pub use bare_item::{
+    BareItem, BareItemBoolean, BareItemByteSeq, BareItemDecimal, BareItemInteger, BareItemString,
+    BareItemToken,
+};
 
 type SFVResult<T> = std::result::Result<T, &'static str>;
 
@@ -305,7 +308,7 @@ impl InnerList {
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum Num {
-    Decimal(Decimal),
+    Decimal(BareItemDecimal),
     Integer(i64),
 }
 

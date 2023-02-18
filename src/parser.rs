@@ -1,7 +1,7 @@
 use crate::{bare_item, utils};
 use crate::{
-    BareItem, Boolean, ByteSeq, Decimal, Dictionary, FromStr, InnerList, Item, List, ListEntry,
-    Num, Parameters, SFVResult, Token,
+    BareItem, BareItemBoolean, BareItemByteSeq, BareItemDecimal, BareItemToken, Dictionary,
+    FromStr, InnerList, Item, List, ListEntry, Num, Parameters, SFVResult,
 };
 use std::iter::Peekable;
 use std::str::{from_utf8, Chars};
@@ -234,19 +234,21 @@ impl Parser {
         }
 
         match input_chars.peek() {
-            Some(&'?') => Ok(BareItem::Boolean(Boolean(Self::parse_bool(input_chars)?))),
+            Some(&'?') => Ok(BareItem::Boolean(BareItemBoolean(Self::parse_bool(
+                input_chars,
+            )?))),
             Some(&'"') => Ok(BareItem::String(bare_item::BareItemString(
                 Self::parse_string(input_chars)?,
             ))),
-            Some(&':') => Ok(BareItem::ByteSeq(ByteSeq(Self::parse_byte_sequence(
-                input_chars,
-            )?))),
-            Some(&c) if c == '*' || c.is_ascii_alphabetic() => {
-                Ok(BareItem::Token(Token(Self::parse_token(input_chars)?)))
-            }
+            Some(&':') => Ok(BareItem::ByteSeq(BareItemByteSeq(
+                Self::parse_byte_sequence(input_chars)?,
+            ))),
+            Some(&c) if c == '*' || c.is_ascii_alphabetic() => Ok(BareItem::Token(BareItemToken(
+                Self::parse_token(input_chars)?,
+            ))),
             Some(&c) if c == '-' || c.is_ascii_digit() => match Self::parse_number(input_chars)? {
                 Num::Decimal(val) => Ok(BareItem::Decimal(val)),
-                Num::Integer(val) => Ok(BareItem::Integer(bare_item::Integer(val))),
+                Num::Integer(val) => Ok(BareItem::Integer(bare_item::BareItemInteger(val))),
             },
             _ => Err("parse_bare_item: item type can't be identified"),
         }
@@ -387,7 +389,7 @@ impl Parser {
                     output_number.set_sign_negative(true)
                 }
 
-                Ok(Num::Decimal(Decimal(output_number)))
+                Ok(Num::Decimal(BareItemDecimal(output_number)))
             }
             _ => Err("parse_number: invalid decimal fraction length"),
         }

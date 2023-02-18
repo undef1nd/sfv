@@ -11,10 +11,10 @@ use std::{
 pub enum BareItem {
     /// Decimal number
     // sf-decimal  = ["-"] 1*12DIGIT "." 1*3DIGIT
-    Decimal(Decimal),
+    Decimal(BareItemDecimal),
     /// Integer number
     // sf-integer = ["-"] 1*15DIGIT
-    Integer(Integer),
+    Integer(BareItemInteger),
     // sf-string = DQUOTE *chr DQUOTE
     // chr       = unescaped / escaped
     // unescaped = %x20-21 / %x23-5B / %x5D-7E
@@ -22,12 +22,12 @@ pub enum BareItem {
     String(BareItemString),
     // ":" *(base64) ":"
     // base64    = ALPHA / DIGIT / "+" / "/" / "="
-    ByteSeq(ByteSeq),
+    ByteSeq(BareItemByteSeq),
     // sf-boolean = "?" boolean
     // boolean    = "0" / "1"
-    Boolean(Boolean),
+    Boolean(BareItemBoolean),
     // sf-token = ( ALPHA / "*" ) *( tchar / ":" / "/" )
-    Token(Token),
+    Token(BareItemToken),
 }
 
 impl BareItem {
@@ -57,7 +57,7 @@ impl BareItem {
     /// # }
     /// ```
     pub fn new_decimal(value: rust_decimal::Decimal) -> SFVResult<BareItem> {
-        let value: Decimal = value.try_into()?;
+        let value: BareItemDecimal = value.try_into()?;
         Ok(BareItem::Decimal(value))
     }
 
@@ -70,7 +70,7 @@ impl BareItem {
     /// # }
     /// ```
     pub fn new_integer(value: i64) -> SFVResult<BareItem> {
-        let value: Integer = value.try_into()?;
+        let value: BareItemInteger = value.try_into()?;
         Ok(BareItem::Integer(value))
     }
 
@@ -96,7 +96,7 @@ impl BareItem {
     /// # }
     /// ```
     pub fn new_byte_seq(value: &[u8]) -> SFVResult<BareItem> {
-        let value: ByteSeq = value.into();
+        let value: BareItemByteSeq = value.into();
         Ok(BareItem::ByteSeq(value))
     }
 
@@ -109,7 +109,7 @@ impl BareItem {
     /// # }
     /// ```
     pub fn new_boolean(value: bool) -> SFVResult<BareItem> {
-        let value: Boolean = value.into();
+        let value: BareItemBoolean = value.into();
         Ok(BareItem::Boolean(value))
     }
 
@@ -122,7 +122,7 @@ impl BareItem {
     /// # }
     /// ```
     pub fn new_token(value: &str) -> SFVResult<BareItem> {
-        let value: Token = value.try_into()?;
+        let value: BareItemToken = value.try_into()?;
         Ok(BareItem::Token(value))
     }
 }
@@ -192,7 +192,7 @@ impl BareItem {
     }
     /// If `BareItem` is a `Boolean`, returns `bool`, otherwise returns `None`.
     /// ```
-    /// # use sfv::{BareItem, Decimal, FromPrimitive};
+    /// # use sfv::{BareItem, FromPrimitive};
     /// let bare_item = BareItem::Boolean(true.into());
     /// assert_eq!(bare_item.as_bool().unwrap(), true);
     /// ```
@@ -315,18 +315,24 @@ impl TryFrom<bool> for BareItem {
     }
 }
 
+/// Decimals are numbers with an integer and a fractional component. The integer component has at most 12 digits; the fractional component has at most three digits.
+///
+/// The ABNF for decimals is:
+/// ```abnf,ignore,no_run
+/// sf-decimal  = ["-"] 1*12DIGIT "." 1*3DIGIT
+/// ```
 #[derive(Debug, PartialEq, Clone)]
-pub struct Decimal(pub(crate) rust_decimal::Decimal);
+pub struct BareItemDecimal(pub(crate) rust_decimal::Decimal);
 
-impl TryFrom<rust_decimal::Decimal> for Decimal {
+impl TryFrom<rust_decimal::Decimal> for BareItemDecimal {
     type Error = &'static str;
     fn try_from(value: rust_decimal::Decimal) -> Result<Self, Self::Error> {
         let validated = Self::validate(value)?;
-        Ok(Decimal(validated))
+        Ok(BareItemDecimal(validated))
     }
 }
 
-impl ValidateValue<'_, rust_decimal::Decimal> for Decimal {
+impl ValidateValue<'_, rust_decimal::Decimal> for BareItemDecimal {
     fn validate(value: rust_decimal::Decimal) -> SFVResult<rust_decimal::Decimal> {
         let fraction_length = 3;
 
@@ -351,14 +357,14 @@ pub trait ValidateValue<'a, T> {
     fn validate(value: T) -> SFVResult<T>;
 }
 
-impl Deref for Decimal {
+impl Deref for BareItemDecimal {
     type Target = rust_decimal::Decimal;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl fmt::Display for Decimal {
+impl fmt::Display for BareItemDecimal {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
     }
@@ -371,25 +377,25 @@ impl fmt::Display for Decimal {
 /// sf-integer = ["-"] 1*15DIGIT
 /// ```
 #[derive(Debug, PartialEq, Clone)]
-pub struct Integer(pub(crate) i64);
+pub struct BareItemInteger(pub(crate) i64);
 
-impl Deref for Integer {
+impl Deref for BareItemInteger {
     type Target = i64;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl TryFrom<i64> for Integer {
+impl TryFrom<i64> for BareItemInteger {
     type Error = &'static str;
 
     fn try_from(value: i64) -> Result<Self, Self::Error> {
         let value = Self::validate(value)?;
-        Ok(Integer(value))
+        Ok(BareItemInteger(value))
     }
 }
 
-impl ValidateValue<'_, i64> for Integer {
+impl ValidateValue<'_, i64> for BareItemInteger {
     fn validate(value: i64) -> SFVResult<i64> {
         let (min_int, max_int) = (-999_999_999_999_999_i64, 999_999_999_999_999_i64);
 
@@ -401,13 +407,12 @@ impl ValidateValue<'_, i64> for Integer {
     }
 }
 
-impl fmt::Display for Integer {
+impl fmt::Display for BareItemInteger {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
-// TODO: how to get around naming collision without using std::string::String everywhere?
 /// Strings are zero or more printable ASCII (RFC0020) characters (i.e., the range %x20 to %x7E). Note that this excludes tabs, newlines, carriage returns, etc.
 ///
 /// The ABNF for Strings is:
@@ -473,21 +478,21 @@ impl fmt::Display for BareItemString {
 /// base64    = ALPHA / DIGIT / "+" / "/" / "="
 /// ```
 #[derive(Debug, PartialEq, Clone)]
-pub struct ByteSeq(pub(crate) Vec<u8>);
+pub struct BareItemByteSeq(pub(crate) Vec<u8>);
 
-impl From<&[u8]> for ByteSeq {
+impl From<&[u8]> for BareItemByteSeq {
     fn from(value: &[u8]) -> Self {
-        ByteSeq(value.to_vec())
+        BareItemByteSeq(value.to_vec())
     }
 }
 
-impl From<Vec<u8>> for ByteSeq {
+impl From<Vec<u8>> for BareItemByteSeq {
     fn from(value: Vec<u8>) -> Self {
-        ByteSeq(value)
+        BareItemByteSeq(value)
     }
 }
 
-impl Deref for ByteSeq {
+impl Deref for BareItemByteSeq {
     type Target = [u8];
     fn deref(&self) -> &Self::Target {
         self.0.as_slice()
@@ -502,22 +507,22 @@ impl Deref for ByteSeq {
 /// boolean    = "0" / "1"
 /// ```
 #[derive(Debug, PartialEq, Clone)]
-pub struct Boolean(pub(crate) bool);
+pub struct BareItemBoolean(pub(crate) bool);
 
-impl From<bool> for Boolean {
+impl From<bool> for BareItemBoolean {
     fn from(value: bool) -> Self {
-        Boolean(value)
+        BareItemBoolean(value)
     }
 }
 
-impl Deref for Boolean {
+impl Deref for BareItemBoolean {
     type Target = bool;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl fmt::Display for Boolean {
+impl fmt::Display for BareItemBoolean {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
     }
@@ -529,31 +534,10 @@ impl fmt::Display for Boolean {
 /// ```abnf,ignore,no_run
 /// sf-token = ( ALPHA / "*" ) *( tchar / ":" / "/" )
 /// ```
-///
-/// # Example
-/// ```
-/// use sfv::{BareItem, Token};
-/// use std::convert::{TryFrom, TryInto};
-///
-/// # fn main() -> Result<(), &'static str> {
-/// let token_try_from = Token::try_from("foo")?;
-/// let item = BareItem::Token(token_try_from);
-///
-/// let str_try_into: Token = "bar".try_into()?;
-/// let item = BareItem::Token(str_try_into);
-///
-/// let direct_item_construction = BareItem::Token("baz".try_into()?);
-/// # Ok(())
-/// # }
-/// ```
-///
-/// ```compile_fail
-/// Token("foo"); // A Token can not be constructed directly
-/// ```
 #[derive(Debug, PartialEq, Clone)]
-pub struct Token(pub(crate) String);
+pub struct BareItemToken(pub(crate) String);
 
-impl Deref for Token {
+impl Deref for BareItemToken {
     type Target = String;
 
     fn deref(&self) -> &Self::Target {
@@ -561,23 +545,23 @@ impl Deref for Token {
     }
 }
 
-impl TryFrom<String> for Token {
+impl TryFrom<String> for BareItemToken {
     type Error = &'static str;
     fn try_from(value: String) -> Result<Self, Self::Error> {
         let value = Self::validate(&value)?;
-        Ok(Token(value.to_owned()))
+        Ok(BareItemToken(value.to_owned()))
     }
 }
 
-impl TryFrom<&str> for Token {
+impl TryFrom<&str> for BareItemToken {
     type Error = &'static str;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         let value = Self::validate(value)?;
-        Ok(Token(value.to_owned()))
+        Ok(BareItemToken(value.to_owned()))
     }
 }
 
-impl<'a> ValidateValue<'a, &'a str> for Token {
+impl<'a> ValidateValue<'a, &'a str> for BareItemToken {
     fn validate(value: &'a str) -> SFVResult<&'a str> {
         if !value.is_ascii() {
             return Err("serialize_string: non-ascii character");
@@ -601,7 +585,7 @@ impl<'a> ValidateValue<'a, &'a str> for Token {
     }
 }
 
-impl fmt::Display for Token {
+impl fmt::Display for BareItemToken {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
     }
@@ -630,7 +614,7 @@ mod tests {
 
     #[test]
     fn create_too_long_decimal_errors() -> Result<(), Box<dyn Error>> {
-        let disallowed_value: Result<Decimal, &str> =
+        let disallowed_value: Result<BareItemDecimal, &str> =
             rust_decimal::Decimal::from_str("12345678912345.123")?.try_into();
         assert_eq!(
             Err("serialize_decimal: integer component > 12 digits"),

@@ -2,7 +2,7 @@ use crate::bare_item::ValidateValue;
 use crate::{
     BareItem, Dictionary, InnerList, Item, List, ListEntry, Parameters, RefBareItem, SFVResult,
 };
-use crate::{BareItemString, Decimal, Integer, Token};
+use crate::{BareItemDecimal, BareItemInteger, BareItemString, BareItemToken};
 use data_encoding::BASE64;
 
 /// Serializes structured field value into String.
@@ -215,7 +215,7 @@ impl Serializer {
 
     pub(crate) fn serialize_integer(value: i64, output: &mut String) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc8941.html#ser-integer
-        let value = Integer::validate(value)?;
+        let value = BareItemInteger::validate(value)?;
         output.push_str(&value.to_string());
         Ok(())
     }
@@ -225,7 +225,7 @@ impl Serializer {
         output: &mut String,
     ) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc8941.html#ser-decimal
-        let decimal = Decimal::validate(value)?;
+        let decimal = BareItemDecimal::validate(value)?;
 
         if decimal.fract().is_zero() {
             output.push_str(&format!("{:.1}", &decimal));
@@ -254,7 +254,7 @@ impl Serializer {
 
     pub(crate) fn serialize_token(value: &str, output: &mut String) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc8941.html#ser-token
-        let value = Token::validate(value)?;
+        let value = BareItemToken::validate(value)?;
 
         output.push_str(value);
         Ok(())
