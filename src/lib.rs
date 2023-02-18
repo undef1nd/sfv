@@ -101,7 +101,7 @@ Creates `Item` with empty parameters:
 use sfv::{Item, BareItem, SerializeValue};
 # use std::convert::TryInto;
 # fn main() -> Result<(), &'static str> {
-let str_item = Item::new(BareItem::String(String::from("foo").try_into()?));
+let str_item = Item::new(BareItem::new_string("foo")?);
 assert_eq!(str_item.serialize_value().unwrap(), "\"foo\"");
 # Ok(())
 # }
@@ -117,8 +117,8 @@ use rust_decimal::Decimal;
 # fn main() -> Result<(), &'static str> {
 let mut params = Parameters::new();
 let decimal = Decimal::from_f64(13.45655).unwrap();
-params.insert("key".into(), BareItem::Decimal(decimal.try_into()?));
-let int_item = Item::with_params(BareItem::Integer(99_i64.try_into()?), params);
+params.insert("key".into(), BareItem::new_decimal(decimal)?);
+let int_item = Item::with_params(BareItem::new_integer(99_i64)?, params);
 assert_eq!(int_item.serialize_value().unwrap(), "99;key=13.457");
 # Ok(())
 # }
@@ -131,19 +131,19 @@ use sfv::{Item, BareItem, InnerList, List, SerializeValue, Parameters};
 # use std::convert::TryInto;
 # fn main() -> Result<(), &'static str> {
 
-let tok_item = BareItem::Token("tok".try_into()?);
+let tok_item = BareItem::new_token("tok")?;
 
 // Creates Item.
-let str_item = Item::new(BareItem::String(String::from("foo").try_into()?));
+let str_item = Item::new(BareItem::new_string("foo")?);
 
 // Creates InnerList members.
 let mut int_item_params = Parameters::new();
-int_item_params.insert("key".into(), BareItem::Boolean(false.into()));
-let int_item = Item::with_params(BareItem::Integer(99_i64.try_into()?), int_item_params);
+int_item_params.insert("key".into(), BareItem::new_boolean(false)?);
+let int_item = Item::with_params(BareItem::new_integer(99_i64)?, int_item_params);
 
 // Creates InnerList.
 let mut inner_list_params = Parameters::new();
-inner_list_params.insert("bar".into(), BareItem::Boolean(true.into()));
+inner_list_params.insert("bar".into(), BareItem::new_boolean(true)?);
 let inner_list = InnerList::with_params(vec![int_item, str_item], inner_list_params);
 
 
@@ -164,9 +164,9 @@ use sfv::{Parser, Item, BareItem, SerializeValue, ParseValue, Dictionary};
 # use std::convert::TryInto;
 # fn main() -> Result<(), &'static str> {
 
-let member_value1 = Item::new(BareItem::String(String::from("apple").try_into()?));
-let member_value2 = Item::new(BareItem::Boolean(true.into()));
-let member_value3 = Item::new(BareItem::Boolean(false.into()));
+let member_value1 = Item::new(BareItem::new_string("apple")?);
+let member_value2 = Item::new(BareItem::new_boolean(true)?);
+let member_value3 = Item::new(BareItem::new_boolean(false)?);
 
 let mut dict = Dictionary::new();
 dict.insert("key1".into(), member_value1.into());
