@@ -1,4 +1,5 @@
-use crate::serializer::Serializer;
+use crate::{utils, SFVResult};
+use rust_decimal::prelude::ToPrimitive;
 use std::{
     convert::{TryFrom, TryInto},
     fmt,
@@ -165,11 +166,34 @@ pub struct Decimal(pub(crate) rust_decimal::Decimal);
 impl TryFrom<rust_decimal::Decimal> for Decimal {
     type Error = &'static str;
     fn try_from(value: rust_decimal::Decimal) -> Result<Self, Self::Error> {
-        let mut output = String::new();
-        Serializer::serialize_decimal(value, &mut output)?;
-
-        Ok(Decimal(value))
+        let validated = Self::validate(value)?;
+        Ok(Decimal(validated))
     }
+}
+
+impl ValidateValue<'_, rust_decimal::Decimal> for Decimal {
+    fn validate(value: rust_decimal::Decimal) -> SFVResult<rust_decimal::Decimal> {
+        let fraction_length = 3;
+
+        let decimal = value.round_dp(fraction_length);
+        let int_comp = decimal.trunc();
+        let int_comp = int_comp
+            .abs()
+            .to_u64()
+            .ok_or("serialize_decimal: integer component > 12 digits")?;
+
+        if int_comp > 999_999_999_999_u64 {
+            return Err("serialize_decimal: integer component > 12 digits");
+        }
+
+        Ok(decimal)
+    }
+}
+
+/// Validates a bare item value and returns a new sanitized value
+/// or passes back ownership of the existing value in case the input needs no change.
+pub trait ValidateValue<'a, T> {
+    fn validate(value: T) -> SFVResult<T>;
 }
 
 impl Deref for Decimal {
@@ -205,9 +229,20 @@ impl TryFrom<i64> for Integer {
     type Error = &'static str;
 
     fn try_from(value: i64) -> Result<Self, Self::Error> {
-        let mut output = String::new();
-        Serializer::serialize_integer(value, &mut output)?;
+        let value = Self::validate(value)?;
         Ok(Integer(value))
+    }
+}
+
+impl ValidateValue<'_, i64> for Integer {
+    fn validate(value: i64) -> SFVResult<i64> {
+        let (min_int, max_int) = (-999_999_999_999_999_i64, 999_999_999_999_999_i64);
+
+        if !(min_int <= value && value <= max_int) {
+            return Err("serialize_integer: integer is out of range");
+        }
+
+        Ok(value)
     }
 }
 
@@ -241,10 +276,23 @@ impl Deref for BareItemString {
 impl TryFrom<String> for BareItemString {
     type Error = &'static str;
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        let mut output = String::new();
-        Serializer::serialize_string(&value, &mut output)?;
+        let value = Self::validate(&value)?;
+        Ok(BareItemString(value.to_owned()))
+    }
+}
 
-        Ok(BareItemString(value))
+impl<'a> ValidateValue<'a, &'a str> for BareItemString {
+    fn validate(value: &'a str) -> SFVResult<&'a str> {
+        if !value.is_ascii() {
+            return Err("serialize_string: non-ascii character");
+        }
+
+        let vchar_or_sp = |char| char == '\x7f' || ('\x00'..='\x1f').contains(&char);
+        if value.chars().any(vchar_or_sp) {
+            return Err("serialize_string: not a visible character");
+        }
+
+        Ok(value)
     }
 }
 
@@ -353,19 +401,40 @@ impl Deref for Token {
 impl TryFrom<String> for Token {
     type Error = &'static str;
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        let mut output = String::new();
-        Serializer::serialize_token(&value, &mut output)?;
-
-        Ok(Token(value))
+        let value = Self::validate(&value)?;
+        Ok(Token(value.to_owned()))
     }
 }
 
 impl TryFrom<&str> for Token {
     type Error = &'static str;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let mut output = String::new();
-        Serializer::serialize_token(&value, &mut output)?;
+        let value = Self::validate(value)?;
         Ok(Token(value.to_owned()))
+    }
+}
+
+impl<'a> ValidateValue<'a, &'a str> for Token {
+    fn validate(value: &'a str) -> SFVResult<&'a str> {
+        if !value.is_ascii() {
+            return Err("serialize_string: non-ascii character");
+        }
+
+        let mut chars = value.chars();
+        if let Some(char) = chars.next() {
+            if !(char.is_ascii_alphabetic() || char == '*') {
+                return Err("serialise_token: first character is not ALPHA or '*'");
+            }
+        }
+
+        if chars
+            .clone()
+            .any(|c| !(utils::is_tchar(c) || c == ':' || c == '/'))
+        {
+            return Err("serialise_token: disallowed character");
+        }
+
+        Ok(value)
     }
 }
 
