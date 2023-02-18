@@ -1,5 +1,5 @@
 use crate::{utils, SFVResult};
-use rust_decimal::prelude::ToPrimitive;
+use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
 use std::{
     convert::{TryFrom, TryInto},
     fmt,
@@ -28,6 +28,103 @@ pub enum BareItem {
     Boolean(Boolean),
     // sf-token = ( ALPHA / "*" ) *( tchar / ":" / "/" )
     Token(Token),
+}
+
+impl BareItem {
+    /// Creates a `BareItem::Decimal` from an `f64` input.
+    /// ```
+    /// # use sfv::BareItem;
+    /// # fn main() -> Result<(), &'static str> {
+    /// let value = BareItem::new_decimal_from_f64(13.37)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn new_decimal_from_f64(value: f64) -> SFVResult<BareItem> {
+        let decimal = rust_decimal::Decimal::from_f64(value)
+            .ok_or("validate_decimal: value can not represent decimal")?;
+
+        Self::new_decimal(decimal)
+    }
+
+    /// Creates a `BareItem::Decimal` from a `rust_decimal::Decimal` input.
+    /// ```
+    /// # use sfv::BareItem;
+    /// # use crate::sfv::FromPrimitive;
+    /// # fn main() -> Result<(), &'static str> {
+    /// let decimal = rust_decimal::Decimal::from_f64(13.37).unwrap();
+    /// let value = BareItem::new_decimal(decimal);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn new_decimal(value: rust_decimal::Decimal) -> SFVResult<BareItem> {
+        let value: Decimal = value.try_into()?;
+        Ok(BareItem::Decimal(value))
+    }
+
+    /// Creates a `BareItem::Decimal` from a `rust_decimal::Decimal` input.
+    /// ```
+    /// # use sfv::BareItem;
+    /// # fn main() -> Result<(), &'static str> {
+    /// let value = BareItem::new_integer(42)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn new_integer(value: i64) -> SFVResult<BareItem> {
+        let value: Integer = value.try_into()?;
+        Ok(BareItem::Integer(value))
+    }
+
+    /// Creates a `BareItem::String` from a `&str` input.
+    /// ```
+    /// # use sfv::BareItem;
+    /// # fn main() -> Result<(), &'static str> {
+    /// let value = BareItem::new_string("foo")?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn new_string(value: &str) -> SFVResult<BareItem> {
+        let value: BareItemString = value.try_into()?;
+        Ok(BareItem::String(value))
+    }
+
+    /// Creates a `BareItem::ByteSeq` from a byte slice input.
+    /// ```
+    /// # use sfv::BareItem;
+    /// # fn main() -> Result<(), &'static str> {
+    /// let value = BareItem::new_byte_seq("hello".as_bytes())?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn new_byte_seq(value: &[u8]) -> SFVResult<BareItem> {
+        let value: ByteSeq = value.into();
+        Ok(BareItem::ByteSeq(value))
+    }
+
+    /// Creates a `BareItem::Boolean` from a `bool` input.
+    /// ```
+    /// # use sfv::BareItem;
+    /// # fn main() -> Result<(), &'static str> {
+    /// let value = BareItem::new_boolean(true)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn new_boolean(value: bool) -> SFVResult<BareItem> {
+        let value: Boolean = value.into();
+        Ok(BareItem::Boolean(value))
+    }
+
+    /// Creates a `BareItem::Token` from a `&str` input.
+    /// ```
+    /// # use sfv::BareItem;
+    /// # fn main() -> Result<(), &'static str> {
+    /// let value = BareItem::new_boolean(true)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn new_token(value: &str) -> SFVResult<BareItem> {
+        let value: Token = value.try_into()?;
+        Ok(BareItem::Token(value))
+    }
 }
 
 impl BareItem {
@@ -137,7 +234,7 @@ impl TryFrom<i64> for BareItem {
     /// # }
     /// ```
     fn try_from(item: i64) -> Result<Self, Self::Error> {
-        Ok(BareItem::Integer(item.try_into()?))
+        Self::new_integer(item)
     }
 }
 
@@ -156,7 +253,65 @@ impl TryFrom<rust_decimal::Decimal> for BareItem {
     /// # }
     /// ```
     fn try_from(item: rust_decimal::Decimal) -> Result<Self, Self::Error> {
-        Ok(BareItem::Decimal(item.try_into()?))
+        Self::new_decimal(item)
+    }
+}
+
+impl TryFrom<f64> for BareItem {
+    type Error = &'static str;
+
+    /// Converts `f64` into `BareItem::Decimal`.
+    /// ```
+    /// # use sfv::{BareItem, FromPrimitive};
+    /// # use std::convert::TryInto;
+    /// # use rust_decimal::prelude::ToPrimitive;
+    /// # fn main() -> Result<(), &'static str> {
+    /// let decimal_number = 48.01;
+    /// let bare_item: BareItem = decimal_number.try_into()?;
+    /// assert_eq!(bare_item.as_decimal().unwrap().to_f64().unwrap(), decimal_number);
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn try_from(value: f64) -> Result<Self, Self::Error> {
+        Self::new_decimal_from_f64(value)
+    }
+}
+
+impl TryFrom<&[u8]> for BareItem {
+    type Error = &'static str;
+
+    /// Converts a byte slice into `BareItem::ByteSeq`.
+    /// ```
+    /// # use sfv::{BareItem, FromPrimitive};
+    /// # use std::convert::TryInto;
+    /// # fn main() -> Result<(), &'static str> {
+    /// let byte_slice = "hello".as_bytes();
+    /// let bare_item: BareItem = byte_slice.try_into()?;
+    /// assert_eq!(bare_item.as_byte_seq().unwrap(), byte_slice);
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        Self::new_byte_seq(value)
+    }
+}
+
+impl TryFrom<bool> for BareItem {
+    type Error = &'static str;
+
+    /// Converts a `bool` into `BareItem::Boolean`.
+    /// ```
+    /// # use sfv::{BareItem, FromPrimitive};
+    /// # use std::convert::TryInto;
+    /// # fn main() -> Result<(), &'static str> {
+    /// let boolean = true;
+    /// let bare_item: BareItem = boolean.try_into()?;
+    /// assert_eq!(bare_item.as_bool().unwrap(), boolean);
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn try_from(value: bool) -> Result<Self, Self::Error> {
+        Self::new_boolean(value)
     }
 }
 
@@ -277,6 +432,14 @@ impl TryFrom<String> for BareItemString {
     type Error = &'static str;
     fn try_from(value: String) -> Result<Self, Self::Error> {
         let value = Self::validate(&value)?;
+        Ok(BareItemString(value.to_owned()))
+    }
+}
+
+impl TryFrom<&str> for BareItemString {
+    type Error = &'static str;
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        let value = Self::validate(value)?;
         Ok(BareItemString(value.to_owned()))
     }
 }
