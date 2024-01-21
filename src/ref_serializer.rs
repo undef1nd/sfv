@@ -115,7 +115,8 @@ impl<'a> RefListSerializer<'a> {
 
 /// Serializes `Dictionary` field value components incrementally.
 /// ```
-/// use sfv::{RefBareItem, RefDictSerializer, Decimal, FromPrimitive};
+/// use sfv::{RefBareItem, RefDictSerializer, FromPrimitive};
+/// use rust_decimal::Decimal;
 ///
 /// let mut serialized_item = String::new();
 /// let serializer = RefDictSerializer::new(&mut serialized_item);
@@ -245,7 +246,7 @@ impl<'a> Container<'a> for RefDictSerializer<'a> {
 #[cfg(test)]
 mod alternative_serializer_tests {
     use super::*;
-    use crate::{Decimal, FromPrimitive};
+    use crate::FromPrimitive;
 
     #[test]
     fn test_fast_serialize_item() -> SFVResult<()> {
@@ -287,7 +288,7 @@ mod alternative_serializer_tests {
             .bare_item_member("member2", &RefBareItem::Boolean(true))?
             .parameter(
                 "key3",
-                &RefBareItem::Decimal(Decimal::from_f64(45.4586).unwrap()),
+                &RefBareItem::Decimal(rust_decimal::Decimal::from_f64(45.4586).unwrap()),
             )?
             .parameter("key4", &RefBareItem::String("str"))?
             .open_inner_list("key5")?

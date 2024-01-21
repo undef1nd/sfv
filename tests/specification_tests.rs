@@ -4,7 +4,8 @@ use serde_json::Value;
 use sfv::FromStr;
 use sfv::Parser;
 use sfv::SerializeValue;
-use sfv::{BareItem, Decimal, Dictionary, InnerList, Item, List, ListEntry, Parameters};
+use sfv::{BareItem, Dictionary, InnerList, Item, List, ListEntry, Parameters};
+use std::convert::TryInto;
 use std::error::Error;
 use std::path::PathBuf;
 use std::{env, fs};
@@ -89,13 +90,21 @@ fn run_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
 }
 
 fn run_test_case_serialization_only(test_case: &TestData) -> Result<(), Box<dyn Error>> {
-    let expected_field_value = build_expected_field_value(test_case)?;
-    let actual_result = expected_field_value.serialize();
+    let expected_field_value = build_expected_field_value(test_case);
 
+    // TODO: must_fail has to always fail on creation
+    // As not all cases are moved yet, we take a two-step approach here:
+    // Either creation fails or serialization fails
     if let Some(true) = test_case.must_fail {
+        if expected_field_value.is_err() {
+            return Ok(());
+        }
+        let actual_result = expected_field_value?.serialize();
         assert!(actual_result.is_err());
         return Ok(());
     }
+
+    let actual_result = expected_field_value?.serialize();
 
     // Test serialization
     if let Some(canonical_val) = &test_case.canonical {
@@ -234,31 +243,36 @@ fn build_bare_item(bare_item_value: &Value) -> Result<BareItem, Box<dyn Error>> 
         bare_item if bare_item.is_i64() => Ok(BareItem::Integer(
             bare_item
                 .as_i64()
-                .ok_or("build_bare_item: bare_item value is not an i64")?,
+                .ok_or("build_bare_item: bare_item value is not an i64")?
+                .try_into()?,
         )),
         bare_item if bare_item.is_f64() => {
-            let decimal = Decimal::from_str(&serde_json::to_string(bare_item)?)?;
-            Ok(BareItem::Decimal(decimal))
+            let decimal = rust_decimal::Decimal::from_str(&serde_json::to_string(bare_item)?)?;
+            Ok(BareItem::Decimal(decimal.try_into()?))
         }
         bare_item if bare_item.is_boolean() => Ok(BareItem::Boolean(
             bare_item
                 .as_bool()
-                .ok_or("build_bare_item: bare_item value is not a bool")?,
+                .ok_or("build_bare_item: bare_item value is not a bool")?
+                .into(),
         )),
-        bare_item if bare_item.is_string() => Ok(BareItem::String(
-            bare_item
+        bare_item if bare_item.is_string() => {
+            let converted = bare_item
                 .as_str()
                 .ok_or("build_bare_item: bare_item value is not a str")?
                 .clone()
-                .to_owned(),
-        )),
+                .to_owned()
+                .try_into();
+            Ok(BareItem::String(converted?))
+        }
         bare_item if (bare_item.is_object() && bare_item["__type"] == "token") => {
             Ok(BareItem::Token(
                 bare_item["value"]
                     .as_str()
                     .ok_or("build_bare_item: bare_item value is not a str")?
                     .clone()
-                    .to_owned(),
+                    .to_owned()
+                    .try_into()?,
             ))
         }
         bare_item if (bare_item.is_object() && bare_item["__type"] == "binary") => {
@@ -266,7 +280,7 @@ fn build_bare_item(bare_item_value: &Value) -> Result<BareItem, Box<dyn Error>> 
                 .as_str()
                 .ok_or("build_bare_item: bare_item value is not a str")?
                 .clone();
-            Ok(BareItem::ByteSeq(BASE32.decode(str_val.as_bytes())?))
+            Ok(BareItem::ByteSeq(BASE32.decode(str_val.as_bytes())?.into()))
         }
         _ => Err("build_bare_item: unknown bare_item value".into()),
     }

@@ -1,8 +1,8 @@
-use crate::utils;
+use crate::bare_item::ValidateValue;
 use crate::{
-    BareItem, Decimal, Dictionary, InnerList, Item, List, ListEntry, Parameters, RefBareItem,
-    SFVResult,
+    BareItem, Dictionary, InnerList, Item, List, ListEntry, Parameters, RefBareItem, SFVResult,
 };
+use crate::{BareItemDecimal, BareItemInteger, BareItemString, BareItemToken};
 use data_encoding::BASE64;
 
 /// Serializes structured field value into String.
@@ -99,7 +99,7 @@ impl Serializer {
                 ListEntry::Item(ref item) => {
                     // If dict member is boolean true, no need to serialize it: only its params must be serialized
                     // Otherwise serialize entire item with its params
-                    if item.bare_item == BareItem::Boolean(true) {
+                    if item.bare_item == BareItem::Boolean(true.into()) {
                         Self::serialize_parameters(&item.params, output)?;
                     } else {
                         output.push('=');
@@ -214,35 +214,21 @@ impl Serializer {
     }
 
     pub(crate) fn serialize_integer(value: i64, output: &mut String) -> SFVResult<()> {
-        //https://httpwg.org/specs/rfc8941.html#ser-integer
-
-        let (min_int, max_int) = (-999_999_999_999_999_i64, 999_999_999_999_999_i64);
-        if !(min_int <= value && value <= max_int) {
-            return Err("serialize_integer: integer is out of range");
-        }
+        // https://httpwg.org/specs/rfc8941.html#ser-integer
+        let value = BareItemInteger::validate(value)?;
         output.push_str(&value.to_string());
         Ok(())
     }
 
-    pub(crate) fn serialize_decimal(value: Decimal, output: &mut String) -> SFVResult<()> {
+    pub(crate) fn serialize_decimal(
+        value: rust_decimal::Decimal,
+        output: &mut String,
+    ) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc8941.html#ser-decimal
+        let decimal = BareItemDecimal::validate(value)?;
 
-        let integer_comp_length = 12;
-        let fraction_length = 3;
-
-        let decimal = value.round_dp(fraction_length);
-        let int_comp = decimal.trunc();
-        let fract_comp = decimal.fract();
-
-        // TODO: Replace with > 999_999_999_999_u64
-        if int_comp.abs().to_string().len() > integer_comp_length {
-            return Err("serialize_decimal: integer component > 12 digits");
-        }
-
-        if fract_comp.is_zero() {
-            output.push_str(&int_comp.to_string());
-            output.push('.');
-            output.push('0');
+        if decimal.fract().is_zero() {
+            output.push_str(&format!("{:.1}", &decimal));
         } else {
             output.push_str(&decimal.to_string());
         }
@@ -252,15 +238,7 @@ impl Serializer {
 
     pub(crate) fn serialize_string(value: &str, output: &mut String) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc8941.html#ser-integer
-
-        if !value.is_ascii() {
-            return Err("serialize_string: non-ascii character");
-        }
-
-        let vchar_or_sp = |char| char == '\x7f' || ('\x00'..='\x1f').contains(&char);
-        if value.chars().any(vchar_or_sp) {
-            return Err("serialize_string: not a visible character");
-        }
+        let value = BareItemString::validate(value)?;
 
         output.push('\"');
         for char in value.chars() {
@@ -276,24 +254,7 @@ impl Serializer {
 
     pub(crate) fn serialize_token(value: &str, output: &mut String) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc8941.html#ser-token
-
-        if !value.is_ascii() {
-            return Err("serialize_string: non-ascii character");
-        }
-
-        let mut chars = value.chars();
-        if let Some(char) = chars.next() {
-            if !(char.is_ascii_alphabetic() || char == '*') {
-                return Err("serialise_token: first character is not ALPHA or '*'");
-            }
-        }
-
-        if chars
-            .clone()
-            .any(|c| !(utils::is_tchar(c) || c == ':' || c == '/'))
-        {
-            return Err("serialise_token: disallowed character");
-        }
+        let value = BareItemToken::validate(value)?;
 
         output.push_str(value);
         Ok(())
