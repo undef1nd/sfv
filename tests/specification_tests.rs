@@ -249,7 +249,6 @@ fn build_bare_item(bare_item_value: &Value) -> Result<BareItem, Box<dyn Error>> 
             bare_item
                 .as_str()
                 .ok_or("build_bare_item: bare_item value is not a str")?
-                .clone()
                 .to_owned(),
         )),
         bare_item if (bare_item.is_object() && bare_item["__type"] == "token") => {
@@ -257,15 +256,13 @@ fn build_bare_item(bare_item_value: &Value) -> Result<BareItem, Box<dyn Error>> 
                 bare_item["value"]
                     .as_str()
                     .ok_or("build_bare_item: bare_item value is not a str")?
-                    .clone()
                     .to_owned(),
             ))
         }
         bare_item if (bare_item.is_object() && bare_item["__type"] == "binary") => {
             let str_val = bare_item["value"]
                 .as_str()
-                .ok_or("build_bare_item: bare_item value is not a str")?
-                .clone();
+                .ok_or("build_bare_item: bare_item value is not a str")?;
             Ok(BareItem::ByteSeq(BASE32.decode(str_val.as_bytes())?))
         }
         _ => Err("build_bare_item: unknown bare_item value".into()),
