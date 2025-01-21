@@ -310,7 +310,12 @@ fn run_spec_parse_serialize_tests() -> Result<(), Box<dyn Error>> {
     let test_suites_dir: PathBuf = env::current_dir()?.join("tests").join("spec_tests");
     let json_files = fs::read_dir(test_suites_dir)?
         .filter_map(Result::ok)
-        .filter(|fp| fp.path().extension().unwrap_or_default() == "json");
+        .filter(|fp| {
+            fp.path().extension().unwrap_or_default() == "json"
+            // These are only supported in RFC 9651.
+            && fp.path().file_stem().unwrap_or_default() != "date"
+            && fp.path().file_stem().unwrap_or_default() != "display-string"
+        });
 
     for file_path in json_files {
         println!("\n## Test suite file: {:?}\n", &file_path.file_name());
