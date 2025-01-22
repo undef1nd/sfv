@@ -13,11 +13,19 @@ use std::{env, fs};
 struct TestData {
     name: String,
     raw: Option<Vec<String>>,
-    header_type: String,
+    header_type: HeaderType,
     expected: Option<Value>,
     #[serde(default)]
     must_fail: bool,
     canonical: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum HeaderType {
+    Item,
+    List,
+    Dictionary,
 }
 
 #[derive(Debug, PartialEq)]
@@ -45,13 +53,12 @@ fn run_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
         .ok_or("run_test_case: raw value is not specified")?
         .join(", ");
 
-    let actual_result = match test_case.header_type.as_str() {
-        "item" => Parser::parse_item(input.as_bytes()).map(|itm| FieldType::Item(itm)),
-        "list" => Parser::parse_list(input.as_bytes()).map(|lst| FieldType::List(lst)),
-        "dictionary" => {
+    let actual_result = match test_case.header_type {
+        HeaderType::Item => Parser::parse_item(input.as_bytes()).map(|itm| FieldType::Item(itm)),
+        HeaderType::List => Parser::parse_list(input.as_bytes()).map(|lst| FieldType::List(lst)),
+        HeaderType::Dictionary => {
             Parser::parse_dictionary(input.as_bytes()).map(|dict| FieldType::Dict(dict))
         }
-        _ => return Err("run_test_case: unexpected field value type in test case".into()),
     };
 
     // Check that actual result for must_fail tests is Err
@@ -116,20 +123,19 @@ fn build_expected_field_value(test_case: &TestData) -> Result<FieldType, Box<dyn
         .ok_or("build_expected_field_value: test's expected value is not specified")?;
 
     // Build expected Structured Field Value from serde Value
-    match test_case.header_type.as_str() {
-        "item" => {
+    match test_case.header_type {
+        HeaderType::Item=> {
             let item = build_item(expected_value)?;
             Ok(FieldType::Item(item))
         }
-        "list" => {
+        HeaderType::List => {
             let list = build_list(expected_value)?;
             Ok(FieldType::List(list))
         }
-        "dictionary" => {
+        HeaderType::Dictionary => {
             let dict = build_dict(expected_value)?;
             Ok(FieldType::Dict(dict))
         }
-        _ => return Err("unknown field type".into()),
     }
 }
 
