@@ -9,7 +9,7 @@ use std::error::Error;
 use std::path::PathBuf;
 use std::{env, fs};
 
-#[derive(Debug, PartialEq, Deserialize)]
+#[derive(Debug, Deserialize)]
 struct TestData {
     name: String,
     raw: Option<Vec<String>>,
