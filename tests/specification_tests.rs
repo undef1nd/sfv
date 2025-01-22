@@ -54,10 +54,10 @@ fn run_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
         .join(", ");
 
     let actual_result = match test_case.header_type {
-        HeaderType::Item => Parser::parse_item(input.as_bytes()).map(|itm| FieldType::Item(itm)),
-        HeaderType::List => Parser::parse_list(input.as_bytes()).map(|lst| FieldType::List(lst)),
+        HeaderType::Item => Parser::parse_item(input.as_bytes()).map(FieldType::Item),
+        HeaderType::List => Parser::parse_list(input.as_bytes()).map(FieldType::List),
         HeaderType::Dictionary => {
-            Parser::parse_dictionary(input.as_bytes()).map(|dict| FieldType::Dict(dict))
+            Parser::parse_dictionary(input.as_bytes()).map(FieldType::Dict)
         }
     };
 
@@ -71,17 +71,7 @@ fn run_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
     let actual_field_value = actual_result?;
 
     // Test parsing
-    match (&actual_field_value, &expected_field_value) {
-        (FieldType::Dict(val1), FieldType::Dict(val2)) => {
-            assert!(val1.iter().eq(val2.iter()));
-        }
-        (FieldType::List(val1), FieldType::List(val2)) => {
-            assert!(val1.iter().eq(val2.iter()));
-        }
-        (_, _) => {
-            assert_eq!(expected_field_value, actual_field_value);
-        }
-    }
+    assert_eq!(expected_field_value, actual_field_value);
 
     // Test serialization
     if let Some(canonical_val) = &test_case.canonical {
