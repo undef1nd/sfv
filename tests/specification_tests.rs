@@ -15,7 +15,8 @@ struct TestData {
     raw: Option<Vec<String>>,
     header_type: String,
     expected: Option<Value>,
-    must_fail: Option<bool>,
+    #[serde(default)]
+    must_fail: bool,
     canonical: Option<Vec<String>>,
 }
 
@@ -54,7 +55,7 @@ fn run_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
     };
 
     // Check that actual result for must_fail tests is Err
-    if let Some(true) = test_case.must_fail {
+    if test_case.must_fail {
         assert!(actual_result.is_err());
         return Ok(());
     }
@@ -91,7 +92,7 @@ fn run_test_case_serialization_only(test_case: &TestData) -> Result<(), Box<dyn 
     let expected_field_value = build_expected_field_value(test_case)?;
     let actual_result = expected_field_value.serialize();
 
-    if let Some(true) = test_case.must_fail {
+    if test_case.must_fail {
         assert!(actual_result.is_err());
         return Ok(());
     }
