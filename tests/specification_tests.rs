@@ -15,7 +15,6 @@ struct TestData {
     raw: Option<Vec<String>>,
     header_type: String,
     expected: Option<Value>,
-    can_fail: Option<bool>,
     must_fail: Option<bool>,
     canonical: Option<Vec<String>>,
 }
