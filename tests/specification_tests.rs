@@ -56,9 +56,7 @@ fn run_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
     let actual_result = match test_case.header_type {
         HeaderType::Item => Parser::parse_item(input.as_bytes()).map(FieldType::Item),
         HeaderType::List => Parser::parse_list(input.as_bytes()).map(FieldType::List),
-        HeaderType::Dictionary => {
-            Parser::parse_dictionary(input.as_bytes()).map(FieldType::Dict)
-        }
+        HeaderType::Dictionary => Parser::parse_dictionary(input.as_bytes()).map(FieldType::Dict),
     };
 
     // Check that actual result for must_fail tests is Err
@@ -114,7 +112,7 @@ fn build_expected_field_value(test_case: &TestData) -> Result<FieldType, Box<dyn
 
     // Build expected Structured Field Value from serde Value
     match test_case.header_type {
-        HeaderType::Item=> {
+        HeaderType::Item => {
             let item = build_item(expected_value)?;
             Ok(FieldType::Item(item))
         }
