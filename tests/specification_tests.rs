@@ -9,15 +9,23 @@ use std::error::Error;
 use std::path::PathBuf;
 use std::{env, fs};
 
-#[derive(Debug, PartialEq, Deserialize)]
+#[derive(Debug, Deserialize)]
 struct TestData {
     name: String,
     raw: Option<Vec<String>>,
-    header_type: String,
+    header_type: HeaderType,
     expected: Option<Value>,
-    can_fail: Option<bool>,
-    must_fail: Option<bool>,
+    #[serde(default)]
+    must_fail: bool,
     canonical: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum HeaderType {
+    Item,
+    List,
+    Dictionary,
 }
 
 #[derive(Debug, PartialEq)]
@@ -45,17 +53,14 @@ fn run_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
         .ok_or("run_test_case: raw value is not specified")?
         .join(", ");
 
-    let actual_result = match test_case.header_type.as_str() {
-        "item" => Parser::parse_item(input.as_bytes()).map(|itm| FieldType::Item(itm)),
-        "list" => Parser::parse_list(input.as_bytes()).map(|lst| FieldType::List(lst)),
-        "dictionary" => {
-            Parser::parse_dictionary(input.as_bytes()).map(|dict| FieldType::Dict(dict))
-        }
-        _ => return Err("run_test_case: unexpected field value type in test case".into()),
+    let actual_result = match test_case.header_type {
+        HeaderType::Item => Parser::parse_item(input.as_bytes()).map(FieldType::Item),
+        HeaderType::List => Parser::parse_list(input.as_bytes()).map(FieldType::List),
+        HeaderType::Dictionary => Parser::parse_dictionary(input.as_bytes()).map(FieldType::Dict),
     };
 
     // Check that actual result for must_fail tests is Err
-    if let Some(true) = test_case.must_fail {
+    if test_case.must_fail {
         assert!(actual_result.is_err());
         return Ok(());
     }
@@ -64,17 +69,7 @@ fn run_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
     let actual_field_value = actual_result?;
 
     // Test parsing
-    match (&actual_field_value, &expected_field_value) {
-        (FieldType::Dict(val1), FieldType::Dict(val2)) => {
-            assert!(val1.iter().eq(val2.iter()));
-        }
-        (FieldType::List(val1), FieldType::List(val2)) => {
-            assert!(val1.iter().eq(val2.iter()));
-        }
-        (_, _) => {
-            assert_eq!(expected_field_value, actual_field_value);
-        }
-    }
+    assert_eq!(expected_field_value, actual_field_value);
 
     // Test serialization
     if let Some(canonical_val) = &test_case.canonical {
@@ -92,7 +87,7 @@ fn run_test_case_serialization_only(test_case: &TestData) -> Result<(), Box<dyn 
     let expected_field_value = build_expected_field_value(test_case)?;
     let actual_result = expected_field_value.serialize();
 
-    if let Some(true) = test_case.must_fail {
+    if test_case.must_fail {
         assert!(actual_result.is_err());
         return Ok(());
     }
@@ -116,20 +111,19 @@ fn build_expected_field_value(test_case: &TestData) -> Result<FieldType, Box<dyn
         .ok_or("build_expected_field_value: test's expected value is not specified")?;
 
     // Build expected Structured Field Value from serde Value
-    match test_case.header_type.as_str() {
-        "item" => {
+    match test_case.header_type {
+        HeaderType::Item => {
             let item = build_item(expected_value)?;
             Ok(FieldType::Item(item))
         }
-        "list" => {
+        HeaderType::List => {
             let list = build_list(expected_value)?;
             Ok(FieldType::List(list))
         }
-        "dictionary" => {
+        HeaderType::Dictionary => {
             let dict = build_dict(expected_value)?;
             Ok(FieldType::Dict(dict))
         }
-        _ => return Err("unknown field type".into()),
     }
 }
 
