@@ -3,7 +3,6 @@ use crate::{
     BareItem, Decimal, Dictionary, InnerList, Item, List, ListEntry, Parameters, RefBareItem,
     SFVResult,
 };
-use data_encoding::BASE64;
 
 /// Serializes structured field value into String.
 pub trait SerializeValue {
@@ -303,7 +302,7 @@ impl Serializer {
         // https://httpwg.org/specs/rfc8941.html#ser-binary
 
         output.push(':');
-        let encoded = BASE64.encode(value.as_ref());
+        let encoded = base64::Engine::encode(&utils::BASE64, value);
         output.push_str(&encoded);
         output.push(':');
         Ok(())
