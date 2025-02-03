@@ -302,8 +302,7 @@ impl Serializer {
         // https://httpwg.org/specs/rfc8941.html#ser-binary
 
         output.push(':');
-        let encoded = base64::Engine::encode(&utils::BASE64, value);
-        output.push_str(&encoded);
+        base64::Engine::encode_string(&utils::BASE64, value, output);
         output.push(':');
         Ok(())
     }
