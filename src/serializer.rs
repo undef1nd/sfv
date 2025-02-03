@@ -197,6 +197,15 @@ impl Serializer {
     pub(crate) fn serialize_key(input_key: &str, output: &mut String) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc8941.html#ser-key
 
+        match input_key.chars().next() {
+            None => return Err("serialize_key: key is empty"),
+            Some(char) => {
+                if !(char.is_ascii_lowercase() || char == '*') {
+                    return Err("serialize_key: first character is not lcalpha or '*'");
+                }
+            }
+        }
+
         let disallowed_chars =
             |c: char| !(c.is_ascii_lowercase() || c.is_ascii_digit() || "_-*.".contains(c));
 
@@ -204,11 +213,6 @@ impl Serializer {
             return Err("serialize_key: disallowed character in input");
         }
 
-        if let Some(char) = input_key.chars().next() {
-            if !(char.is_ascii_lowercase() || char == '*') {
-                return Err("serialize_key: first character is not lcalpha or '*'");
-            }
-        }
         output.push_str(input_key);
         Ok(())
     }
@@ -278,21 +282,23 @@ impl Serializer {
         // https://httpwg.org/specs/rfc8941.html#ser-token
 
         if !value.is_ascii() {
-            return Err("serialize_string: non-ascii character");
+            return Err("serialize_token: non-ascii character");
         }
 
-        let mut chars = value.chars();
-        if let Some(char) = chars.next() {
-            if !(char.is_ascii_alphabetic() || char == '*') {
-                return Err("serialise_token: first character is not ALPHA or '*'");
+        match value.chars().next() {
+            None => return Err("serialize_token: token is empty"),
+            Some(char) => {
+                if !(char.is_ascii_alphabetic() || char == '*') {
+                    return Err("serialize_token: first character is not ALPHA or '*'");
+                }
             }
         }
 
-        if chars
-            .clone()
+        if value
+            .chars()
             .any(|c| !(utils::is_tchar(c) || c == ':' || c == '/'))
         {
-            return Err("serialise_token: disallowed character");
+            return Err("serialize_token: disallowed character");
         }
 
         output.push_str(value);
