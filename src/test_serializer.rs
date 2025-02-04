@@ -280,15 +280,19 @@ fn serialize_token_errors() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
 
     assert_eq!(
-        Err("serialise_token: first character is not ALPHA or '*'"),
+        Err("serialize_token: token is empty"),
+        Serializer::serialize_token("", &mut buf)
+    );
+    assert_eq!(
+        Err("serialize_token: first character is not ALPHA or '*'"),
         Serializer::serialize_token("#some", &mut buf)
     );
     assert_eq!(
-        Err("serialise_token: disallowed character"),
+        Err("serialize_token: disallowed character"),
         Serializer::serialize_token("s ", &mut buf)
     );
     assert_eq!(
-        Err("serialise_token: disallowed character"),
+        Err("serialize_token: disallowed character"),
         Serializer::serialize_token("abc:de\t", &mut buf)
     );
     Ok(())
@@ -418,12 +422,16 @@ fn serialize_key() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn serialize_key_erros() -> Result<(), Box<dyn Error>> {
+fn serialize_key_errors() -> Result<(), Box<dyn Error>> {
     let mut buf = String::new();
 
     assert_eq!(
+        Err("serialize_key: key is empty"),
+        Serializer::serialize_key("", &mut buf)
+    );
+    assert_eq!(
         Err("serialize_key: disallowed character in input"),
-        Serializer::serialize_key("AND", &mut buf)
+        Serializer::serialize_key("aND", &mut buf)
     );
     assert_eq!(
         Err("serialize_key: first character is not lcalpha or '*'"),
