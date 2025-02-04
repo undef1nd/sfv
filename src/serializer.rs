@@ -3,7 +3,6 @@ use crate::{
     BareItem, Decimal, Dictionary, InnerList, Item, List, ListEntry, Parameters, RefBareItem,
     SFVResult,
 };
-use data_encoding::BASE64;
 use std::fmt::Write as _;
 
 /// Serializes structured field value into String.
@@ -306,8 +305,7 @@ impl Serializer {
         // https://httpwg.org/specs/rfc8941.html#ser-binary
 
         output.push(':');
-        let encoded = BASE64.encode(value.as_ref());
-        output.push_str(&encoded);
+        base64::Engine::encode_string(&utils::BASE64, value, output);
         output.push(':');
         Ok(())
     }

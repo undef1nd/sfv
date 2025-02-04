@@ -327,7 +327,7 @@ impl Parser {
         if !b64_content.chars().all(utils::is_allowed_b64_content) {
             return Err("parse_byte_seq: invalid char in byte sequence");
         }
-        match utils::base64()?.decode(b64_content.as_bytes()) {
+        match base64::Engine::decode(&utils::BASE64, b64_content) {
             Ok(content) => Ok(content),
             Err(_) => Err("parse_byte_seq: decoding error"),
         }

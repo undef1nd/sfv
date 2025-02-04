@@ -1,4 +1,3 @@
-use data_encoding::BASE32;
 use serde::Deserialize;
 use serde_json::Value;
 use sfv::FromStr;
@@ -257,7 +256,10 @@ fn build_bare_item(bare_item_value: &Value) -> Result<BareItem, Box<dyn Error>> 
             let str_val = bare_item["value"]
                 .as_str()
                 .ok_or("build_bare_item: bare_item value is not a str")?;
-            Ok(BareItem::ByteSeq(BASE32.decode(str_val.as_bytes())?))
+            Ok(BareItem::ByteSeq(
+                base32::decode(base32::Alphabet::Rfc4648 { padding: true }, str_val)
+                    .ok_or("build_bare_item: invalid base32")?,
+            ))
         }
         _ => Err("build_bare_item: unknown bare_item value".into()),
     }
