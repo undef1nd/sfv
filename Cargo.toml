@@ -1,6 +1,6 @@
 [package]
 name = "sfv"
-version = "0.9.4"
+version = "0.10.4"
 authors = ["Tania Batieva <yalyna.ts@gmail.com>"]
 edition = "2018"
 license = "MIT/Apache-2.0"
