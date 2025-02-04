@@ -3,7 +3,7 @@ extern crate criterion;
 
 use criterion::{BenchmarkId, Criterion};
 use rust_decimal::prelude::FromPrimitive;
-use sfv::{BareItem, Decimal, Parser, SerializeValue};
+use sfv::{Decimal, Parser, SerializeValue};
 use sfv::{RefBareItem, RefDictSerializer, RefItemSerializer, RefListSerializer};
 
 criterion_main!(parsing, serializing, ref_serializing);
