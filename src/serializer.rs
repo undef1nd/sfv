@@ -233,7 +233,7 @@ impl Serializer {
 
         let fraction_length = 3;
 
-        let decimal = value.round_dp(fraction_length);
+        let decimal = value.round_dp(fraction_length).normalize();
         let int_comp = decimal.trunc();
         let fract_comp = decimal.fract();
 
