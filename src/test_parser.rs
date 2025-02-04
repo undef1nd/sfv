@@ -641,68 +641,68 @@ fn parse_number_decimal() -> Result<(), Box<dyn Error>> {
 fn parse_number_errors() -> Result<(), Box<dyn Error>> {
     let mut input = ":aGVsbG8:rest".chars().peekable();
     assert_eq!(
-        Err("parse_number: input number does not start with a digit"),
+        Err("parse_number: expected digit"),
         Parser::parse_number(&mut input)
     );
     assert_eq!(":aGVsbG8:rest", input.collect::<String>());
 
     let mut input = "-11.5555 test string".chars().peekable();
     assert_eq!(
-        Err("parse_number: invalid decimal fraction length"),
+        Err("parse_number: too many digits after decimal point"),
         Parser::parse_number(&mut input)
     );
-    assert_eq!(" test string", input.collect::<String>());
+    assert_eq!("5 test string", input.collect::<String>());
 
     assert_eq!(
-        Err("parse_number: input number does not start with a digit"),
+        Err("parse_number: expected digit"),
         Parser::parse_number(&mut "--0".chars().peekable())
     );
     assert_eq!(
-        Err("parse_number: decimal too long, illegal position for decimal point"),
+        Err("parse_number: too many digits before decimal point"),
         Parser::parse_number(&mut "1999999999999.1".chars().peekable())
     );
     assert_eq!(
-        Err("parse_number: decimal ends with '.'"),
+        Err("parse_number: trailing decimal point"),
         Parser::parse_number(&mut "19888899999.".chars().peekable())
     );
     assert_eq!(
-        Err("parse_number: integer too long, length > 15"),
+        Err("parse_number: too many digits"),
         Parser::parse_number(&mut "1999999999999999".chars().peekable())
     );
     assert_eq!(
-        Err("parse_number: decimal too long, length > 16"),
+        Err("parse_number: too many digits after decimal point"),
         Parser::parse_number(&mut "19999999999.99991".chars().peekable())
     );
     assert_eq!(
-        Err("parse_number: input number does not start with a digit"),
+        Err("parse_number: expected digit"),
         Parser::parse_number(&mut "- 42".chars().peekable())
     );
     assert_eq!(
-        Err("parse_number: input number does not start with a digit"),
+        Err("parse_number: expected digit"),
         Parser::parse_number(&mut "- 42".chars().peekable())
     );
     assert_eq!(
-        Err("parse_number: decimal ends with '.'"),
+        Err("parse_number: trailing decimal point"),
         Parser::parse_number(&mut "1..4".chars().peekable())
     );
     assert_eq!(
-        Err("parse_number: input number lacks a digit"),
+        Err("parse_number: expected digit"),
         Parser::parse_number(&mut "-".chars().peekable())
     );
     assert_eq!(
-        Err("parse_number: decimal ends with '.'"),
+        Err("parse_number: trailing decimal point"),
         Parser::parse_number(&mut "-5. 14".chars().peekable())
     );
     assert_eq!(
-        Err("parse_number: decimal ends with '.'"),
+        Err("parse_number: trailing decimal point"),
         Parser::parse_number(&mut "7. 1".chars().peekable())
     );
     assert_eq!(
-        Err("parse_number: invalid decimal fraction length"),
+        Err("parse_number: too many digits after decimal point"),
         Parser::parse_number(&mut "-7.3333333333".chars().peekable())
     );
     assert_eq!(
-        Err("parse_number: decimal too long, illegal position for decimal point"),
+        Err("parse_number: too many digits before decimal point"),
         Parser::parse_number(&mut "-7333333333323.12".chars().peekable())
     );
 
