@@ -4,6 +4,7 @@ use crate::{
     SFVResult,
 };
 use data_encoding::BASE64;
+use std::fmt::Write as _;
 
 /// Serializes structured field value into String.
 pub trait SerializeValue {
@@ -224,31 +225,27 @@ impl Serializer {
         if !(min_int <= value && value <= max_int) {
             return Err("serialize_integer: integer is out of range");
         }
-        output.push_str(&value.to_string());
+        write!(output, "{}", value).unwrap();
         Ok(())
     }
 
     pub(crate) fn serialize_decimal(value: Decimal, output: &mut String) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc8941.html#ser-decimal
 
-        let integer_comp_length = 12;
         let fraction_length = 3;
 
         let decimal = value.round_dp(fraction_length);
         let int_comp = decimal.trunc();
         let fract_comp = decimal.fract();
 
-        // TODO: Replace with > 999_999_999_999_u64
-        if int_comp.abs().to_string().len() > integer_comp_length {
+        if int_comp.abs() > Decimal::from(999_999_999_999_i64) {
             return Err("serialize_decimal: integer component > 12 digits");
         }
 
         if fract_comp.is_zero() {
-            output.push_str(&int_comp.to_string());
-            output.push('.');
-            output.push('0');
+            write!(output, "{}.0", int_comp).unwrap();
         } else {
-            output.push_str(&decimal.to_string());
+            write!(output, "{}", decimal).unwrap();
         }
 
         Ok(())
