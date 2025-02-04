@@ -529,7 +529,7 @@ fn parse_byte_sequence_errors() -> Result<(), Box<dyn Error>> {
         Parser::parse_byte_sequence(&mut "aGVsbG8".chars().peekable())
     );
     assert_eq!(
-        Err("parse_byte_seq: invalid char in byte sequence"),
+        Err("parse_byte_seq: decoding error"),
         Parser::parse_byte_sequence(&mut ":aGVsb G8=:".chars().peekable())
     );
     assert_eq!(

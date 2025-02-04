@@ -16,10 +16,6 @@ pub(crate) fn is_tchar(c: char) -> bool {
     tchars.contains(c) || c.is_ascii_alphanumeric()
 }
 
-pub(crate) fn is_allowed_b64_content(c: char) -> bool {
-    c.is_ascii_alphanumeric() || c == '+' || c == '=' || c == '/'
-}
-
 pub(crate) fn consume_ows_chars(input_chars: &mut Peekable<Chars>) {
     while let Some(c) = input_chars.peek() {
         if c == &' ' || c == &'\t' {
