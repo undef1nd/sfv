@@ -1,6 +1,8 @@
-use crate::FromStr;
-use crate::{BareItem, Decimal, Dictionary, InnerList, Item, List, Num, Parameters};
-use crate::{ParseMore, ParseValue, Parser};
+use crate::parser::ParseValue;
+use crate::{
+    BareItem, Decimal, Dictionary, FromStr, InnerList, Item, List, Num, Parameters, ParseMore,
+    Parser,
+};
 use std::error::Error;
 use std::iter::FromIterator;
 

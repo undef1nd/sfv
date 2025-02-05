@@ -6,8 +6,7 @@ use crate::{
 use std::iter::Peekable;
 use std::str::{from_utf8, Chars};
 
-/// Implements parsing logic for each structured field value type.
-pub trait ParseValue {
+pub(crate) trait ParseValue {
     /// This method should not be used for parsing input into structured field value.
     /// Use `Parser::parse_item`, `Parser::parse_list` or `Parsers::parse_dictionary` for that.
     fn parse(input_chars: &mut Peekable<Chars>) -> SFVResult<Self>
