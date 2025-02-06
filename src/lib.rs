@@ -145,7 +145,7 @@ assert_eq!(
 
 Creates `Dictionary` field value:
 ```
-use sfv::{Parser, Item, BareItem, SerializeValue, ParseValue, Dictionary};
+use sfv::{Parser, Item, BareItem, SerializeValue, Dictionary};
 
 let member_value1 = Item::new(BareItem::String(String::from("apple")));
 let member_value2 = Item::new(BareItem::Boolean(true));
@@ -180,7 +180,7 @@ pub use rust_decimal::{
     Decimal,
 };
 
-pub use parser::{ParseMore, ParseValue, Parser};
+pub use parser::{ParseMore, Parser};
 pub use ref_serializer::{RefDictSerializer, RefItemSerializer, RefListSerializer};
 pub use serializer::SerializeValue;
 

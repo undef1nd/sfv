@@ -10,7 +10,7 @@ pub trait SerializeValue {
     /// Serializes structured field value into String.
     /// # Examples
     /// ```
-    /// # use sfv::{Parser, SerializeValue, ParseValue};
+    /// # use sfv::{Parser, SerializeValue};
     ///
     /// let parsed_list_field = Parser::parse_list("\"london\", \t\t\"berlin\"".as_bytes());
     /// assert!(parsed_list_field.is_ok());
