@@ -1,7 +1,6 @@
 use crate::utils;
 use crate::{
-    BareItem, Decimal, Dictionary, FromStr, InnerList, Item, List, ListEntry, Num, Parameters,
-    SFVResult,
+    BareItem, Decimal, Dictionary, InnerList, Item, List, ListEntry, Num, Parameters, SFVResult,
 };
 use std::iter::Peekable;
 use std::str::{from_utf8, Chars};
@@ -332,88 +331,68 @@ impl Parser {
     pub(crate) fn parse_number(input_chars: &mut Peekable<Chars>) -> SFVResult<Num> {
         // https://httpwg.org/specs/rfc8941.html#parse-number
 
-        let mut sign = 1;
-        if let Some('-') = input_chars.peek() {
-            sign = -1;
+        fn char_to_i64(c: char) -> i64 {
+            (c as u32 - '0' as u32) as i64
+        }
+
+        let sign = if let Some('-') = input_chars.peek() {
             input_chars.next();
-        }
+            -1
+        } else {
+            1
+        };
 
-        match input_chars.peek() {
-            Some(c) if !c.is_ascii_digit() => {
-                return Err("parse_number: input number does not start with a digit")
-            }
-            None => return Err("parse_number: input number lacks a digit"),
-            _ => (),
-        }
-
-        // Get number from input as a string and identify whether it's a decimal or integer
-        let (is_integer, input_number) = Self::extract_digits(input_chars)?;
-
-        // Parse input_number from string into integer
-        if is_integer {
-            let output_number = input_number
-                .parse::<i64>()
-                .map_err(|_err| "parse_number: parsing i64 failed")?
-                * sign;
-
-            let (min_int, max_int) = (-999_999_999_999_999_i64, 999_999_999_999_999_i64);
-            if !(min_int <= output_number && output_number <= max_int) {
-                return Err("parse_number: integer number is out of range");
-            }
-
-            return Ok(Num::Integer(output_number));
-        }
-
-        // Parse input_number from string into decimal
-        let chars_after_dot = input_number
-            .find('.')
-            .map(|dot_pos| input_number.len() - dot_pos - 1);
-
-        match chars_after_dot {
-            Some(0) => Err("parse_number: decimal ends with '.'"),
-            Some(1..=3) => {
-                let mut output_number = Decimal::from_str(&input_number)
-                    .map_err(|_err| "parse_number: parsing f64 failed")?;
-
-                if sign == -1 {
-                    output_number.set_sign_negative(true)
-                }
-
-                Ok(Num::Decimal(output_number))
-            }
-            _ => Err("parse_number: invalid decimal fraction length"),
-        }
-    }
-
-    fn extract_digits(input_chars: &mut Peekable<Chars>) -> SFVResult<(bool, String)> {
-        let mut is_integer = true;
-        let mut input_number = String::from("");
-        while let Some(curr_char) = input_chars.peek() {
-            if curr_char.is_ascii_digit() {
-                input_number.push(*curr_char);
+        let mut magnitude = match input_chars.peek() {
+            Some(&c @ '0'..='9') => {
                 input_chars.next();
-            } else if curr_char == &'.' && is_integer {
-                if input_number.len() > 12 {
-                    return Err(
-                        "parse_number: decimal too long, illegal position for decimal point",
-                    );
+                char_to_i64(c)
+            }
+            _ => return Err("parse_number: expected digit"),
+        };
+
+        let mut digits = 1;
+
+        loop {
+            match input_chars.peek() {
+                Some('.') => {
+                    if digits > 12 {
+                        return Err("parse_number: too many digits before decimal point");
+                    }
+                    input_chars.next();
+                    break;
                 }
-                input_number.push(*curr_char);
-                is_integer = false;
-                input_chars.next();
-            } else {
-                break;
-            }
-
-            if is_integer && input_number.len() > 15 {
-                return Err("parse_number: integer too long, length > 15");
-            }
-
-            if !is_integer && input_number.len() > 16 {
-                return Err("parse_number: decimal too long, length > 16");
+                Some(&c @ '0'..='9') => {
+                    digits += 1;
+                    if digits > 15 {
+                        return Err("parse_number: too many digits");
+                    }
+                    input_chars.next();
+                    magnitude = magnitude * 10 + char_to_i64(c);
+                }
+                _ => return Ok(Num::Integer(sign * magnitude)),
             }
         }
-        Ok((is_integer, input_number))
+
+        digits = 0;
+
+        while let Some(&c @ '0'..='9') = input_chars.peek() {
+            if digits == 3 {
+                return Err("parse_number: too many digits after decimal point");
+            }
+
+            input_chars.next();
+            magnitude = magnitude * 10 + char_to_i64(c);
+            digits += 1;
+        }
+
+        if digits == 0 {
+            Err("parse_number: trailing decimal point")
+        } else {
+            Ok(Num::Decimal(Decimal::from_i128_with_scale(
+                (sign * magnitude) as i128,
+                digits,
+            )))
+        }
     }
 
     pub(crate) fn parse_parameters(input_chars: &mut Peekable<Chars>) -> SFVResult<Parameters> {
