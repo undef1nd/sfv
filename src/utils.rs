@@ -1,6 +1,5 @@
 use base64::engine;
 use std::iter::Peekable;
-use std::str::Chars;
 
 pub(crate) const BASE64: engine::GeneralPurpose = engine::GeneralPurpose::new(
     &base64::alphabet::STANDARD,
@@ -16,7 +15,7 @@ pub(crate) fn is_tchar(c: char) -> bool {
     tchars.contains(c) || c.is_ascii_alphanumeric()
 }
 
-pub(crate) fn consume_ows_chars(input_chars: &mut Peekable<Chars>) {
+pub(crate) fn consume_ows_chars(input_chars: &mut Peekable<impl Iterator<Item = char>>) {
     while let Some(c) = input_chars.peek() {
         if c == &' ' || c == &'\t' {
             input_chars.next();
@@ -26,7 +25,7 @@ pub(crate) fn consume_ows_chars(input_chars: &mut Peekable<Chars>) {
     }
 }
 
-pub(crate) fn consume_sp_chars(input_chars: &mut Peekable<Chars>) {
+pub(crate) fn consume_sp_chars(input_chars: &mut Peekable<impl Iterator<Item = char>>) {
     while let Some(c) = input_chars.peek() {
         if c == &' ' {
             input_chars.next();

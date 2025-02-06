@@ -3,12 +3,12 @@ use crate::{
     BareItem, Decimal, Dictionary, InnerList, Item, List, ListEntry, Num, Parameters, SFVResult,
 };
 use std::iter::Peekable;
-use std::str::{from_utf8, Chars};
+use std::str::from_utf8;
 
 pub(crate) trait ParseValue {
     /// This method should not be used for parsing input into structured field value.
     /// Use `Parser::parse_item`, `Parser::parse_list` or `Parsers::parse_dictionary` for that.
-    fn parse(input_chars: &mut Peekable<Chars>) -> SFVResult<Self>
+    fn parse(input_chars: &mut Peekable<impl Iterator<Item = char> + Clone>) -> SFVResult<Self>
     where
         Self: Sized;
 }
@@ -32,7 +32,7 @@ pub trait ParseMore {
 }
 
 impl ParseValue for Item {
-    fn parse(input_chars: &mut Peekable<Chars>) -> SFVResult<Item> {
+    fn parse(input_chars: &mut Peekable<impl Iterator<Item = char> + Clone>) -> SFVResult<Item> {
         // https://httpwg.org/specs/rfc8941.html#parse-item
         let bare_item = Parser::parse_bare_item(input_chars)?;
         let params = Parser::parse_parameters(input_chars)?;
@@ -42,7 +42,7 @@ impl ParseValue for Item {
 }
 
 impl ParseValue for List {
-    fn parse(input_chars: &mut Peekable<Chars>) -> SFVResult<List> {
+    fn parse(input_chars: &mut Peekable<impl Iterator<Item = char> + Clone>) -> SFVResult<List> {
         // https://httpwg.org/specs/rfc8941.html#parse-list
         // List represents an array of (item_or_inner_list, parameters)
 
@@ -75,7 +75,9 @@ impl ParseValue for List {
 }
 
 impl ParseValue for Dictionary {
-    fn parse(input_chars: &mut Peekable<Chars>) -> SFVResult<Dictionary> {
+    fn parse(
+        input_chars: &mut Peekable<impl Iterator<Item = char> + Clone>,
+    ) -> SFVResult<Dictionary> {
         let mut dict = Dictionary::new();
 
         while input_chars.peek().is_some() {
@@ -176,7 +178,9 @@ impl Parser {
         Ok(output)
     }
 
-    fn parse_list_entry(input_chars: &mut Peekable<Chars>) -> SFVResult<ListEntry> {
+    fn parse_list_entry(
+        input_chars: &mut Peekable<impl Iterator<Item = char> + Clone>,
+    ) -> SFVResult<ListEntry> {
         // https://httpwg.org/specs/rfc8941.html#parse-item-or-list
         // ListEntry represents a tuple (item_or_inner_list, parameters)
 
@@ -192,7 +196,9 @@ impl Parser {
         }
     }
 
-    pub(crate) fn parse_inner_list(input_chars: &mut Peekable<Chars>) -> SFVResult<InnerList> {
+    pub(crate) fn parse_inner_list(
+        input_chars: &mut Peekable<impl Iterator<Item = char> + Clone>,
+    ) -> SFVResult<InnerList> {
         // https://httpwg.org/specs/rfc8941.html#parse-innerlist
 
         if Some('(') != input_chars.next() {
@@ -225,7 +231,9 @@ impl Parser {
         Err("parse_inner_list: the end of the inner list was not found")
     }
 
-    pub(crate) fn parse_bare_item(input_chars: &mut Peekable<Chars>) -> SFVResult<BareItem> {
+    pub(crate) fn parse_bare_item(
+        input_chars: &mut Peekable<impl Iterator<Item = char> + Clone>,
+    ) -> SFVResult<BareItem> {
         // https://httpwg.org/specs/rfc8941.html#parse-bare-item
         if input_chars.peek().is_none() {
             return Err("parse_bare_item: empty item");
@@ -246,7 +254,9 @@ impl Parser {
         }
     }
 
-    pub(crate) fn parse_bool(input_chars: &mut Peekable<Chars>) -> SFVResult<bool> {
+    pub(crate) fn parse_bool(
+        input_chars: &mut Peekable<impl Iterator<Item = char>>,
+    ) -> SFVResult<bool> {
         // https://httpwg.org/specs/rfc8941.html#parse-boolean
 
         if input_chars.next() != Some('?') {
@@ -260,7 +270,9 @@ impl Parser {
         }
     }
 
-    pub(crate) fn parse_string(input_chars: &mut Peekable<Chars>) -> SFVResult<String> {
+    pub(crate) fn parse_string(
+        input_chars: &mut Peekable<impl Iterator<Item = char>>,
+    ) -> SFVResult<String> {
         // https://httpwg.org/specs/rfc8941.html#parse-string
 
         if input_chars.next() != Some('\"') {
@@ -285,7 +297,9 @@ impl Parser {
         Err("parse_string: no closing '\"'")
     }
 
-    pub(crate) fn parse_token(input_chars: &mut Peekable<Chars>) -> SFVResult<String> {
+    pub(crate) fn parse_token(
+        input_chars: &mut Peekable<impl Iterator<Item = char>>,
+    ) -> SFVResult<String> {
         // https://httpwg.org/specs/rfc8941.html#parse-token
 
         if let Some(first_char) = input_chars.peek() {
@@ -310,7 +324,9 @@ impl Parser {
         Ok(output_string)
     }
 
-    pub(crate) fn parse_byte_sequence(input_chars: &mut Peekable<Chars>) -> SFVResult<Vec<u8>> {
+    pub(crate) fn parse_byte_sequence(
+        input_chars: &mut Peekable<impl Iterator<Item = char> + Clone>,
+    ) -> SFVResult<Vec<u8>> {
         // https://httpwg.org/specs/rfc8941.html#parse-binary
 
         if input_chars.next() != Some(':') {
@@ -328,7 +344,9 @@ impl Parser {
         }
     }
 
-    pub(crate) fn parse_number(input_chars: &mut Peekable<Chars>) -> SFVResult<Num> {
+    pub(crate) fn parse_number(
+        input_chars: &mut Peekable<impl Iterator<Item = char>>,
+    ) -> SFVResult<Num> {
         // https://httpwg.org/specs/rfc8941.html#parse-number
 
         fn char_to_i64(c: char) -> i64 {
@@ -395,7 +413,9 @@ impl Parser {
         }
     }
 
-    pub(crate) fn parse_parameters(input_chars: &mut Peekable<Chars>) -> SFVResult<Parameters> {
+    pub(crate) fn parse_parameters(
+        input_chars: &mut Peekable<impl Iterator<Item = char> + Clone>,
+    ) -> SFVResult<Parameters> {
         // https://httpwg.org/specs/rfc8941.html#parse-param
 
         let mut params = Parameters::new();
@@ -425,7 +445,9 @@ impl Parser {
         Ok(params)
     }
 
-    pub(crate) fn parse_key(input_chars: &mut Peekable<Chars>) -> SFVResult<String> {
+    pub(crate) fn parse_key(
+        input_chars: &mut Peekable<impl Iterator<Item = char>>,
+    ) -> SFVResult<String> {
         match input_chars.peek() {
             Some(c) if c == &'*' || c.is_ascii_lowercase() => (),
             _ => return Err("parse_key: first character is not lcalpha or '*'"),
