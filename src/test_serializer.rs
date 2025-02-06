@@ -177,7 +177,11 @@ fn serialize_decimal() -> Result<(), Box<dyn Error>> {
 
     buf.clear();
     Serializer::serialize_decimal(Decimal::from_str("-100.130")?, &mut buf)?;
-    assert_eq!("-100.130", &buf);
+    assert_eq!("-100.13", &buf);
+
+    buf.clear();
+    Serializer::serialize_decimal(Decimal::from_str("-100.100")?, &mut buf)?;
+    assert_eq!("-100.1", &buf);
 
     buf.clear();
     Serializer::serialize_decimal(Decimal::from_str("-137.0")?, &mut buf)?;
