@@ -1,0 +1,35 @@
+[package]
+name = "sfv-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2018"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.sfv]
+path = ".."
+
+[[bin]]
+name = "parse_dictionary"
+path = "fuzz_targets/parse_dictionary.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parse_list"
+path = "fuzz_targets/parse_list.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parse_item"
+path = "fuzz_targets/parse_item.rs"
+test = false
+doc = false
+bench = false

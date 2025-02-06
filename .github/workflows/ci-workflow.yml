@@ -59,3 +59,19 @@ jobs:
           command: fmt
           toolchain: stable
           args: -- --check
+
+  fuzz-check:
+    name: Run fuzz check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+      - run: cargo install cargo-fuzz
+      - uses: actions-rs/cargo@v1
+        with:
+          command: fuzz
+          args: check
