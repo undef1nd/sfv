@@ -291,8 +291,8 @@ impl Serializer {
         }
 
         if value
-            .chars()
-            .any(|c| !(utils::is_tchar(c) || c == ':' || c == '/'))
+            .bytes()
+            .any(|c| !(utils::is_tchar(c) || c == b':' || c == b'/'))
         {
             return Err("serialize_token: disallowed character");
         }
