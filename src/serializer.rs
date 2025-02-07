@@ -1,7 +1,7 @@
 use crate::utils;
 use crate::{
-    BareItem, Decimal, Dictionary, InnerList, Item, List, ListEntry, Parameters, RefBareItem,
-    SFVResult,
+    AsRefBareItem, BareItem, Decimal, Dictionary, InnerList, Item, List, ListEntry, Parameters,
+    RefBareItem, SFVResult,
 };
 use std::fmt::Write as _;
 
@@ -143,20 +143,12 @@ impl Serializer {
     }
 
     pub(crate) fn serialize_bare_item(
-        input_bare_item: &BareItem,
+        value: impl AsRefBareItem,
         output: &mut String,
     ) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc8941.html#ser-bare-item
 
-        let ref_bare_item = input_bare_item.to_ref_bare_item();
-        Self::serialize_ref_bare_item(ref_bare_item, output)
-    }
-
-    pub(crate) fn serialize_ref_bare_item(
-        value: RefBareItem,
-        output: &mut String,
-    ) -> SFVResult<()> {
-        match value {
+        match value.as_ref_bare_item() {
             RefBareItem::Boolean(value) => Self::serialize_bool(value, output)?,
             RefBareItem::String(value) => Self::serialize_string(value, output)?,
             RefBareItem::ByteSeq(value) => Self::serialize_byte_sequence(value, output)?,
@@ -174,22 +166,23 @@ impl Serializer {
         // https://httpwg.org/specs/rfc8941.html#ser-params
 
         for (param_name, param_value) in input_params.iter() {
-            Self::serialize_ref_parameter(param_name, param_value.to_ref_bare_item(), output)?;
+            Self::serialize_parameter(param_name, param_value, output)?;
         }
         Ok(())
     }
 
-    pub(crate) fn serialize_ref_parameter(
+    pub(crate) fn serialize_parameter(
         name: &str,
-        value: RefBareItem,
+        value: impl AsRefBareItem,
         output: &mut String,
     ) -> SFVResult<()> {
         output.push(';');
         Self::serialize_key(name, output)?;
 
+        let value = value.as_ref_bare_item();
         if value != RefBareItem::Boolean(true) {
             output.push('=');
-            Self::serialize_ref_bare_item(value, output)?;
+            Self::serialize_bare_item(value, output)?;
         }
         Ok(())
     }
