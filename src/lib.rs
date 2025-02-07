@@ -415,7 +415,7 @@ pub(crate) enum Num {
 }
 
 /// Similar to `BareItem`, but used to serialize values via `RefItemSerializer`, `RefListSerializer`, `RefDictSerializer`.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum RefBareItem<'a> {
     Integer(i64),
     Decimal(Decimal),
@@ -432,7 +432,7 @@ impl BareItem {
             BareItem::Integer(val) => RefBareItem::Integer(*val),
             BareItem::Decimal(val) => RefBareItem::Decimal(*val),
             BareItem::String(val) => RefBareItem::String(val),
-            BareItem::ByteSeq(val) => RefBareItem::ByteSeq(val.as_slice()),
+            BareItem::ByteSeq(val) => RefBareItem::ByteSeq(val),
             BareItem::Boolean(val) => RefBareItem::Boolean(*val),
             BareItem::Token(val) => RefBareItem::Token(val),
         }

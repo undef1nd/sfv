@@ -149,20 +149,20 @@ impl Serializer {
         // https://httpwg.org/specs/rfc8941.html#ser-bare-item
 
         let ref_bare_item = input_bare_item.to_ref_bare_item();
-        Self::serialize_ref_bare_item(&ref_bare_item, output)
+        Self::serialize_ref_bare_item(ref_bare_item, output)
     }
 
     pub(crate) fn serialize_ref_bare_item(
-        value: &RefBareItem,
+        value: RefBareItem,
         output: &mut String,
     ) -> SFVResult<()> {
         match value {
-            RefBareItem::Boolean(value) => Self::serialize_bool(*value, output)?,
+            RefBareItem::Boolean(value) => Self::serialize_bool(value, output)?,
             RefBareItem::String(value) => Self::serialize_string(value, output)?,
             RefBareItem::ByteSeq(value) => Self::serialize_byte_sequence(value, output)?,
             RefBareItem::Token(value) => Self::serialize_token(value, output)?,
-            RefBareItem::Integer(value) => Self::serialize_integer(*value, output)?,
-            RefBareItem::Decimal(value) => Self::serialize_decimal(*value, output)?,
+            RefBareItem::Integer(value) => Self::serialize_integer(value, output)?,
+            RefBareItem::Decimal(value) => Self::serialize_decimal(value, output)?,
         };
         Ok(())
     }
@@ -174,20 +174,20 @@ impl Serializer {
         // https://httpwg.org/specs/rfc8941.html#ser-params
 
         for (param_name, param_value) in input_params.iter() {
-            Self::serialize_ref_parameter(param_name, &param_value.to_ref_bare_item(), output)?;
+            Self::serialize_ref_parameter(param_name, param_value.to_ref_bare_item(), output)?;
         }
         Ok(())
     }
 
     pub(crate) fn serialize_ref_parameter(
         name: &str,
-        value: &RefBareItem,
+        value: RefBareItem,
         output: &mut String,
     ) -> SFVResult<()> {
         output.push(';');
         Self::serialize_key(name, output)?;
 
-        if value != &RefBareItem::Boolean(true) {
+        if value != RefBareItem::Boolean(true) {
             output.push('=');
             Self::serialize_ref_bare_item(value, output)?;
         }
