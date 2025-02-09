@@ -52,10 +52,12 @@ fn run_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
         .ok_or("run_test_case: raw value is not specified")?
         .join(", ");
 
+    let parser = Parser::from_str(&input);
+
     let actual_result = match test_case.header_type {
-        HeaderType::Item => Parser::parse_item(input.as_bytes()).map(FieldType::Item),
-        HeaderType::List => Parser::parse_list(input.as_bytes()).map(FieldType::List),
-        HeaderType::Dictionary => Parser::parse_dictionary(input.as_bytes()).map(FieldType::Dict),
+        HeaderType::Item => parser.parse_item().map(FieldType::Item),
+        HeaderType::List => parser.parse_list().map(FieldType::List),
+        HeaderType::Dictionary => parser.parse_dictionary().map(FieldType::Dict),
     };
 
     // Check that actual result for must_fail tests is Err

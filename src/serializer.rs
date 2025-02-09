@@ -12,7 +12,7 @@ pub trait SerializeValue {
     /// ```
     /// # use sfv::{Parser, SerializeValue};
     ///
-    /// let parsed_list_field = Parser::parse_list("\"london\", \t\t\"berlin\"".as_bytes());
+    /// let parsed_list_field = Parser::from_str("\"london\", \t\t\"berlin\"").parse_list();
     /// assert!(parsed_list_field.is_ok());
     ///
     /// assert_eq!(
