@@ -7,7 +7,7 @@ use std::iter::Peekable;
 pub(crate) trait ParseValue {
     /// This method should not be used for parsing input into structured field value.
     /// Use `Parser::parse_item`, `Parser::parse_list` or `Parsers::parse_dictionary` for that.
-    fn parse(input_chars: &mut Peekable<impl Iterator<Item = u8> + Clone>) -> SFVResult<Self>
+    fn parse(input_chars: &mut Peekable<impl Iterator<Item = u8>>) -> SFVResult<Self>
     where
         Self: Sized;
 }
@@ -31,7 +31,7 @@ pub trait ParseMore {
 }
 
 impl ParseValue for Item {
-    fn parse(input_chars: &mut Peekable<impl Iterator<Item = u8> + Clone>) -> SFVResult<Item> {
+    fn parse(input_chars: &mut Peekable<impl Iterator<Item = u8>>) -> SFVResult<Item> {
         // https://httpwg.org/specs/rfc8941.html#parse-item
         let bare_item = Parser::parse_bare_item(input_chars)?;
         let params = Parser::parse_parameters(input_chars)?;
@@ -41,7 +41,7 @@ impl ParseValue for Item {
 }
 
 impl ParseValue for List {
-    fn parse(input_chars: &mut Peekable<impl Iterator<Item = u8> + Clone>) -> SFVResult<List> {
+    fn parse(input_chars: &mut Peekable<impl Iterator<Item = u8>>) -> SFVResult<List> {
         // https://httpwg.org/specs/rfc8941.html#parse-list
         // List represents an array of (item_or_inner_list, parameters)
 
@@ -74,9 +74,7 @@ impl ParseValue for List {
 }
 
 impl ParseValue for Dictionary {
-    fn parse(
-        input_chars: &mut Peekable<impl Iterator<Item = u8> + Clone>,
-    ) -> SFVResult<Dictionary> {
+    fn parse(input_chars: &mut Peekable<impl Iterator<Item = u8>>) -> SFVResult<Dictionary> {
         let mut dict = Dictionary::new();
 
         while input_chars.peek().is_some() {
@@ -172,7 +170,7 @@ impl Parser {
     }
 
     fn parse_list_entry(
-        input_chars: &mut Peekable<impl Iterator<Item = u8> + Clone>,
+        input_chars: &mut Peekable<impl Iterator<Item = u8>>,
     ) -> SFVResult<ListEntry> {
         // https://httpwg.org/specs/rfc8941.html#parse-item-or-list
         // ListEntry represents a tuple (item_or_inner_list, parameters)
@@ -190,7 +188,7 @@ impl Parser {
     }
 
     pub(crate) fn parse_inner_list(
-        input_chars: &mut Peekable<impl Iterator<Item = u8> + Clone>,
+        input_chars: &mut Peekable<impl Iterator<Item = u8>>,
     ) -> SFVResult<InnerList> {
         // https://httpwg.org/specs/rfc8941.html#parse-innerlist
 
@@ -225,7 +223,7 @@ impl Parser {
     }
 
     pub(crate) fn parse_bare_item(
-        input_chars: &mut Peekable<impl Iterator<Item = u8> + Clone>,
+        input_chars: &mut Peekable<impl Iterator<Item = u8>>,
     ) -> SFVResult<BareItem> {
         // https://httpwg.org/specs/rfc8941.html#parse-bare-item
         if input_chars.peek().is_none() {
@@ -318,7 +316,7 @@ impl Parser {
     }
 
     pub(crate) fn parse_byte_sequence(
-        input_chars: &mut Peekable<impl Iterator<Item = u8> + Clone>,
+        input_chars: &mut Peekable<impl Iterator<Item = u8>>,
     ) -> SFVResult<Vec<u8>> {
         // https://httpwg.org/specs/rfc8941.html#parse-binary
 
@@ -326,11 +324,15 @@ impl Parser {
             return Err("parse_byte_seq: first char is not ':'");
         }
 
-        if !input_chars.clone().any(|c| c == b':') {
-            return Err("parse_byte_seq: no closing ':'");
+        let mut b64_content = vec![];
+        loop {
+            match input_chars.next() {
+                Some(b':') => break,
+                Some(c) => b64_content.push(c),
+                None => return Err("parse_byte_seq: no closing ':'"),
+            }
         }
 
-        let b64_content = input_chars.take_while(|c| c != &b':').collect::<Vec<_>>();
         match base64::Engine::decode(&utils::BASE64, b64_content) {
             Ok(content) => Ok(content),
             Err(_) => Err("parse_byte_seq: decoding error"),
@@ -407,7 +409,7 @@ impl Parser {
     }
 
     pub(crate) fn parse_parameters(
-        input_chars: &mut Peekable<impl Iterator<Item = u8> + Clone>,
+        input_chars: &mut Peekable<impl Iterator<Item = u8>>,
     ) -> SFVResult<Parameters> {
         // https://httpwg.org/specs/rfc8941.html#parse-param
 
