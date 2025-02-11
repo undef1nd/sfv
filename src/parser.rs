@@ -131,7 +131,7 @@ impl ParseMore for Dictionary {
 
 /// Exposes methods for parsing input into structured field value.
 pub struct Parser<'a> {
-    pub(crate) input: std::iter::Peekable<std::iter::Copied<std::slice::Iter<'a, u8>>>,
+    input: std::iter::Peekable<std::iter::Copied<std::slice::Iter<'a, u8>>>,
 }
 
 impl<'a> Parser<'a> {
@@ -461,5 +461,10 @@ impl<'a> Parser<'a> {
         while let Some(b' ') = self.input.peek() {
             self.input.next();
         }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn remaining(self) -> Vec<u8> {
+        self.input.collect()
     }
 }

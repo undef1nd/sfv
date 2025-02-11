@@ -375,7 +375,7 @@ fn parse_bare_item_errors() -> Result<(), Box<dyn Error>> {
 fn parse_bool() -> Result<(), Box<dyn Error>> {
     let mut parser = Parser::from_str("?0gk");
     assert_eq!(false, parser.parse_bool()?);
-    assert_eq!(parser.input.collect::<Vec<_>>(), b"gk");
+    assert_eq!(parser.remaining(), b"gk");
 
     assert_eq!(false, Parser::from_str("?0").parse_bool()?);
     assert_eq!(true, Parser::from_str("?1").parse_bool()?);
@@ -399,7 +399,7 @@ fn parse_bool_errors() -> Result<(), Box<dyn Error>> {
 fn parse_string() -> Result<(), Box<dyn Error>> {
     let mut parser = Parser::from_str("\"some string\" ;not string");
     assert_eq!("some string".to_owned(), parser.parse_string()?);
-    assert_eq!(parser.input.collect::<Vec<_>>(), " ;not string".as_bytes());
+    assert_eq!(parser.remaining(), " ;not string".as_bytes());
 
     assert_eq!(
         "test".to_owned(),
@@ -446,7 +446,7 @@ fn parse_string_errors() -> Result<(), Box<dyn Error>> {
 fn parse_token() -> Result<(), Box<dyn Error>> {
     let mut parser = Parser::from_str("*some:token}not token");
     assert_eq!("*some:token".to_owned(), parser.parse_token()?);
-    assert_eq!(parser.input.collect::<Vec<_>>(), "}not token".as_bytes());
+    assert_eq!(parser.remaining(), b"}not token");
 
     assert_eq!("token".to_owned(), Parser::from_str("token").parse_token()?);
     assert_eq!(
@@ -481,7 +481,7 @@ fn parse_token_errors() -> Result<(), Box<dyn Error>> {
         Err("parse_token: first character is not ALPHA or '*'"),
         parser.parse_token()
     );
-    assert_eq!(parser.input.collect::<Vec<_>>(), "765token".as_bytes());
+    assert_eq!(parser.remaining(), b"765token");
 
     assert_eq!(
         Err("parse_token: first character is not ALPHA or '*'"),
@@ -501,7 +501,7 @@ fn parse_byte_sequence() -> Result<(), Box<dyn Error>> {
         "hello".to_owned().into_bytes(),
         parser.parse_byte_sequence()?
     );
-    assert_eq!("rest_of_str".as_bytes(), parser.input.collect::<Vec<_>>());
+    assert_eq!(parser.remaining(), b"rest_of_str");
 
     assert_eq!(
         "hello".to_owned().into_bytes(),
@@ -543,7 +543,7 @@ fn parse_byte_sequence_errors() -> Result<(), Box<dyn Error>> {
 fn parse_number_int() -> Result<(), Box<dyn Error>> {
     let mut parser = Parser::from_str("-733333333332d.14");
     assert_eq!(Num::Integer(-733333333332), parser.parse_number()?);
-    assert_eq!("d.14".as_bytes(), parser.input.collect::<Vec<_>>());
+    assert_eq!(parser.remaining(), b"d.14");
 
     assert_eq!(Num::Integer(42), Parser::from_str("42").parse_number()?);
     assert_eq!(Num::Integer(-42), Parser::from_str("-42").parse_number()?);
@@ -579,7 +579,7 @@ fn parse_number_decimal() -> Result<(), Box<dyn Error>> {
         Num::Decimal(Decimal::from_str("0.42")?),
         parser.parse_number()?
     );
-    assert_eq!(" test string".as_bytes(), parser.input.collect::<Vec<_>>());
+    assert_eq!(parser.remaining(), b" test string");
 
     assert_eq!(
         Num::Decimal(Decimal::from_str("1.5")?),
@@ -617,14 +617,14 @@ fn parse_number_decimal() -> Result<(), Box<dyn Error>> {
 fn parse_number_errors() -> Result<(), Box<dyn Error>> {
     let mut parser = Parser::from_str(":aGVsbG8:rest");
     assert_eq!(Err("parse_number: expected digit"), parser.parse_number());
-    assert_eq!(":aGVsbG8:rest".as_bytes(), parser.input.collect::<Vec<_>>());
+    assert_eq!(parser.remaining(), b":aGVsbG8:rest");
 
     let mut parser = Parser::from_str("-11.5555 test string");
     assert_eq!(
         Err("parse_number: too many digits after decimal point"),
         parser.parse_number()
     );
-    assert_eq!("5 test string".as_bytes(), parser.input.collect::<Vec<_>>());
+    assert_eq!(parser.remaining(), b"5 test string");
 
     assert_eq!(
         Err("parse_number: expected digit"),
