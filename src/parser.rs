@@ -3,9 +3,7 @@ use crate::{
     BareItem, Decimal, Dictionary, InnerList, Item, List, ListEntry, Num, Parameters, SFVResult,
 };
 
-pub(crate) trait ParseValue {
-    /// This method should not be used for parsing input into structured field value.
-    /// Use `Parser::parse_item`, `Parser::parse_list` or `Parsers::parse_dictionary` for that.
+trait ParseValue {
     fn parse(parser: &mut Parser) -> SFVResult<Self>
     where
         Self: Sized;
