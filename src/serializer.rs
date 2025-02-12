@@ -274,19 +274,18 @@ impl Serializer {
             return Err("serialize_token: non-ascii character");
         }
 
-        match value.chars().next() {
+        let mut bytes = value.bytes();
+
+        match bytes.next() {
             None => return Err("serialize_token: token is empty"),
-            Some(char) => {
-                if !(char.is_ascii_alphabetic() || char == '*') {
+            Some(c) => {
+                if !utils::is_allowed_start_token_char(c) {
                     return Err("serialize_token: first character is not ALPHA or '*'");
                 }
             }
         }
 
-        if value
-            .bytes()
-            .any(|c| !(utils::is_tchar(c) || c == b':' || c == b'/'))
-        {
+        if bytes.any(|c| !utils::is_allowed_inner_token_char(c)) {
             return Err("serialize_token: disallowed character");
         }
 
