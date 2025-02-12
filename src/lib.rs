@@ -25,19 +25,19 @@ use sfv::Parser;
 
 // Parsing structured field value of Item type.
 let item_header_input = "12.445;foo=bar";
-let item = Parser::parse_item(item_header_input.as_bytes());
+let item = Parser::from_str(item_header_input).parse_item();
 assert!(item.is_ok());
 println!("{:#?}", item);
 
 // Parsing structured field value of List type.
 let list_header_input = "1;a=tok, (\"foo\" \"bar\");baz, ()";
-let list = Parser::parse_list(list_header_input.as_bytes());
+let list = Parser::from_str(list_header_input).parse_list();
 assert!(list.is_ok());
 println!("{:#?}", list);
 
 // Parsing structured field value of Dictionary type.
 let dict_header_input = "a=?0, b, c; foo=bar, rating=1.5, fruits=(apple pear)";
-let dict = Parser::parse_dictionary(dict_header_input.as_bytes());
+let dict = Parser::from_str(dict_header_input).parse_dictionary();
 assert!(dict.is_ok());
 println!("{:#?}", dict);
 ```
@@ -47,52 +47,52 @@ println!("{:#?}", dict);
 use sfv::*;
 
 let dict_header = "u=2, n=(* foo 2)";
-    let dict = Parser::parse_dictionary(dict_header.as_bytes()).unwrap();
+let dict = Parser::from_str(dict_header).parse_dictionary().unwrap();
 
-    // Case 1 - handling value if it's an Item of Integer type
-    let u_val = match dict.get("u") {
-        Some(ListEntry::Item(item)) => item.bare_item.as_int(),
-        _ => None,
-    };
+// Case 1 - handling value if it's an Item of Integer type
+let u_val = match dict.get("u") {
+    Some(ListEntry::Item(item)) => item.bare_item.as_int(),
+    _ => None,
+};
 
-    if let Some(u_val) = u_val {
-        println!("{}", u_val);
-    }
+if let Some(u_val) = u_val {
+    println!("{}", u_val);
+}
 
-    // Case 2 - matching on all possible types
-    match dict.get("u") {
-        Some(ListEntry::Item(item)) => match &item.bare_item {
-            BareItem::Token(val) => {
-                // do something if it's a Token
-                println!("{}", val);
-            }
-            BareItem::Integer(val) => {
-                // do something if it's an Integer
-                println!("{}", val);
-            }
-            BareItem::Boolean(val) => {
-                // do something if it's a Boolean
-                println!("{}", val);
-            }
-            BareItem::Decimal(val) => {
-                // do something if it's a Decimal
-                println!("{}", val);
-            }
-            BareItem::String(val) => {
-                // do something if it's a String
-                println!("{}", val);
-            }
-            BareItem::ByteSeq(val) => {
-                // do something if it's a ByteSeq
-                println!("{:?}", val);
-            }
-        },
-        Some(ListEntry::InnerList(inner_list)) => {
-            // do something if it's an InnerList
-            println!("{:?}", inner_list.items);
+// Case 2 - matching on all possible types
+match dict.get("u") {
+    Some(ListEntry::Item(item)) => match &item.bare_item {
+        BareItem::Token(val) => {
+            // do something if it's a Token
+            println!("{}", val);
         }
-        None => panic!("key not found"),
+        BareItem::Integer(val) => {
+            // do something if it's an Integer
+            println!("{}", val);
+        }
+        BareItem::Boolean(val) => {
+            // do something if it's a Boolean
+            println!("{}", val);
+        }
+        BareItem::Decimal(val) => {
+            // do something if it's a Decimal
+            println!("{}", val);
+        }
+        BareItem::String(val) => {
+            // do something if it's a String
+            println!("{}", val);
+        }
+        BareItem::ByteSeq(val) => {
+            // do something if it's a ByteSeq
+            println!("{:?}", val);
+        }
+    },
+    Some(ListEntry::InnerList(inner_list)) => {
+        // do something if it's an InnerList
+        println!("{:?}", inner_list.items);
     }
+    None => panic!("key not found"),
+}
 ```
 
 ### Structured Field Value Construction and Serialization
