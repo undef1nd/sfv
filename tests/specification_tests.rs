@@ -73,14 +73,18 @@ fn run_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
     assert_eq!(expected_field_value, actual_field_value);
 
     // Test serialization
+    let actual_result = actual_field_value.serialize();
     if let Some(canonical_val) = &test_case.canonical {
-        let actual_result = actual_field_value.serialize();
         if canonical_val.is_empty() {
             assert!(actual_result.is_err());
         } else {
             assert_eq!(canonical_val[0], actual_result?);
         }
+    } else {
+        // If the canonical field is omitted, the canonical form is the input.
+        assert_eq!(input, actual_result?);
     }
+
     Ok(())
 }
 
