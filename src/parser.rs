@@ -193,12 +193,11 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub(crate) fn parse_inner_list(&mut self) -> SFVResult<InnerList> {
+    fn parse_inner_list(&mut self) -> SFVResult<InnerList> {
         // https://httpwg.org/specs/rfc8941.html#parse-innerlist
 
-        if Some(b'(') != self.input.next() {
-            return Err("parse_inner_list: input does not start with '('");
-        }
+        debug_assert_eq!(self.input.peek(), Some(&b'('));
+        self.input.next();
 
         let mut inner_list = Vec::new();
         while self.input.peek().is_some() {
@@ -237,7 +236,7 @@ impl<'a> Parser<'a> {
             Some(b'"') => Ok(BareItem::String(self.parse_string()?)),
             Some(b':') => Ok(BareItem::ByteSeq(self.parse_byte_sequence()?)),
             Some(&c) if c == b'*' || c.is_ascii_alphabetic() => {
-                Ok(BareItem::Token(self.parse_token()?))
+                Ok(BareItem::Token(self.parse_token(c)))
             }
             Some(&c) if c == b'-' || c.is_ascii_digit() => match self.parse_number()? {
                 Num::Decimal(val) => Ok(BareItem::Decimal(val)),
@@ -247,12 +246,11 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub(crate) fn parse_bool(&mut self) -> SFVResult<bool> {
+    fn parse_bool(&mut self) -> SFVResult<bool> {
         // https://httpwg.org/specs/rfc8941.html#parse-boolean
 
-        if self.input.next() != Some(b'?') {
-            return Err("parse_bool: first character is not '?'");
-        }
+        debug_assert_eq!(self.input.peek(), Some(&b'?'));
+        self.input.next();
 
         match self.input.next() {
             Some(b'0') => Ok(false),
@@ -261,12 +259,11 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub(crate) fn parse_string(&mut self) -> SFVResult<String> {
+    fn parse_string(&mut self) -> SFVResult<String> {
         // https://httpwg.org/specs/rfc8941.html#parse-string
 
-        if self.input.next() != Some(b'"') {
-            return Err("parse_string: first character is not '\"'");
-        }
+        debug_assert_eq!(self.input.peek(), Some(&b'"'));
+        self.input.next();
 
         let mut output_string = String::from("");
         while let Some(curr_char) = self.input.next() {
@@ -286,37 +283,30 @@ impl<'a> Parser<'a> {
         Err("parse_string: no closing '\"'")
     }
 
-    pub(crate) fn parse_token(&mut self) -> SFVResult<String> {
+    fn parse_token(&mut self, first_char: u8) -> String {
         // https://httpwg.org/specs/rfc8941.html#parse-token
 
-        if let Some(first_char) = self.input.peek() {
-            if !utils::is_allowed_start_token_char(*first_char) {
-                return Err("parse_token: first character is not ALPHA or '*'");
-            }
-        } else {
-            return Err("parse_token: empty input string");
-        }
+        debug_assert!(utils::is_allowed_start_token_char(first_char));
+        self.input.next();
 
-        let mut output_string = String::from("");
-        while let Some(curr_char) = self.input.peek() {
-            if !utils::is_allowed_inner_token_char(*curr_char) {
-                return Ok(output_string);
-            }
+        let mut output_string = String::new();
+        output_string.push(first_char as char);
 
-            match self.input.next() {
-                Some(c) => output_string.push(c as char),
-                None => return Err("parse_token: end of the string"),
+        while let Some(&curr_char) = self.input.peek() {
+            if !utils::is_allowed_inner_token_char(curr_char) {
+                break;
             }
+            output_string.push(curr_char as char);
+            self.input.next();
         }
-        Ok(output_string)
+        output_string
     }
 
-    pub(crate) fn parse_byte_sequence(&mut self) -> SFVResult<Vec<u8>> {
+    fn parse_byte_sequence(&mut self) -> SFVResult<Vec<u8>> {
         // https://httpwg.org/specs/rfc8941.html#parse-binary
 
-        if self.input.next() != Some(b':') {
-            return Err("parse_byte_seq: first char is not ':'");
-        }
+        debug_assert_eq!(self.input.peek(), Some(&b':'));
+        self.input.next();
 
         let mut b64_content = vec![];
         loop {

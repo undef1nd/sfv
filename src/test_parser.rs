@@ -1,6 +1,6 @@
 use crate::{
-    BareItem, Decimal, Dictionary, FromStr, InnerList, Item, List, Num, Parameters, ParseMore,
-    Parser,
+    BareItem, Decimal, Dictionary, FromStr, InnerList, Item, List, ListEntry, Num, Parameters,
+    ParseMore, Parser,
 };
 use std::error::Error;
 use std::iter::FromIterator;
@@ -181,10 +181,13 @@ fn parse_list_errors() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn parse_inner_list_errors() -> Result<(), Box<dyn Error>> {
-    let input = "c b); a=1";
     assert_eq!(
-        Err("parse_inner_list: input does not start with '('"),
-        Parser::from_str(input).parse_inner_list()
+        Err("parse_inner_list: bad delimitation"),
+        Parser::from_str("(1c)").parse_list()
+    );
+    assert_eq!(
+        Err("parse_inner_list: the end of the inner list was not found"),
+        Parser::from_str("(1").parse_list()
     );
     Ok(())
 }
@@ -197,7 +200,10 @@ fn parse_inner_list_with_param_and_spaces() -> Result<(), Box<dyn Error>> {
     let item1 = Item::new(BareItem::Token("c".to_owned()));
     let item2 = Item::new(BareItem::Token("b".to_owned()));
     let expected = InnerList::with_params(vec![item1, item2], inner_list_param);
-    assert_eq!(expected, Parser::from_str(input).parse_inner_list()?);
+    assert_eq!(
+        vec![ListEntry::InnerList(expected)],
+        Parser::from_str(input).parse_list()?
+    );
     Ok(())
 }
 
@@ -374,23 +380,25 @@ fn parse_bare_item_errors() -> Result<(), Box<dyn Error>> {
 #[test]
 fn parse_bool() -> Result<(), Box<dyn Error>> {
     let mut parser = Parser::from_str("?0gk");
-    assert_eq!(false, parser.parse_bool()?);
+    assert_eq!(BareItem::Boolean(false), parser.parse_bare_item()?);
     assert_eq!(parser.remaining(), b"gk");
 
-    assert_eq!(false, Parser::from_str("?0").parse_bool()?);
-    assert_eq!(true, Parser::from_str("?1").parse_bool()?);
+    assert_eq!(
+        BareItem::Boolean(false),
+        Parser::from_str("?0").parse_bare_item()?
+    );
+    assert_eq!(
+        BareItem::Boolean(true),
+        Parser::from_str("?1").parse_bare_item()?
+    );
     Ok(())
 }
 
 #[test]
 fn parse_bool_errors() -> Result<(), Box<dyn Error>> {
     assert_eq!(
-        Err("parse_bool: first character is not '?'"),
-        Parser::from_str("").parse_bool()
-    );
-    assert_eq!(
         Err("parse_bool: invalid variant"),
-        Parser::from_str("?").parse_bool()
+        Parser::from_str("?").parse_bare_item()
     );
     Ok(())
 }
@@ -398,21 +406,27 @@ fn parse_bool_errors() -> Result<(), Box<dyn Error>> {
 #[test]
 fn parse_string() -> Result<(), Box<dyn Error>> {
     let mut parser = Parser::from_str("\"some string\" ;not string");
-    assert_eq!("some string".to_owned(), parser.parse_string()?);
+    assert_eq!(
+        BareItem::String("some string".to_owned()),
+        parser.parse_bare_item()?
+    );
     assert_eq!(parser.remaining(), " ;not string".as_bytes());
 
     assert_eq!(
-        "test".to_owned(),
-        Parser::from_str("\"test\"").parse_string()?
+        BareItem::String("test".to_owned()),
+        Parser::from_str("\"test\"").parse_bare_item()?
     );
     assert_eq!(
-        r#"te\st"#.to_owned(),
-        Parser::from_str("\"te\\\\st\"").parse_string()?
+        BareItem::String(r#"te\st"#.to_owned()),
+        Parser::from_str("\"te\\\\st\"").parse_bare_item()?
     );
-    assert_eq!("".to_owned(), Parser::from_str("\"\"").parse_string()?);
     assert_eq!(
-        "some string".to_owned(),
-        Parser::from_str("\"some string\"").parse_string()?
+        BareItem::String("".to_owned()),
+        Parser::from_str("\"\"").parse_bare_item()?
+    );
+    assert_eq!(
+        BareItem::String("some string".to_owned()),
+        Parser::from_str("\"some string\"").parse_bare_item()?
     );
     Ok(())
 }
@@ -420,24 +434,20 @@ fn parse_string() -> Result<(), Box<dyn Error>> {
 #[test]
 fn parse_string_errors() -> Result<(), Box<dyn Error>> {
     assert_eq!(
-        Err("parse_string: first character is not '\"'"),
-        Parser::from_str("test").parse_string()
-    );
-    assert_eq!(
         Err("parse_string: last input character is '\\'"),
-        Parser::from_str("\"\\").parse_string()
+        Parser::from_str("\"\\").parse_bare_item()
     );
     assert_eq!(
         Err("parse_string: disallowed character after '\\'"),
-        Parser::from_str("\"\\l\"").parse_string()
+        Parser::from_str("\"\\l\"").parse_bare_item()
     );
     assert_eq!(
         Err("parse_string: invalid string character"),
-        Parser::from_str("\"\u{1f}\"").parse_string()
+        Parser::from_str("\"\u{1f}\"").parse_bare_item()
     );
     assert_eq!(
         Err("parse_string: no closing '\"'"),
-        Parser::from_str("\"smth").parse_string()
+        Parser::from_str("\"smth").parse_bare_item()
     );
     Ok(())
 }
@@ -445,52 +455,41 @@ fn parse_string_errors() -> Result<(), Box<dyn Error>> {
 #[test]
 fn parse_token() -> Result<(), Box<dyn Error>> {
     let mut parser = Parser::from_str("*some:token}not token");
-    assert_eq!("*some:token".to_owned(), parser.parse_token()?);
+    assert_eq!(
+        BareItem::Token("*some:token".to_owned()),
+        parser.parse_bare_item()?
+    );
     assert_eq!(parser.remaining(), b"}not token");
 
-    assert_eq!("token".to_owned(), Parser::from_str("token").parse_token()?);
     assert_eq!(
-        "a_b-c.d3:f%00/*".to_owned(),
-        Parser::from_str("a_b-c.d3:f%00/*").parse_token()?
+        BareItem::Token("token".to_owned()),
+        Parser::from_str("token").parse_bare_item()?
     );
     assert_eq!(
-        "TestToken".to_owned(),
-        Parser::from_str("TestToken").parse_token()?
+        BareItem::Token("a_b-c.d3:f%00/*".to_owned()),
+        Parser::from_str("a_b-c.d3:f%00/*").parse_bare_item()?
     );
     assert_eq!(
-        "some".to_owned(),
-        Parser::from_str("some@token").parse_token()?
+        BareItem::Token("TestToken".to_owned()),
+        Parser::from_str("TestToken").parse_bare_item()?
     );
     assert_eq!(
-        "*TestToken*".to_owned(),
-        Parser::from_str("*TestToken*").parse_token()?
+        BareItem::Token("some".to_owned()),
+        Parser::from_str("some@token").parse_bare_item()?
     );
-    assert_eq!("*".to_owned(), Parser::from_str("*[@:token").parse_token()?);
     assert_eq!(
-        "test".to_owned(),
-        Parser::from_str("test token").parse_token()?
+        BareItem::Token("*TestToken*".to_owned()),
+        Parser::from_str("*TestToken*").parse_bare_item()?
+    );
+    assert_eq!(
+        BareItem::Token("*".to_owned()),
+        Parser::from_str("*[@:token").parse_bare_item()?
+    );
+    assert_eq!(
+        BareItem::Token("test".to_owned()),
+        Parser::from_str("test token").parse_bare_item()?
     );
 
-    Ok(())
-}
-
-#[test]
-fn parse_token_errors() -> Result<(), Box<dyn Error>> {
-    let mut parser = Parser::from_str("765token");
-    assert_eq!(
-        Err("parse_token: first character is not ALPHA or '*'"),
-        parser.parse_token()
-    );
-    assert_eq!(parser.remaining(), b"765token");
-
-    assert_eq!(
-        Err("parse_token: first character is not ALPHA or '*'"),
-        Parser::from_str("7token").parse_token()
-    );
-    assert_eq!(
-        Err("parse_token: empty input string"),
-        Parser::from_str("").parse_token()
-    );
     Ok(())
 }
 
@@ -498,26 +497,26 @@ fn parse_token_errors() -> Result<(), Box<dyn Error>> {
 fn parse_byte_sequence() -> Result<(), Box<dyn Error>> {
     let mut parser = Parser::from_str(":aGVsbG8:rest_of_str");
     assert_eq!(
-        "hello".to_owned().into_bytes(),
-        parser.parse_byte_sequence()?
+        BareItem::ByteSeq(b"hello".to_vec()),
+        parser.parse_bare_item()?
     );
     assert_eq!(parser.remaining(), b"rest_of_str");
 
     assert_eq!(
-        "hello".to_owned().into_bytes(),
-        Parser::from_str(":aGVsbG8:").parse_byte_sequence()?
+        BareItem::ByteSeq(b"hello".to_vec()),
+        Parser::from_str(":aGVsbG8:").parse_bare_item()?
     );
     assert_eq!(
-        "test_encode".to_owned().into_bytes(),
-        Parser::from_str(":dGVzdF9lbmNvZGU:").parse_byte_sequence()?
+        BareItem::ByteSeq(b"test_encode".to_vec()),
+        Parser::from_str(":dGVzdF9lbmNvZGU:").parse_bare_item()?
     );
     assert_eq!(
-        "new:year tree".to_owned().into_bytes(),
-        Parser::from_str(":bmV3OnllYXIgdHJlZQ==:").parse_byte_sequence()?
+        BareItem::ByteSeq(b"new:year tree".to_vec()),
+        Parser::from_str(":bmV3OnllYXIgdHJlZQ==:").parse_bare_item()?
     );
     assert_eq!(
-        "".to_owned().into_bytes(),
-        Parser::from_str("::").parse_byte_sequence()?
+        BareItem::ByteSeq(vec![]),
+        Parser::from_str("::").parse_bare_item()?
     );
     Ok(())
 }
@@ -525,16 +524,12 @@ fn parse_byte_sequence() -> Result<(), Box<dyn Error>> {
 #[test]
 fn parse_byte_sequence_errors() -> Result<(), Box<dyn Error>> {
     assert_eq!(
-        Err("parse_byte_seq: first char is not ':'"),
-        Parser::from_str("aGVsbG8").parse_byte_sequence()
-    );
-    assert_eq!(
         Err("parse_byte_seq: decoding error"),
-        Parser::from_str(":aGVsb G8=:").parse_byte_sequence()
+        Parser::from_str(":aGVsb G8=:").parse_bare_item()
     );
     assert_eq!(
         Err("parse_byte_seq: no closing ':'"),
-        Parser::from_str(":aGVsbG8=").parse_byte_sequence()
+        Parser::from_str(":aGVsbG8=").parse_bare_item()
     );
     Ok(())
 }
