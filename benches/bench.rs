@@ -105,8 +105,7 @@ fn serializing_ref_item(c: &mut Criterion) {
             bench.iter(|| {
                 let mut output = String::new();
                 let ser = RefItemSerializer::new(&mut output);
-                ser.bare_item(&RefBareItem::ByteSeq(input.as_bytes()))
-                    .unwrap();
+                ser.bare_item(input.as_bytes()).unwrap();
             });
         },
     );
@@ -117,29 +116,27 @@ fn serializing_ref_list(c: &mut Criterion) {
         bench.iter(|| {
             let mut output = String::new();
             let ser = RefListSerializer::new(&mut output);
-            ser.bare_item(&RefBareItem::Token("a"))
+            ser.bare_item(RefBareItem::Token("a"))
                 .unwrap()
-                .bare_item(&RefBareItem::Token("abcdefghigklmnoprst"))
+                .bare_item(RefBareItem::Token("abcdefghigklmnoprst"))
                 .unwrap()
-                .bare_item(&RefBareItem::Integer(123456785686457))
+                .bare_item(123456785686457)
                 .unwrap()
-                .bare_item(&RefBareItem::Decimal(
-                    Decimal::from_f64(99999999999.999).unwrap(),
-                ))
+                .bare_item(Decimal::from_f64(99999999999.999).unwrap())
                 .unwrap()
                 .open_inner_list()
                 .close_inner_list()
                 .open_inner_list()
-                .inner_list_bare_item(&RefBareItem::String("somelongstringvalue"))
+                .inner_list_bare_item(RefBareItem::String("somelongstringvalue"))
                 .unwrap()
-                .inner_list_bare_item(&RefBareItem::String("anotherlongstringvalue"))
+                .inner_list_bare_item(RefBareItem::String("anotherlongstringvalue"))
                 .unwrap()
                 .inner_list_parameter(
                     "key",
-                    &RefBareItem::ByteSeq("somever longstringvaluerepresentedasbytes".as_bytes()),
+                    "somever longstringvaluerepresentedasbytes".as_bytes(),
                 )
                 .unwrap()
-                .inner_list_bare_item(&RefBareItem::Integer(145))
+                .inner_list_bare_item(145)
                 .unwrap()
                 .close_inner_list();
         });
@@ -151,20 +148,20 @@ fn serializing_ref_dict(c: &mut Criterion) {
         bench.iter(|| {
             let mut output = String::new();
             RefDictSerializer::new(&mut output)
-                .bare_item_member("a", &RefBareItem::Boolean(true))
+                .bare_item_member("a", true)
                 .unwrap()
-                .bare_item_member("dict_key2", &RefBareItem::Token("abcdefghigklmnoprst"))
+                .bare_item_member("dict_key2", RefBareItem::Token("abcdefghigklmnoprst"))
                 .unwrap()
-                .bare_item_member("dict_key3", &RefBareItem::Integer(123456785686457))
+                .bare_item_member("dict_key3", 123456785686457)
                 .unwrap()
                 .open_inner_list("dict_key4")
                 .unwrap()
-                .inner_list_bare_item(&RefBareItem::String("inner-list-member"))
+                .inner_list_bare_item(RefBareItem::String("inner-list-member"))
                 .unwrap()
-                .inner_list_bare_item(&RefBareItem::ByteSeq("inner-list-member".as_bytes()))
+                .inner_list_bare_item("inner-list-member".as_bytes())
                 .unwrap()
                 .close_inner_list()
-                .parameter("key", &RefBareItem::Token("aW5uZXItbGlzdC1wYXJhbWV0ZXJz"))
+                .parameter("key", RefBareItem::Token("aW5uZXItbGlzdC1wYXJhbWV0ZXJz"))
                 .unwrap();
         });
     });

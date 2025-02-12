@@ -415,7 +415,7 @@ pub(crate) enum Num {
 }
 
 /// Similar to `BareItem`, but used to serialize values via `RefItemSerializer`, `RefListSerializer`, `RefDictSerializer`.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum RefBareItem<'a> {
     Integer(i64),
     Decimal(Decimal),
@@ -425,16 +425,55 @@ pub enum RefBareItem<'a> {
     Token(&'a str),
 }
 
-impl BareItem {
-    /// Converts `BareItem` into `RefBareItem`.
-    fn to_ref_bare_item(&self) -> RefBareItem {
+pub trait AsRefBareItem {
+    fn as_ref_bare_item(&self) -> RefBareItem;
+}
+
+impl AsRefBareItem for BareItem {
+    fn as_ref_bare_item(&self) -> RefBareItem {
         match self {
             BareItem::Integer(val) => RefBareItem::Integer(*val),
             BareItem::Decimal(val) => RefBareItem::Decimal(*val),
             BareItem::String(val) => RefBareItem::String(val),
-            BareItem::ByteSeq(val) => RefBareItem::ByteSeq(val.as_slice()),
+            BareItem::ByteSeq(val) => RefBareItem::ByteSeq(val),
             BareItem::Boolean(val) => RefBareItem::Boolean(*val),
             BareItem::Token(val) => RefBareItem::Token(val),
         }
+    }
+}
+
+impl AsRefBareItem for RefBareItem<'_> {
+    fn as_ref_bare_item(&self) -> RefBareItem {
+        *self
+    }
+}
+
+impl<T: ?Sized + AsRefBareItem> AsRefBareItem for &T {
+    fn as_ref_bare_item(&self) -> RefBareItem {
+        T::as_ref_bare_item(self)
+    }
+}
+
+impl AsRefBareItem for i64 {
+    fn as_ref_bare_item(&self) -> RefBareItem {
+        RefBareItem::Integer(*self)
+    }
+}
+
+impl AsRefBareItem for bool {
+    fn as_ref_bare_item(&self) -> RefBareItem {
+        RefBareItem::Boolean(*self)
+    }
+}
+
+impl AsRefBareItem for Decimal {
+    fn as_ref_bare_item(&self) -> RefBareItem {
+        RefBareItem::Decimal(*self)
+    }
+}
+
+impl AsRefBareItem for [u8] {
+    fn as_ref_bare_item(&self) -> RefBareItem {
+        RefBareItem::ByteSeq(self)
     }
 }
