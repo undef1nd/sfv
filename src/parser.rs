@@ -290,7 +290,7 @@ impl<'a> Parser<'a> {
         // https://httpwg.org/specs/rfc8941.html#parse-token
 
         if let Some(first_char) = self.input.peek() {
-            if !first_char.is_ascii_alphabetic() && first_char != &b'*' {
+            if !utils::is_token_start(*first_char) {
                 return Err("parse_token: first character is not ALPHA or '*'");
             }
         } else {
@@ -299,7 +299,7 @@ impl<'a> Parser<'a> {
 
         let mut output_string = String::from("");
         while let Some(curr_char) = self.input.peek() {
-            if !utils::is_tchar(*curr_char) && curr_char != &b':' && curr_char != &b'/' {
+            if !utils::is_token_continue(*curr_char) {
                 return Ok(output_string);
             }
 
