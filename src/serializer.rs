@@ -1,7 +1,7 @@
 use crate::utils;
 use crate::{
-    AsRefBareItem, BareItem, Decimal, Dictionary, InnerList, Item, List, ListEntry, Parameters,
-    RefBareItem, SFVResult,
+    AsRefBareItem, BareItem, Decimal, Dictionary, Error, InnerList, Item, List, ListEntry,
+    Parameters, RefBareItem, SFVResult,
 };
 use std::fmt::Write as _;
 
@@ -62,7 +62,9 @@ impl Serializer {
     pub(crate) fn serialize_list(input_list: &List, output: &mut String) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc8941.html#ser-list
         if input_list.is_empty() {
-            return Err("serialize_list: serializing empty field is not allowed");
+            return Err(Error::new(
+                "serialize_list: serializing empty field is not allowed",
+            ));
         }
 
         for (idx, member) in input_list.iter().enumerate() {
@@ -88,7 +90,9 @@ impl Serializer {
     pub(crate) fn serialize_dict(input_dict: &Dictionary, output: &mut String) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc8941.html#ser-dictionary
         if input_dict.is_empty() {
-            return Err("serialize_dictionary: serializing empty field is not allowed");
+            return Err(Error::new(
+                "serialize_dictionary: serializing empty field is not allowed",
+            ));
         }
 
         for (idx, (member_name, member_value)) in input_dict.iter().enumerate() {
@@ -190,10 +194,12 @@ impl Serializer {
         // https://httpwg.org/specs/rfc8941.html#ser-key
 
         match input_key.chars().next() {
-            None => return Err("serialize_key: key is empty"),
+            None => return Err(Error::new("serialize_key: key is empty")),
             Some(char) => {
                 if !(char.is_ascii_lowercase() || char == '*') {
-                    return Err("serialize_key: first character is not lcalpha or '*'");
+                    return Err(Error::new(
+                        "serialize_key: first character is not lcalpha or '*'",
+                    ));
                 }
             }
         }
@@ -202,7 +208,7 @@ impl Serializer {
             |c: char| !(c.is_ascii_lowercase() || c.is_ascii_digit() || "_-*.".contains(c));
 
         if input_key.chars().any(disallowed_chars) {
-            return Err("serialize_key: disallowed character in input");
+            return Err(Error::new("serialize_key: disallowed character in input"));
         }
 
         output.push_str(input_key);
@@ -214,7 +220,7 @@ impl Serializer {
 
         let (min_int, max_int) = (-999_999_999_999_999_i64, 999_999_999_999_999_i64);
         if !(min_int <= value && value <= max_int) {
-            return Err("serialize_integer: integer is out of range");
+            return Err(Error::new("serialize_integer: integer is out of range"));
         }
         write!(output, "{}", value).unwrap();
         Ok(())
@@ -230,7 +236,9 @@ impl Serializer {
         let fract_comp = decimal.fract();
 
         if int_comp.abs() > Decimal::from(999_999_999_999_i64) {
-            return Err("serialize_decimal: integer component > 12 digits");
+            return Err(Error::new(
+                "serialize_decimal: integer component > 12 digits",
+            ));
         }
 
         if fract_comp.is_zero() {
@@ -246,12 +254,12 @@ impl Serializer {
         // https://httpwg.org/specs/rfc8941.html#ser-integer
 
         if !value.is_ascii() {
-            return Err("serialize_string: non-ascii character");
+            return Err(Error::new("serialize_string: non-ascii character"));
         }
 
         let vchar_or_sp = |char| char == '\x7f' || ('\x00'..='\x1f').contains(&char);
         if value.chars().any(vchar_or_sp) {
-            return Err("serialize_string: not a visible character");
+            return Err(Error::new("serialize_string: not a visible character"));
         }
 
         output.push('\"');
@@ -270,22 +278,24 @@ impl Serializer {
         // https://httpwg.org/specs/rfc8941.html#ser-token
 
         if !value.is_ascii() {
-            return Err("serialize_token: non-ascii character");
+            return Err(Error::new("serialize_token: non-ascii character"));
         }
 
         let mut bytes = value.bytes();
 
         match bytes.next() {
-            None => return Err("serialize_token: token is empty"),
+            None => return Err(Error::new("serialize_token: token is empty")),
             Some(c) => {
                 if !utils::is_allowed_start_token_char(c) {
-                    return Err("serialize_token: first character is not ALPHA or '*'");
+                    return Err(Error::new(
+                        "serialize_token: first character is not ALPHA or '*'",
+                    ));
                 }
             }
         }
 
         if bytes.any(|c| !utils::is_allowed_inner_token_char(c)) {
-            return Err("serialize_token: disallowed character");
+            return Err(Error::new("serialize_token: disallowed character"));
         }
 
         output.push_str(value);

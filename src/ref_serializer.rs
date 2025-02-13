@@ -1,5 +1,5 @@
 use crate::serializer::Serializer;
-use crate::{AsRefBareItem, RefBareItem, SFVResult};
+use crate::{AsRefBareItem, Error, RefBareItem, SFVResult};
 use std::marker::PhantomData;
 
 /// Serializes `Item` field value components incrementally.
@@ -94,7 +94,9 @@ impl<'a> RefListSerializer<'a> {
 
     pub fn parameter(self, name: &str, value: impl AsRefBareItem) -> SFVResult<Self> {
         if self.buffer.is_empty() {
-            return Err("parameters must be serialized after bare item or inner list");
+            return Err(Error::new(
+                "parameters must be serialized after bare item or inner list",
+            ));
         }
         Serializer::serialize_parameter(name, value, self.buffer)?;
         Ok(RefListSerializer {
@@ -170,7 +172,9 @@ impl<'a> RefDictSerializer<'a> {
 
     pub fn parameter(self, name: &str, value: impl AsRefBareItem) -> SFVResult<Self> {
         if self.buffer.is_empty() {
-            return Err("parameters must be serialized after bare item or inner list");
+            return Err(Error::new(
+                "parameters must be serialized after bare item or inner list",
+            ));
         }
         Serializer::serialize_parameter(name, value, self.buffer)?;
         Ok(RefDictSerializer {
@@ -212,7 +216,9 @@ impl<'a, T: Container<'a>> RefInnerListSerializer<'a, T> {
 
     pub fn inner_list_parameter(self, name: &str, value: impl AsRefBareItem) -> SFVResult<Self> {
         if self.buffer.is_empty() {
-            return Err("parameters must be serialized after bare item or inner list");
+            return Err(Error::new(
+                "parameters must be serialized after bare item or inner list",
+            ));
         }
         Serializer::serialize_parameter(name, value, self.buffer)?;
         Ok(RefInnerListSerializer {

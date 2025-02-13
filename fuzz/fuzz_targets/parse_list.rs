@@ -10,8 +10,10 @@ fuzz_target!(|data: &[u8]| {
             assert!(serialized.is_err());
         } else {
             assert_eq!(
-                sfv::Parser::from_bytes(serialized.unwrap().as_bytes()).parse_list(),
-                Ok(list)
+                sfv::Parser::from_bytes(serialized.unwrap().as_bytes())
+                    .parse_list()
+                    .unwrap(),
+                list
             );
         }
     }

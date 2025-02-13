@@ -1,6 +1,7 @@
 use crate::utils;
 use crate::{
-    BareItem, Decimal, Dictionary, InnerList, Item, List, ListEntry, Num, Parameters, SFVResult,
+    BareItem, Decimal, Dictionary, Error, InnerList, Item, List, ListEntry, Num, Parameters,
+    SFVResult,
 };
 
 trait ParseValue {
@@ -56,7 +57,9 @@ impl ParseValue for List {
 
             if let Some(c) = parser.next() {
                 if c != b',' {
-                    return Err("parse_list: trailing characters after list member");
+                    return Err(Error::new(
+                        "parse_list: trailing characters after list member",
+                    ));
                 }
             }
 
@@ -100,7 +103,9 @@ impl ParseValue for Dictionary {
 
             if let Some(c) = parser.next() {
                 if c != b',' {
-                    return Err("parse_dict: trailing characters after dictionary member");
+                    return Err(Error::new(
+                        "parse_dict: trailing characters after dictionary member",
+                    ));
                 }
             }
 
@@ -232,7 +237,9 @@ impl<'a> Parser<'a> {
             }
         }
 
-        Err("parse_inner_list: the end of the inner list was not found")
+        Err(Error::new(
+            "parse_inner_list: the end of the inner list was not found",
+        ))
     }
 
     pub(crate) fn parse_bare_item(&mut self) -> SFVResult<BareItem> {
@@ -252,7 +259,7 @@ impl<'a> Parser<'a> {
                 Num::Decimal(val) => Ok(BareItem::Decimal(val)),
                 Num::Integer(val) => Ok(BareItem::Integer(val)),
             },
-            _ => Err("parse_bare_item: item type can't be identified"),
+            _ => Err(Error::new("parse_bare_item: item type can't be identified")),
         }
     }
 
@@ -266,7 +273,7 @@ impl<'a> Parser<'a> {
         match self.next() {
             Some(b'0') => Ok(false),
             Some(b'1') => Ok(true),
-            _ => Err("parse_bool: invalid variant"),
+            _ => Err(Error::new("parse_bool: invalid variant")),
         }
     }
 
@@ -286,13 +293,13 @@ impl<'a> Parser<'a> {
                     Some(c @ b'\\' | c @ b'\"') => {
                         output_string.push(c as char);
                     }
-                    None => return Err("parse_string: last input character is '\\'"),
-                    _ => return Err("parse_string: disallowed character after '\\'"),
+                    None => return Err(Error::new("parse_string: last input character is '\\'")),
+                    _ => return Err(Error::new("parse_string: disallowed character after '\\'")),
                 },
                 _ => output_string.push(curr_char as char),
             }
         }
-        Err("parse_string: no closing '\"'")
+        Err(Error::new("parse_string: no closing '\"'"))
     }
 
     pub(crate) fn parse_token(&mut self) -> SFVResult<String> {
@@ -303,7 +310,7 @@ impl<'a> Parser<'a> {
                 return Err("parse_token: first character is not ALPHA or '*'");
             }
         } else {
-            return Err("parse_token: empty input string");
+            return Err(Error::new("parse_token: empty input string"));
         }
 
         let mut output_string = String::from("");
@@ -314,7 +321,7 @@ impl<'a> Parser<'a> {
 
             match self.next() {
                 Some(c) => output_string.push(c as char),
-                None => return Err("parse_token: end of the string"),
+                None => return Err(Error::new("parse_token: end of the string")),
             }
         }
         Ok(output_string)
@@ -339,7 +346,7 @@ impl<'a> Parser<'a> {
 
         match base64::Engine::decode(&utils::BASE64, &self.input[start..self.index - 1]) {
             Ok(content) => Ok(content),
-            Err(_) => Err("parse_byte_seq: decoding error"),
+            Err(_) => Err(Error::new("parse_byte_seq: decoding error")),
         }
     }
 
@@ -362,7 +369,7 @@ impl<'a> Parser<'a> {
                 self.next();
                 char_to_i64(c)
             }
-            _ => return Err("parse_number: expected digit"),
+            _ => return Err(Error::new("parse_number: expected digit")),
         };
 
         let mut digits = 1;
@@ -371,7 +378,9 @@ impl<'a> Parser<'a> {
             match self.peek() {
                 Some(b'.') => {
                     if digits > 12 {
-                        return Err("parse_number: too many digits before decimal point");
+                        return Err(Error::new(
+                            "parse_number: too many digits before decimal point",
+                        ));
                     }
                     self.next();
                     break;
@@ -379,7 +388,7 @@ impl<'a> Parser<'a> {
                 Some(c @ b'0'..=b'9') => {
                     digits += 1;
                     if digits > 15 {
-                        return Err("parse_number: too many digits");
+                        return Err(Error::new("parse_number: too many digits"));
                     }
                     self.next();
                     magnitude = magnitude * 10 + char_to_i64(c);
@@ -392,7 +401,9 @@ impl<'a> Parser<'a> {
 
         while let Some(c @ b'0'..=b'9') = self.peek() {
             if digits == 3 {
-                return Err("parse_number: too many digits after decimal point");
+                return Err(Error::new(
+                    "parse_number: too many digits after decimal point",
+                ));
             }
 
             self.next();
@@ -401,7 +412,7 @@ impl<'a> Parser<'a> {
         }
 
         if digits == 0 {
-            Err("parse_number: trailing decimal point")
+            Err(Error::new("parse_number: trailing decimal point"))
         } else {
             Ok(Num::Decimal(Decimal::from_i128_with_scale(
                 (sign * magnitude) as i128,
