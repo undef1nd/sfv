@@ -1,5 +1,5 @@
 use crate::{
-    BareItem, Decimal, Dictionary, Error, FromStr, InnerList, Item, List, Num, Parameters,
+    integer, BareItem, Decimal, Dictionary, Error, FromStr, InnerList, Item, List, Num, Parameters,
     ParseMore, Parser,
 };
 use std::error::Error as StdError;
@@ -554,30 +554,51 @@ fn parse_byte_sequence_errors() -> Result<(), Box<dyn StdError>> {
 #[test]
 fn parse_number_int() -> Result<(), Box<dyn StdError>> {
     let mut parser = Parser::from_str("-733333333332d.14");
-    assert_eq!(Num::Integer(-733333333332), parser.parse_number()?);
+    assert_eq!(Num::Integer(integer(-733333333332)), parser.parse_number()?);
     assert_eq!(parser.remaining(), b"d.14");
 
-    assert_eq!(Num::Integer(42), Parser::from_str("42").parse_number()?);
-    assert_eq!(Num::Integer(-42), Parser::from_str("-42").parse_number()?);
-    assert_eq!(Num::Integer(-42), Parser::from_str("-042").parse_number()?);
-    assert_eq!(Num::Integer(0), Parser::from_str("0").parse_number()?);
-    assert_eq!(Num::Integer(0), Parser::from_str("00").parse_number()?);
     assert_eq!(
-        Num::Integer(123456789012345),
+        Num::Integer(integer(42)),
+        Parser::from_str("42").parse_number()?
+    );
+    assert_eq!(
+        Num::Integer(integer(-42)),
+        Parser::from_str("-42").parse_number()?
+    );
+    assert_eq!(
+        Num::Integer(integer(-42)),
+        Parser::from_str("-042").parse_number()?
+    );
+    assert_eq!(
+        Num::Integer(integer(0)),
+        Parser::from_str("0").parse_number()?
+    );
+    assert_eq!(
+        Num::Integer(integer(0)),
+        Parser::from_str("00").parse_number()?
+    );
+    assert_eq!(
+        Num::Integer(integer(123456789012345)),
         Parser::from_str("123456789012345").parse_number()?
     );
     assert_eq!(
-        Num::Integer(-123456789012345),
+        Num::Integer(integer(-123456789012345)),
         Parser::from_str("-123456789012345").parse_number()?
     );
-    assert_eq!(Num::Integer(2), Parser::from_str("2,3").parse_number()?);
-    assert_eq!(Num::Integer(4), Parser::from_str("4-2").parse_number()?);
     assert_eq!(
-        Num::Integer(-999999999999999),
+        Num::Integer(integer(2)),
+        Parser::from_str("2,3").parse_number()?
+    );
+    assert_eq!(
+        Num::Integer(integer(4)),
+        Parser::from_str("4-2").parse_number()?
+    );
+    assert_eq!(
+        Num::Integer(integer(-999999999999999)),
         Parser::from_str("-999999999999999").parse_number()?
     );
     assert_eq!(
-        Num::Integer(999999999999999),
+        Num::Integer(integer(999999999999999)),
         Parser::from_str("999999999999999").parse_number()?
     );
 

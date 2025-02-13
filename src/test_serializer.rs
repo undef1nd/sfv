@@ -1,7 +1,7 @@
 use crate::serializer::Serializer;
 use crate::FromStr;
 use crate::SerializeValue;
-use crate::{BareItem, Decimal, Dictionary, Error, InnerList, Item, List, Parameters};
+use crate::{integer, BareItem, Decimal, Dictionary, Error, InnerList, Item, List, Parameters};
 use std::error::Error as StdError;
 use std::iter::FromIterator;
 
@@ -127,39 +127,22 @@ fn serialize_item_with_token_param() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn serialize_integer() -> Result<(), Box<dyn StdError>> {
+fn serialize_integer() {
     let mut buf = String::new();
-    Serializer::serialize_integer(-12, &mut buf)?;
+    Serializer::serialize_integer(integer(-12), &mut buf);
     assert_eq!("-12", &buf);
 
     buf.clear();
-    Serializer::serialize_integer(0, &mut buf)?;
+    Serializer::serialize_integer(integer(0), &mut buf);
     assert_eq!("0", &buf);
 
     buf.clear();
-    Serializer::serialize_integer(999_999_999_999_999, &mut buf)?;
+    Serializer::serialize_integer(integer(999_999_999_999_999), &mut buf);
     assert_eq!("999999999999999", &buf);
 
     buf.clear();
-    Serializer::serialize_integer(-999_999_999_999_999, &mut buf)?;
+    Serializer::serialize_integer(integer(-999_999_999_999_999), &mut buf);
     assert_eq!("-999999999999999", &buf);
-    Ok(())
-}
-
-#[test]
-fn serialize_integer_errors() -> Result<(), Box<dyn StdError>> {
-    let mut buf = String::new();
-    assert_eq!(
-        Err(Error::new("serialize_integer: integer is out of range")),
-        Serializer::serialize_integer(1_000_000_000_000_000, &mut buf)
-    );
-
-    buf.clear();
-    assert_eq!(
-        Err(Error::new("serialize_integer: integer is out of range")),
-        Serializer::serialize_integer(-1_000_000_000_000_000, &mut buf)
-    );
-    Ok(())
 }
 
 #[test]

@@ -1,6 +1,6 @@
 use crate::utils;
 use crate::{
-    BareItem, Decimal, Dictionary, Error, InnerList, Item, List, ListEntry, Parameters,
+    BareItem, Decimal, Dictionary, Error, InnerList, Integer, Item, List, ListEntry, Parameters,
     RefBareItem, SFVResult,
 };
 use std::fmt::Write as _;
@@ -155,7 +155,7 @@ impl Serializer {
             RefBareItem::String(value) => Self::serialize_string(value, output)?,
             RefBareItem::ByteSeq(value) => Self::serialize_byte_sequence(value, output),
             RefBareItem::Token(value) => Self::serialize_token(value, output)?,
-            RefBareItem::Integer(value) => Self::serialize_integer(value, output)?,
+            RefBareItem::Integer(value) => Self::serialize_integer(value, output),
             RefBareItem::Decimal(value) => Self::serialize_decimal(value, output)?,
         };
         Ok(())
@@ -213,15 +213,10 @@ impl Serializer {
         Ok(())
     }
 
-    pub(crate) fn serialize_integer(value: i64, output: &mut String) -> SFVResult<()> {
+    pub(crate) fn serialize_integer(value: Integer, output: &mut String) {
         //https://httpwg.org/specs/rfc8941.html#ser-integer
 
-        let (min_int, max_int) = (-999_999_999_999_999_i64, 999_999_999_999_999_i64);
-        if !(min_int <= value && value <= max_int) {
-            return Err(Error::new("serialize_integer: integer is out of range"));
-        }
         write!(output, "{}", value).unwrap();
-        Ok(())
     }
 
     pub(crate) fn serialize_decimal(value: Decimal, output: &mut String) -> SFVResult<()> {

@@ -1,8 +1,10 @@
 use crate::utils;
 use crate::{
-    BareItem, Decimal, Dictionary, Error, InnerList, Item, List, ListEntry, Num, Parameters,
-    SFVResult,
+    BareItem, Decimal, Dictionary, Error, InnerList, Integer, Item, List, ListEntry, Num,
+    Parameters, SFVResult,
 };
+
+use std::convert::TryFrom;
 
 trait ParseValue {
     fn parse(parser: &mut Parser) -> SFVResult<Self>
@@ -442,7 +444,7 @@ impl<'a> Parser<'a> {
                     self.next();
                     magnitude = magnitude * 10 + char_to_i64(c);
                 }
-                _ => return Ok(Num::Integer(sign * magnitude)),
+                _ => return Ok(Num::Integer(Integer::try_from(sign * magnitude).unwrap())),
             }
         }
 

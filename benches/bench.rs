@@ -3,8 +3,10 @@ extern crate criterion;
 
 use criterion::{BenchmarkId, Criterion};
 use rust_decimal::prelude::FromPrimitive;
-use sfv::{Decimal, Parser, SerializeValue};
-use sfv::{RefBareItem, RefDictSerializer, RefItemSerializer, RefListSerializer};
+use sfv::{
+    integer, Decimal, Parser, RefBareItem, RefDictSerializer, RefItemSerializer, RefListSerializer,
+    SerializeValue,
+};
 
 criterion_main!(parsing, serializing, ref_serializing);
 
@@ -118,7 +120,7 @@ fn serializing_ref_list(c: &mut Criterion) {
                 .unwrap()
                 .bare_item(RefBareItem::Token("abcdefghigklmnoprst"))
                 .unwrap()
-                .bare_item(123456785686457)
+                .bare_item(integer(123456785686457))
                 .unwrap()
                 .bare_item(Decimal::from_f64(99999999999.999).unwrap())
                 .unwrap()
@@ -150,7 +152,7 @@ fn serializing_ref_dict(c: &mut Criterion) {
                 .unwrap()
                 .bare_item_member("dict_key2", RefBareItem::Token("abcdefghigklmnoprst"))
                 .unwrap()
-                .bare_item_member("dict_key3", 123456785686457)
+                .bare_item_member("dict_key3", integer(123456785686457))
                 .unwrap()
                 .open_inner_list("dict_key4")
                 .unwrap()

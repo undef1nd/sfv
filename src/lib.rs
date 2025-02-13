@@ -165,15 +165,19 @@ assert_eq!(
 */
 
 mod error;
+mod integer;
 mod parser;
 mod ref_serializer;
 mod serializer;
 mod utils;
 
 #[cfg(test)]
+mod test_integer;
+#[cfg(test)]
 mod test_parser;
 #[cfg(test)]
 mod test_serializer;
+
 use indexmap::IndexMap;
 
 pub use rust_decimal::{
@@ -182,6 +186,7 @@ pub use rust_decimal::{
 };
 
 pub use error::Error;
+pub use integer::{integer, Integer, OutOfRangeError};
 pub use parser::{ParseMore, Parser};
 pub use ref_serializer::{
     RefDictSerializer, RefInnerListSerializer, RefItemSerializer, RefListSerializer,
@@ -298,7 +303,7 @@ pub enum BareItem {
     Decimal(Decimal),
     /// Integer number
     // sf-integer = ["-"] 1*15DIGIT
-    Integer(i64),
+    Integer(Integer),
     // sf-string = DQUOTE *chr DQUOTE
     // chr       = unescaped / escaped
     // unescaped = %x20-21 / %x23-5B / %x5D-7E
@@ -328,13 +333,13 @@ impl BareItem {
             _ => None,
         }
     }
-    /// If `BareItem` is an integer, returns `i64`, otherwise returns `None`.
+    /// If `BareItem` is an integer, returns `Integer`, otherwise returns `None`.
     /// ```
-    /// # use sfv::BareItem;
+    /// # use sfv::{integer, BareItem};
     /// let bare_item: BareItem = 100.into();
-    /// assert_eq!(bare_item.as_int().unwrap(), 100);
+    /// assert_eq!(bare_item.as_int().unwrap(), integer(100));
     /// ```
-    pub fn as_int(&self) -> Option<i64> {
+    pub fn as_int(&self) -> Option<Integer> {
         match *self {
             BareItem::Integer(val) => Some(val),
             _ => None,
@@ -391,15 +396,9 @@ impl BareItem {
     }
 }
 
-impl From<i64> for BareItem {
-    /// Converts `i64` into `BareItem::Integer`.
-    /// ```
-    /// # use sfv::BareItem;
-    /// let bare_item: BareItem = 456.into();
-    /// assert_eq!(bare_item.as_int().unwrap(), 456);
-    /// ```
-    fn from(item: i64) -> Self {
-        BareItem::Integer(item)
+impl From<Integer> for BareItem {
+    fn from(val: Integer) -> BareItem {
+        BareItem::Integer(val)
     }
 }
 
@@ -431,13 +430,13 @@ impl From<Vec<u8>> for BareItem {
 #[derive(Debug, PartialEq)]
 pub(crate) enum Num {
     Decimal(Decimal),
-    Integer(i64),
+    Integer(Integer),
 }
 
 /// Similar to `BareItem`, but used to serialize values via `RefItemSerializer`, `RefListSerializer`, `RefDictSerializer`.
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum RefBareItem<'a> {
-    Integer(i64),
+    Integer(Integer),
     Decimal(Decimal),
     String(&'a str),
     ByteSeq(&'a [u8]),
@@ -458,8 +457,8 @@ impl<'a> From<&'a BareItem> for RefBareItem<'a> {
     }
 }
 
-impl<'a> From<i64> for RefBareItem<'a> {
-    fn from(val: i64) -> RefBareItem<'a> {
+impl<'a> From<Integer> for RefBareItem<'a> {
+    fn from(val: Integer) -> RefBareItem<'a> {
         RefBareItem::Integer(val)
     }
 }

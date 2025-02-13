@@ -4,6 +4,7 @@ use sfv::FromStr;
 use sfv::Parser;
 use sfv::SerializeValue;
 use sfv::{BareItem, Decimal, Dictionary, InnerList, Item, List, ListEntry, Parameters};
+use std::convert::TryInto;
 use std::error::Error;
 use std::path::PathBuf;
 use std::{env, fs};
@@ -89,7 +90,13 @@ fn run_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
 }
 
 fn run_test_case_serialization_only(test_case: &TestData) -> Result<(), Box<dyn Error>> {
-    let expected_field_value = build_expected_field_value(test_case)?;
+    let expected_field_value = match build_expected_field_value(test_case) {
+        Ok(v) => v,
+        Err(_) => {
+            assert!(test_case.must_fail);
+            return Ok(());
+        }
+    };
     let actual_result = expected_field_value.serialize();
 
     if test_case.must_fail {
@@ -233,7 +240,8 @@ fn build_bare_item(bare_item_value: &Value) -> Result<BareItem, Box<dyn Error>> 
         bare_item if bare_item.is_i64() => Ok(BareItem::Integer(
             bare_item
                 .as_i64()
-                .ok_or("build_bare_item: bare_item value is not an i64")?,
+                .ok_or("build_bare_item: bare_item value is not an i64")?
+                .try_into()?,
         )),
         bare_item if bare_item.is_f64() => {
             let decimal = Decimal::from_str(&serde_json::to_string(bare_item)?)?;
