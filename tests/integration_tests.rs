@@ -19,7 +19,8 @@ fn test_report_to_header() -> Result<(), Box<dyn Error>> {
         .get("report-to")
         .ok_or("parameter does not exist")?
         .as_str()
-        .ok_or("unexpected BareItem variant")?;
+        .ok_or("unexpected BareItem variant")?
+        .as_str();
 
     let endpoints_parsed = Parser::from_bytes(endpoints).parse_dictionary()?;
     if let Some(ListEntry::Item(item)) = endpoints_parsed.get(coep_endpoint) {
@@ -27,7 +28,7 @@ fn test_report_to_header() -> Result<(), Box<dyn Error>> {
             .bare_item
             .as_str()
             .ok_or("unexpected BareItem variant")?;
-        assert_eq!(item_value, "https://example.com/coep");
+        assert_eq!(item_value.as_str(), "https://example.com/coep");
         return Ok(());
     }
     Err("unexpected endpoint value".into())

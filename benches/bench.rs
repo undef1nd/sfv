@@ -4,7 +4,7 @@ extern crate criterion;
 use criterion::{BenchmarkId, Criterion};
 use rust_decimal::prelude::FromPrimitive;
 use sfv::{
-    integer, token_ref, Decimal, Parser, RefBareItem, RefDictSerializer, RefItemSerializer,
+    integer, string_ref, token_ref, Decimal, Parser, RefDictSerializer, RefItemSerializer,
     RefListSerializer, SerializeValue,
 };
 
@@ -127,9 +127,9 @@ fn serializing_ref_list(c: &mut Criterion) {
                 .open_inner_list()
                 .close_inner_list()
                 .open_inner_list()
-                .inner_list_bare_item(RefBareItem::String("somelongstringvalue"))
+                .inner_list_bare_item(string_ref("somelongstringvalue"))
                 .unwrap()
-                .inner_list_bare_item(RefBareItem::String("anotherlongstringvalue"))
+                .inner_list_bare_item(string_ref("anotherlongstringvalue"))
                 .unwrap()
                 .inner_list_parameter(
                     "key",
@@ -156,7 +156,7 @@ fn serializing_ref_dict(c: &mut Criterion) {
                 .unwrap()
                 .open_inner_list("dict_key4")
                 .unwrap()
-                .inner_list_bare_item(RefBareItem::String("inner-list-member"))
+                .inner_list_bare_item(string_ref("inner-list-member"))
                 .unwrap()
                 .inner_list_bare_item("inner-list-member".as_bytes())
                 .unwrap()

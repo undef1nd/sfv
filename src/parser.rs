@@ -1,10 +1,11 @@
 use crate::utils;
 use crate::{
     BareItem, Decimal, Dictionary, Error, InnerList, Integer, Item, List, ListEntry, Num,
-    Parameters, SFVResult, Token,
+    Parameters, SFVResult, String, Token,
 };
 
 use std::convert::TryFrom;
+use std::string::String as StdString;
 
 trait ParseValue {
     fn parse(parser: &mut Parser) -> SFVResult<Self>
@@ -310,12 +311,12 @@ impl<'a> Parser<'a> {
 
         self.next();
 
-        let mut output_string = String::new();
+        let mut output_string = StdString::new();
         while let Some(curr_char) = self.peek() {
             match curr_char {
                 b'"' => {
                     self.next();
-                    return Ok(output_string);
+                    return Ok(String::from_string(output_string).unwrap());
                 }
                 0x00..=0x1f | 0x7f..=0xff => {
                     return self.error("invalid string character");
@@ -343,7 +344,7 @@ impl<'a> Parser<'a> {
     pub(crate) fn parse_token(&mut self) -> SFVResult<Token> {
         // https://httpwg.org/specs/rfc8941.html#parse-token
 
-        let mut output_string = String::new();
+        let mut output_string = StdString::new();
 
         match self.peek() {
             Some(c) if utils::is_allowed_start_token_char(c) => {
@@ -497,8 +498,8 @@ impl<'a> Parser<'a> {
         Ok(params)
     }
 
-    pub(crate) fn parse_key(&mut self) -> SFVResult<String> {
-        let mut output = String::new();
+    pub(crate) fn parse_key(&mut self) -> SFVResult<StdString> {
+        let mut output = StdString::new();
 
         match self.peek() {
             Some(c) if utils::is_allowed_start_key_char(c) => {

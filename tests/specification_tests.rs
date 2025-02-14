@@ -3,7 +3,10 @@ use serde_json::Value;
 use sfv::FromStr;
 use sfv::Parser;
 use sfv::SerializeValue;
-use sfv::{BareItem, Decimal, Dictionary, InnerList, Item, List, ListEntry, Parameters, TokenRef};
+use sfv::{
+    BareItem, Decimal, Dictionary, InnerList, Item, List, ListEntry, Parameters, StringRef,
+    TokenRef,
+};
 use std::convert::TryInto;
 use std::error::Error;
 use std::path::PathBuf;
@@ -253,10 +256,12 @@ fn build_bare_item(bare_item_value: &Value) -> Result<BareItem, Box<dyn Error>> 
                 .ok_or("build_bare_item: bare_item value is not a bool")?,
         )),
         bare_item if bare_item.is_string() => Ok(BareItem::String(
-            bare_item
-                .as_str()
-                .ok_or("build_bare_item: bare_item value is not a str")?
-                .to_owned(),
+            StringRef::from_str(
+                bare_item
+                    .as_str()
+                    .ok_or("build_bare_item: bare_item value is not a str")?,
+            )?
+            .to_owned(),
         )),
         bare_item if (bare_item.is_object() && bare_item["__type"] == "token") => {
             Ok(BareItem::Token(

@@ -98,9 +98,9 @@ match dict.get("u") {
 ### Structured Field Value Construction and Serialization
 Creates `Item` with empty parameters:
 ```
-use sfv::{Item, BareItem, SerializeValue};
+use sfv::{string_ref, Item, SerializeValue};
 
-let str_item = Item::new(BareItem::String(String::from("foo")));
+let str_item = Item::new(string_ref("foo").to_owned());
 assert_eq!(str_item.serialize_value().unwrap(), r#""foo""#);
 ```
 
@@ -118,12 +118,12 @@ assert_eq!(int_item.serialize_value().unwrap(), "99;key=13.457");
 
 Creates `List` field value with `Item` and parametrized `InnerList` as members:
 ```
-use sfv::{token_ref, Item, BareItem, InnerList, List, SerializeValue, Parameters};
+use sfv::{string_ref, token_ref, Item, BareItem, InnerList, List, SerializeValue, Parameters};
 
 let tok_item = BareItem::Token(token_ref("tok").to_owned());
 
 // Creates Item.
-let str_item = Item::new(BareItem::String(String::from("foo")));
+let str_item = Item::new(string_ref("foo").to_owned());
 
 // Creates InnerList members.
 let mut int_item_params = Parameters::new();
@@ -145,9 +145,9 @@ assert_eq!(
 
 Creates `Dictionary` field value:
 ```
-use sfv::{Parser, Item, BareItem, SerializeValue, Dictionary};
+use sfv::{string_ref, Parser, Item, SerializeValue, Dictionary};
 
-let member_value1 = Item::new(BareItem::String(String::from("apple")));
+let member_value1 = Item::new(string_ref("apple").to_owned());
 let member_value2 = Item::new(true);
 let member_value3 = Item::new(false);
 
@@ -169,6 +169,7 @@ mod integer;
 mod parser;
 mod ref_serializer;
 mod serializer;
+mod string;
 mod token;
 mod utils;
 
@@ -179,9 +180,12 @@ mod test_parser;
 #[cfg(test)]
 mod test_serializer;
 #[cfg(test)]
+mod test_string;
+#[cfg(test)]
 mod test_token;
 
 use indexmap::IndexMap;
+use std::string::String as StdString;
 
 pub use rust_decimal::{
     prelude::{FromPrimitive, FromStr},
@@ -196,6 +200,7 @@ pub use ref_serializer::{
     RefParameterSerializer,
 };
 pub use serializer::SerializeValue;
+pub use string::{string_ref, String, StringError, StringRef};
 pub use token::{token_ref, Token, TokenError, TokenRef};
 
 type SFVResult<T> = std::result::Result<T, Error>;
@@ -235,7 +240,7 @@ impl Item {
 // dict-member    = member-name [ "=" member-value ]
 // member-name    = key
 // member-value   = sf-item / inner-list
-pub type Dictionary = IndexMap<String, ListEntry>;
+pub type Dictionary = IndexMap<StdString, ListEntry>;
 
 /// Represents `List` type structured field value.
 // sf-list       = list-member *( OWS "," OWS list-member )
@@ -250,7 +255,7 @@ pub type List = Vec<ListEntry>;
 //                 *( lcalpha / DIGIT / "_" / "-" / "." / "*" )
 // lcalpha       = %x61-7A ; a-z
 // param-value   = bare-item
-pub type Parameters = IndexMap<String, BareItem>;
+pub type Parameters = IndexMap<StdString, BareItem>;
 
 /// Represents a member of `List` or `Dictionary` structured field value.
 #[derive(Debug, PartialEq, Clone)]
@@ -351,11 +356,11 @@ impl BareItem {
     }
     /// If `BareItem` is `String`, returns `&str`, otherwise returns `None`.
     /// ```
-    /// # use sfv::BareItem;
-    /// let bare_item = BareItem::String("foo".into());
-    /// assert_eq!(bare_item.as_str().unwrap(), "foo");
+    /// # use sfv::{string_ref, BareItem};
+    /// let bare_item = BareItem::String(string_ref("foo").to_owned());
+    /// assert_eq!(bare_item.as_str().unwrap().as_str(), "foo");
     /// ```
-    pub fn as_str(&self) -> Option<&str> {
+    pub fn as_str(&self) -> Option<&String> {
         match *self {
             BareItem::String(ref val) => Some(val),
             _ => None,
@@ -437,6 +442,12 @@ impl From<Token> for BareItem {
     }
 }
 
+impl From<String> for BareItem {
+    fn from(val: String) -> BareItem {
+        BareItem::String(val)
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub(crate) enum Num {
     Decimal(Decimal),
@@ -448,7 +459,7 @@ pub(crate) enum Num {
 pub enum RefBareItem<'a> {
     Integer(Integer),
     Decimal(Decimal),
-    String(&'a str),
+    String(&'a StringRef),
     ByteSeq(&'a [u8]),
     Boolean(bool),
     Token(&'a TokenRef),
@@ -500,5 +511,17 @@ impl<'a> From<&'a Token> for RefBareItem<'a> {
 impl<'a> From<&'a TokenRef> for RefBareItem<'a> {
     fn from(val: &'a TokenRef) -> RefBareItem<'a> {
         RefBareItem::Token(val)
+    }
+}
+
+impl<'a> From<&'a String> for RefBareItem<'a> {
+    fn from(val: &'a String) -> RefBareItem<'a> {
+        RefBareItem::String(val)
+    }
+}
+
+impl<'a> From<&'a StringRef> for RefBareItem<'a> {
+    fn from(val: &'a StringRef) -> RefBareItem<'a> {
+        RefBareItem::String(val)
     }
 }

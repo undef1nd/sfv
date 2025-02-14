@@ -79,7 +79,7 @@ fn maybe_write_separator(buffer: &mut String, first: &mut bool) {
 
 /// Serializes `List` field value components incrementally.
 /// ```
-/// use sfv::{token_ref, RefBareItem, RefListSerializer};
+/// use sfv::{string_ref, token_ref, RefListSerializer};
 ///
 /// # fn main() -> Result<(), sfv::Error> {
 /// let serialized_list = RefListSerializer::new()
@@ -90,7 +90,7 @@ fn maybe_write_separator(buffer: &mut String, first: &mut bool) {
 ///     .inner_list_parameter("abc_param", false)?
 ///     .inner_list_bare_item(token_ref("def"))?
 ///     .close_inner_list()
-///     .parameter("bar", RefBareItem::String("val"))?
+///     .parameter("bar", string_ref("val"))?
 ///     .finish()?;
 ///
 /// assert_eq!(
@@ -161,7 +161,7 @@ impl<W: BorrowMut<String>> RefListSerializer<W> {
 
 /// Serializes `Dictionary` field value components incrementally.
 /// ```
-/// use sfv::{token_ref, Decimal, FromPrimitive, RefBareItem, RefDictSerializer};
+/// use sfv::{string_ref, token_ref, Decimal, FromPrimitive, RefBareItem, RefDictSerializer};
 ///
 /// # fn main() -> Result<(), sfv::Error> {
 /// let serialized_dict = RefDictSerializer::new()
@@ -172,7 +172,7 @@ impl<W: BorrowMut<String>> RefListSerializer<W> {
 ///    .inner_list_parameter("abc_param", false)?
 ///    .inner_list_bare_item(token_ref("def"))?
 ///    .close_inner_list()
-///    .parameter("bar", RefBareItem::String("val"))?
+///    .parameter("bar", string_ref("val"))?
 ///    .bare_item_member(
 ///         "member3",
 ///         Decimal::from_f64(12.34566).unwrap(),
@@ -320,7 +320,7 @@ impl BufferHolder for String {
 #[cfg(test)]
 mod alternative_serializer_tests {
     use super::*;
-    use crate::{token_ref, Decimal, FromPrimitive};
+    use crate::{string_ref, token_ref, Decimal, FromPrimitive};
 
     #[test]
     fn test_fast_serialize_item() -> SFVResult<()> {
@@ -339,7 +339,7 @@ mod alternative_serializer_tests {
             .parameter("key1", true)?
             .parameter("key2", false)?
             .open_inner_list()
-            .inner_list_bare_item(RefBareItem::String("some_string"))?
+            .inner_list_bare_item(string_ref("some_string"))?
             .inner_list_bare_item(12)?
             .inner_list_parameter("inner-member-key", true)?
             .close_inner_list()
@@ -360,12 +360,12 @@ mod alternative_serializer_tests {
             .parameter("key2", false)?
             .bare_item_member("member2", true)?
             .parameter("key3", Decimal::from_f64(45.4586).unwrap())?
-            .parameter("key4", RefBareItem::String("str"))?
+            .parameter("key4", string_ref("str"))?
             .open_inner_list("key5")?
             .inner_list_bare_item(45)?
             .inner_list_bare_item(0)?
             .close_inner_list()
-            .bare_item_member("key6", RefBareItem::String("foo"))?
+            .bare_item_member("key6", string_ref("foo"))?
             .open_inner_list("key7")?
             .inner_list_bare_item("some_string".as_bytes())?
             .inner_list_bare_item("other_string".as_bytes())?

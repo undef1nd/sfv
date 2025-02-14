@@ -2,7 +2,8 @@ use crate::serializer::Serializer;
 use crate::FromStr;
 use crate::SerializeValue;
 use crate::{
-    integer, token_ref, BareItem, Decimal, Dictionary, Error, InnerList, Item, List, Parameters,
+    integer, string_ref, token_ref, BareItem, Decimal, Dictionary, Error, InnerList, Item, List,
+    Parameters,
 };
 use std::error::Error as StdError;
 use std::iter::FromIterator;
@@ -39,11 +40,10 @@ fn serialize_value_list_mixed_members_with_params() -> Result<(), Box<dyn StdErr
 
     let inner_list_item1_param =
         Parameters::from_iter(vec![("in1_p".to_owned(), BareItem::Boolean(false))]);
-    let inner_list_item1 =
-        Item::with_params(BareItem::String("str1".to_owned()), inner_list_item1_param);
+    let inner_list_item1 = Item::with_params(string_ref("str1").to_owned(), inner_list_item1_param);
     let inner_list_item2_param = Parameters::from_iter(vec![(
         "in2_p".to_owned(),
-        BareItem::String(r#"valu\e"#.to_owned()),
+        BareItem::String(string_ref(r#"valu\e"#).to_owned()),
     )]);
     let inner_list_item2 = Item::with_params(token_ref("str2").to_owned(), inner_list_item2_param);
     let inner_list_param = Parameters::from_iter(vec![(
@@ -61,12 +61,6 @@ fn serialize_value_list_mixed_members_with_params() -> Result<(), Box<dyn StdErr
 
 #[test]
 fn serialize_value_errors() -> Result<(), Box<dyn StdError>> {
-    let disallowed_item = Item::new(BareItem::String("non-ascii text 🐹".into()));
-    assert_eq!(
-        Err(Error::new("serialize_string: non-ascii character")),
-        disallowed_item.serialize_value()
-    );
-
     let disallowed_item = Item::new(Decimal::from_str("12345678912345.123")?);
     assert_eq!(
         Err(Error::new(
@@ -127,7 +121,7 @@ fn serialize_item_with_token_param() -> Result<(), Box<dyn StdError>> {
         "a1".to_owned(),
         BareItem::Token(token_ref("*tok").to_owned()),
     )]);
-    let item = Item::with_params(BareItem::String("12.35".to_owned()), param);
+    let item = Item::with_params(string_ref("12.35").to_owned(), param);
     Serializer::serialize_item(&item, &mut buf)?;
     assert_eq!(r#""12.35";a1=*tok"#, &buf);
     Ok(())
@@ -208,55 +202,30 @@ fn serialize_decimal_errors() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn serialize_string() -> Result<(), Box<dyn StdError>> {
+fn serialize_string() {
     let mut buf = String::new();
-    Serializer::serialize_string("1.1 text", &mut buf)?;
+    Serializer::serialize_string(string_ref("1.1 text"), &mut buf);
     assert_eq!(r#""1.1 text""#, &buf);
 
     buf.clear();
-    Serializer::serialize_string(r#"hello "name""#, &mut buf)?;
+    Serializer::serialize_string(string_ref(r#"hello "name""#), &mut buf);
     assert_eq!(r#""hello \"name\"""#, &buf);
 
     buf.clear();
-    Serializer::serialize_string(r#"something\nothing"#, &mut buf)?;
+    Serializer::serialize_string(string_ref(r#"something\nothing"#), &mut buf);
     assert_eq!(r#""something\\nothing""#, &buf);
 
     buf.clear();
-    Serializer::serialize_string("", &mut buf)?;
+    Serializer::serialize_string(string_ref(""), &mut buf);
     assert_eq!(r#""""#, &buf);
 
     buf.clear();
-    Serializer::serialize_string(" ", &mut buf)?;
+    Serializer::serialize_string(string_ref(" "), &mut buf);
     assert_eq!(r#"" ""#, &buf);
 
     buf.clear();
-    Serializer::serialize_string("    ", &mut buf)?;
+    Serializer::serialize_string(string_ref("    "), &mut buf);
     assert_eq!(r#""    ""#, &buf);
-    Ok(())
-}
-
-#[test]
-fn serialize_string_errors() -> Result<(), Box<dyn StdError>> {
-    let mut buf = String::new();
-
-    assert_eq!(
-        Err(Error::new("serialize_string: not a visible character")),
-        Serializer::serialize_string("text \x00", &mut buf)
-    );
-
-    assert_eq!(
-        Err(Error::new("serialize_string: not a visible character")),
-        Serializer::serialize_string("text \x1f", &mut buf)
-    );
-    assert_eq!(
-        Err(Error::new("serialize_string: not a visible character")),
-        Serializer::serialize_string("text \x7f", &mut buf)
-    );
-    assert_eq!(
-        Err(Error::new("serialize_string: non-ascii character")),
-        Serializer::serialize_string("рядок", &mut buf)
-    );
-    Ok(())
 }
 
 #[test]
@@ -344,7 +313,7 @@ fn serialize_params_string() -> Result<(), Box<dyn StdError>> {
 
     let input = Parameters::from_iter(vec![(
         "b".to_owned(),
-        BareItem::String("param_val".to_owned()),
+        BareItem::String(string_ref("param_val").to_owned()),
     )]);
     Serializer::serialize_parameters(&input, &mut buf)?;
     assert_eq!(r#";b="param_val""#, &buf);
@@ -435,7 +404,7 @@ fn serialize_list_of_items_and_inner_list() -> Result<(), Box<dyn StdError>> {
     let item4 = Item::new(token_ref("b").to_owned());
     let inner_list_param = Parameters::from_iter(vec![(
         "param".to_owned(),
-        BareItem::String("param_value_1".to_owned()),
+        BareItem::String(string_ref("param_value_1").to_owned()),
     )]);
     let inner_list = InnerList::with_params(vec![item3, item4], inner_list_param);
     let input: List = vec![item1.into(), item2.into(), inner_list.into()];
@@ -490,7 +459,10 @@ fn serialize_dictionary_with_params() -> Result<(), Box<dyn StdError>> {
     let item2_params = Parameters::new();
     let item3_params = Parameters::from_iter(vec![
         ("q".to_owned(), BareItem::Boolean(false)),
-        ("r".to_owned(), BareItem::String("+w".to_owned())),
+        (
+            "r".to_owned(),
+            BareItem::String(string_ref("+w").to_owned()),
+        ),
     ]);
 
     let item1 = Item::with_params(123, item1_params);

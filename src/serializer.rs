@@ -1,7 +1,7 @@
 use crate::utils;
 use crate::{
     BareItem, Decimal, Dictionary, Error, InnerList, Integer, Item, List, ListEntry, Parameters,
-    RefBareItem, SFVResult, TokenRef,
+    RefBareItem, SFVResult, StringRef, TokenRef,
 };
 use std::fmt::Write as _;
 
@@ -152,7 +152,7 @@ impl Serializer {
 
         match value.into() {
             RefBareItem::Boolean(value) => Self::serialize_bool(value, output),
-            RefBareItem::String(value) => Self::serialize_string(value, output)?,
+            RefBareItem::String(value) => Self::serialize_string(value, output),
             RefBareItem::ByteSeq(value) => Self::serialize_byte_sequence(value, output),
             RefBareItem::Token(value) => Self::serialize_token(value, output),
             RefBareItem::Integer(value) => Self::serialize_integer(value, output),
@@ -243,28 +243,17 @@ impl Serializer {
         Ok(())
     }
 
-    pub(crate) fn serialize_string(value: &str, output: &mut String) -> SFVResult<()> {
-        // https://httpwg.org/specs/rfc8941.html#ser-integer
-
-        if !value.is_ascii() {
-            return Err(Error::new("serialize_string: non-ascii character"));
-        }
-
-        let vchar_or_sp = |char| char == '\x7f' || ('\x00'..='\x1f').contains(&char);
-        if value.chars().any(vchar_or_sp) {
-            return Err(Error::new("serialize_string: not a visible character"));
-        }
+    pub(crate) fn serialize_string(value: &StringRef, output: &mut String) {
+        // https://httpwg.org/specs/rfc8941.html#ser-string
 
         output.push('"');
-        for char in value.chars() {
+        for char in value.as_str().chars() {
             if char == '\\' || char == '"' {
                 output.push('\\');
             }
             output.push(char);
         }
         output.push('"');
-
-        Ok(())
     }
 
     pub(crate) fn serialize_token(value: &TokenRef, output: &mut String) {
