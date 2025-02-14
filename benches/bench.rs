@@ -4,7 +4,7 @@ extern crate criterion;
 use criterion::{BenchmarkId, Criterion};
 use rust_decimal::prelude::FromPrimitive;
 use sfv::{
-    integer, string_ref, token_ref, Decimal, Parser, RefDictSerializer, RefItemSerializer,
+    integer, key_ref, string_ref, token_ref, Decimal, Parser, RefDictSerializer, RefItemSerializer,
     RefListSerializer, SerializeValue,
 };
 
@@ -132,7 +132,7 @@ fn serializing_ref_list(c: &mut Criterion) {
                 .inner_list_bare_item(string_ref("anotherlongstringvalue"))
                 .unwrap()
                 .inner_list_parameter(
-                    "key",
+                    key_ref("key"),
                     "somever longstringvaluerepresentedasbytes".as_bytes(),
                 )
                 .unwrap()
@@ -148,20 +148,19 @@ fn serializing_ref_dict(c: &mut Criterion) {
     c.bench_function("serializing_ref_dict", move |bench| {
         bench.iter(|| {
             RefDictSerializer::new()
-                .bare_item_member("a", true)
+                .bare_item_member(key_ref("a"), true)
                 .unwrap()
-                .bare_item_member("dict_key2", token_ref("abcdefghigklmnoprst"))
+                .bare_item_member(key_ref("dict_key2"), token_ref("abcdefghigklmnoprst"))
                 .unwrap()
-                .bare_item_member("dict_key3", integer(123456785686457))
+                .bare_item_member(key_ref("dict_key3"), integer(123456785686457))
                 .unwrap()
-                .open_inner_list("dict_key4")
-                .unwrap()
+                .open_inner_list(key_ref("dict_key4"))
                 .inner_list_bare_item(string_ref("inner-list-member"))
                 .unwrap()
                 .inner_list_bare_item("inner-list-member".as_bytes())
                 .unwrap()
                 .close_inner_list()
-                .parameter("key", token_ref("aW5uZXItbGlzdC1wYXJhbWV0ZXJz"))
+                .parameter(key_ref("key"), token_ref("aW5uZXItbGlzdC1wYXJhbWV0ZXJz"))
                 .unwrap()
                 .finish()
         });

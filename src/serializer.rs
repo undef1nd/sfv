@@ -1,7 +1,7 @@
 use crate::utils;
 use crate::{
-    BareItem, Decimal, Dictionary, Error, InnerList, Integer, Item, List, ListEntry, Parameters,
-    RefBareItem, SFVResult, StringRef, TokenRef,
+    BareItem, Decimal, Dictionary, Error, InnerList, Integer, Item, KeyRef, List, ListEntry,
+    Parameters, RefBareItem, SFVResult, StringRef, TokenRef,
 };
 use std::fmt::Write as _;
 
@@ -96,7 +96,7 @@ impl Serializer {
         }
 
         for (idx, (member_name, member_value)) in input_dict.iter().enumerate() {
-            Serializer::serialize_key(member_name, output)?;
+            Serializer::serialize_key(member_name, output);
 
             match member_value {
                 ListEntry::Item(item) => {
@@ -174,12 +174,12 @@ impl Serializer {
     }
 
     pub(crate) fn serialize_parameter<'b>(
-        name: &str,
+        name: &KeyRef,
         value: impl Into<RefBareItem<'b>>,
         output: &mut String,
     ) -> SFVResult<()> {
         output.push(';');
-        Self::serialize_key(name, output)?;
+        Self::serialize_key(name, output);
 
         let value = value.into();
         if value != RefBareItem::Boolean(true) {
@@ -189,28 +189,10 @@ impl Serializer {
         Ok(())
     }
 
-    pub(crate) fn serialize_key(input_key: &str, output: &mut String) -> SFVResult<()> {
+    pub(crate) fn serialize_key(input_key: &KeyRef, output: &mut String) {
         // https://httpwg.org/specs/rfc8941.html#ser-key
 
-        let mut bytes = input_key.bytes();
-
-        match bytes.next() {
-            None => return Err(Error::new("serialize_key: key is empty")),
-            Some(c) => {
-                if !utils::is_allowed_start_key_char(c) {
-                    return Err(Error::new(
-                        "serialize_key: first character is not lcalpha or '*'",
-                    ));
-                }
-            }
-        }
-
-        if bytes.any(|c| !utils::is_allowed_inner_key_char(c)) {
-            return Err(Error::new("serialize_key: disallowed character"));
-        }
-
-        output.push_str(input_key);
-        Ok(())
+        output.push_str(input_key.as_str());
     }
 
     pub(crate) fn serialize_integer(value: Integer, output: &mut String) {

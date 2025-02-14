@@ -4,7 +4,7 @@ use sfv::FromStr;
 use sfv::Parser;
 use sfv::SerializeValue;
 use sfv::{
-    BareItem, Decimal, Dictionary, InnerList, Item, List, ListEntry, Parameters, StringRef,
+    BareItem, Decimal, Dictionary, InnerList, Item, KeyRef, List, ListEntry, Parameters, StringRef,
     TokenRef,
 };
 use std::convert::TryInto;
@@ -171,9 +171,11 @@ fn build_dict(expected_value: &Value) -> Result<Dictionary, Box<dyn Error>> {
         let member = member
             .as_array()
             .ok_or("build_dict: expected dict member is not an array")?;
-        let member_name = member[0]
-            .as_str()
-            .ok_or("build_dict: expected dict member name is not a str")?;
+        let member_name = KeyRef::from_str(
+            member[0]
+                .as_str()
+                .ok_or("build_dict: expected dict member name is not a str")?,
+        )?;
         let member_value = &member[1];
         let item_or_inner_list: ListEntry = build_list_or_item(member_value)?;
         dict.insert(member_name.to_owned(), item_or_inner_list);
@@ -300,9 +302,11 @@ fn build_parameters(params_value: &Value) -> Result<Parameters, Box<dyn Error>> 
         let member = member
             .as_array()
             .ok_or("build_parameters: expected parameter is not an array")?;
-        let key = member[0]
-            .as_str()
-            .ok_or("build_parameters: expected parameter name is not a str")?;
+        let key = KeyRef::from_str(
+            member[0]
+                .as_str()
+                .ok_or("build_parameters: expected parameter name is not a str")?,
+        )?;
         let value = &member[1];
         let itm = build_bare_item(value)?;
         parameters.insert(key.to_owned(), itm);

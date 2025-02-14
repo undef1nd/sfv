@@ -1,6 +1,6 @@
 use crate::utils;
 use crate::{
-    BareItem, Decimal, Dictionary, Error, InnerList, Integer, Item, List, ListEntry, Num,
+    BareItem, Decimal, Dictionary, Error, InnerList, Integer, Item, Key, List, ListEntry, Num,
     Parameters, SFVResult, String, Token,
 };
 
@@ -498,7 +498,7 @@ impl<'a> Parser<'a> {
         Ok(params)
     }
 
-    pub(crate) fn parse_key(&mut self) -> SFVResult<StdString> {
+    pub(crate) fn parse_key(&mut self) -> SFVResult<Key> {
         let mut output = StdString::new();
 
         match self.peek() {
@@ -515,7 +515,7 @@ impl<'a> Parser<'a> {
                     self.next();
                     output.push(c as char);
                 }
-                _ => return Ok(output),
+                _ => return Ok(Key::from_string(output).unwrap()),
             }
         }
     }

@@ -107,18 +107,18 @@ assert_eq!(str_item.serialize_value().unwrap(), r#""foo""#);
 
 Creates `Item` field value with parameters:
 ```
-use sfv::{Item, BareItem, SerializeValue, Parameters, Decimal, FromPrimitive};
+use sfv::{key_ref, Item, BareItem, SerializeValue, Parameters, Decimal, FromPrimitive};
 
 let mut params = Parameters::new();
 let decimal = Decimal::from_f64(13.45655).unwrap();
-params.insert("key".into(), BareItem::Decimal(decimal));
+params.insert(key_ref("key").to_owned(), BareItem::Decimal(decimal));
 let int_item = Item::with_params(99, params);
 assert_eq!(int_item.serialize_value().unwrap(), "99;key=13.457");
 ```
 
 Creates `List` field value with `Item` and parametrized `InnerList` as members:
 ```
-use sfv::{string_ref, token_ref, Item, BareItem, InnerList, List, SerializeValue, Parameters};
+use sfv::{key_ref, string_ref, token_ref, Item, BareItem, InnerList, List, SerializeValue, Parameters};
 
 let tok_item = BareItem::Token(token_ref("tok").to_owned());
 
@@ -127,12 +127,12 @@ let str_item = Item::new(string_ref("foo").to_owned());
 
 // Creates InnerList members.
 let mut int_item_params = Parameters::new();
-int_item_params.insert("key".into(), BareItem::Boolean(false));
+int_item_params.insert(key_ref("key").to_owned(), BareItem::Boolean(false));
 let int_item = Item::with_params(99, int_item_params);
 
 // Creates InnerList.
 let mut inner_list_params = Parameters::new();
-inner_list_params.insert("bar".into(), BareItem::Boolean(true));
+inner_list_params.insert(key_ref("bar").to_owned(), BareItem::Boolean(true));
 let inner_list = InnerList::with_params(vec![int_item, str_item], inner_list_params);
 
 
@@ -145,16 +145,16 @@ assert_eq!(
 
 Creates `Dictionary` field value:
 ```
-use sfv::{string_ref, Parser, Item, SerializeValue, Dictionary};
+use sfv::{key_ref, string_ref, Parser, Item, SerializeValue, Dictionary};
 
 let member_value1 = Item::new(string_ref("apple").to_owned());
 let member_value2 = Item::new(true);
 let member_value3 = Item::new(false);
 
 let mut dict = Dictionary::new();
-dict.insert("key1".into(), member_value1.into());
-dict.insert("key2".into(), member_value2.into());
-dict.insert("key3".into(), member_value3.into());
+dict.insert(key_ref("key1").to_owned(), member_value1.into());
+dict.insert(key_ref("key2").to_owned(), member_value2.into());
+dict.insert(key_ref("key3").to_owned(), member_value3.into());
 
 assert_eq!(
     dict.serialize_value().unwrap(),
@@ -166,6 +166,7 @@ assert_eq!(
 
 mod error;
 mod integer;
+mod key;
 mod parser;
 mod ref_serializer;
 mod serializer;
@@ -176,6 +177,8 @@ mod utils;
 #[cfg(test)]
 mod test_integer;
 #[cfg(test)]
+mod test_key;
+#[cfg(test)]
 mod test_parser;
 #[cfg(test)]
 mod test_serializer;
@@ -185,7 +188,6 @@ mod test_string;
 mod test_token;
 
 use indexmap::IndexMap;
-use std::string::String as StdString;
 
 pub use rust_decimal::{
     prelude::{FromPrimitive, FromStr},
@@ -194,6 +196,7 @@ pub use rust_decimal::{
 
 pub use error::Error;
 pub use integer::{integer, Integer, OutOfRangeError};
+pub use key::{key_ref, Key, KeyError, KeyRef};
 pub use parser::{ParseMore, Parser};
 pub use ref_serializer::{
     RefDictSerializer, RefInnerListSerializer, RefItemSerializer, RefListSerializer,
@@ -240,7 +243,7 @@ impl Item {
 // dict-member    = member-name [ "=" member-value ]
 // member-name    = key
 // member-value   = sf-item / inner-list
-pub type Dictionary = IndexMap<StdString, ListEntry>;
+pub type Dictionary = IndexMap<Key, ListEntry>;
 
 /// Represents `List` type structured field value.
 // sf-list       = list-member *( OWS "," OWS list-member )
@@ -255,7 +258,7 @@ pub type List = Vec<ListEntry>;
 //                 *( lcalpha / DIGIT / "_" / "-" / "." / "*" )
 // lcalpha       = %x61-7A ; a-z
 // param-value   = bare-item
-pub type Parameters = IndexMap<StdString, BareItem>;
+pub type Parameters = IndexMap<Key, BareItem>;
 
 /// Represents a member of `List` or `Dictionary` structured field value.
 #[derive(Debug, PartialEq, Clone)]

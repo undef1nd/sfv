@@ -1,16 +1,16 @@
 use crate::serializer::Serializer;
-use crate::{Error, RefBareItem, SFVResult};
+use crate::{Error, KeyRef, RefBareItem, SFVResult};
 
 use std::borrow::BorrowMut;
 
 /// Serializes `Item` field value components incrementally.
 /// ```
-/// use sfv::RefItemSerializer;
+/// use sfv::{key_ref, RefItemSerializer};
 ///
 /// # fn main() -> Result<(), sfv::Error> {
 /// let serialized_item = RefItemSerializer::new()
 ///     .bare_item(11)?
-///     .parameter("foo", true)?
+///     .parameter(key_ref("foo"), true)?
 ///     .finish();
 ///
 /// assert_eq!(serialized_item, "11;foo");
@@ -57,7 +57,7 @@ pub struct RefParameterSerializer<T> {
 impl<T: BufferHolder> RefParameterSerializer<T> {
     pub fn parameter<'b>(
         mut self,
-        name: &str,
+        name: &KeyRef,
         value: impl Into<RefBareItem<'b>>,
     ) -> SFVResult<Self> {
         Serializer::serialize_parameter(name, value, self.buffer.get_mut())?;
@@ -79,18 +79,18 @@ fn maybe_write_separator(buffer: &mut String, first: &mut bool) {
 
 /// Serializes `List` field value components incrementally.
 /// ```
-/// use sfv::{string_ref, token_ref, RefListSerializer};
+/// use sfv::{key_ref, string_ref, token_ref, RefListSerializer};
 ///
 /// # fn main() -> Result<(), sfv::Error> {
 /// let serialized_list = RefListSerializer::new()
 ///     .bare_item(11)?
-///     .parameter("foo", true)?
+///     .parameter(key_ref("foo"), true)?
 ///     .open_inner_list()
 ///     .inner_list_bare_item(token_ref("abc"))?
-///     .inner_list_parameter("abc_param", false)?
+///     .inner_list_parameter(key_ref("abc_param"), false)?
 ///     .inner_list_bare_item(token_ref("def"))?
 ///     .close_inner_list()
-///     .parameter("bar", string_ref("val"))?
+///     .parameter(key_ref("bar"), string_ref("val"))?
 ///     .finish()?;
 ///
 /// assert_eq!(
@@ -133,7 +133,7 @@ impl<W: BorrowMut<String>> RefListSerializer<W> {
 
     pub fn parameter<'b>(
         mut self,
-        name: &str,
+        name: &KeyRef,
         value: impl Into<RefBareItem<'b>>,
     ) -> SFVResult<Self> {
         if self.first {
@@ -161,20 +161,20 @@ impl<W: BorrowMut<String>> RefListSerializer<W> {
 
 /// Serializes `Dictionary` field value components incrementally.
 /// ```
-/// use sfv::{string_ref, token_ref, Decimal, FromPrimitive, RefBareItem, RefDictSerializer};
+/// use sfv::{key_ref, string_ref, token_ref, Decimal, FromPrimitive, RefBareItem, RefDictSerializer};
 ///
 /// # fn main() -> Result<(), sfv::Error> {
 /// let serialized_dict = RefDictSerializer::new()
-///    .bare_item_member("member1", 11)?
-///    .parameter("foo", true)?
-///    .open_inner_list("member2")?
+///    .bare_item_member(key_ref("member1"), 11)?
+///    .parameter(key_ref("foo"), true)?
+///    .open_inner_list(key_ref("member2"))
 ///    .inner_list_bare_item(token_ref("abc"))?
-///    .inner_list_parameter("abc_param", false)?
+///    .inner_list_parameter(key_ref("abc_param"), false)?
 ///    .inner_list_bare_item(token_ref("def"))?
 ///    .close_inner_list()
-///    .parameter("bar", string_ref("val"))?
+///    .parameter(key_ref("bar"), string_ref("val"))?
 ///    .bare_item_member(
-///         "member3",
+///         key_ref("member3"),
 ///         Decimal::from_f64(12.34566).unwrap(),
 ///    )?
 ///    .finish()?;
@@ -213,11 +213,11 @@ impl<'a> RefDictSerializer<&'a mut String> {
 impl<W: BorrowMut<String>> RefDictSerializer<W> {
     pub fn bare_item_member<'b>(
         mut self,
-        name: &str,
+        name: &KeyRef,
         value: impl Into<RefBareItem<'b>>,
     ) -> SFVResult<Self> {
         maybe_write_separator(self.buffer.borrow_mut(), &mut self.first);
-        Serializer::serialize_key(name, self.buffer.borrow_mut())?;
+        Serializer::serialize_key(name, self.buffer.borrow_mut());
         let value = value.into();
         if value != RefBareItem::Boolean(true) {
             self.buffer.borrow_mut().push('=');
@@ -228,7 +228,7 @@ impl<W: BorrowMut<String>> RefDictSerializer<W> {
 
     pub fn parameter<'b>(
         mut self,
-        name: &str,
+        name: &KeyRef,
         value: impl Into<RefBareItem<'b>>,
     ) -> SFVResult<Self> {
         if self.first {
@@ -240,11 +240,11 @@ impl<W: BorrowMut<String>> RefDictSerializer<W> {
         Ok(self)
     }
 
-    pub fn open_inner_list(mut self, name: &str) -> SFVResult<RefInnerListSerializer<Self>> {
+    pub fn open_inner_list(mut self, name: &KeyRef) -> RefInnerListSerializer<Self> {
         maybe_write_separator(self.buffer.borrow_mut(), &mut self.first);
-        Serializer::serialize_key(name, self.buffer.borrow_mut())?;
+        Serializer::serialize_key(name, self.buffer.borrow_mut());
         self.buffer.borrow_mut().push_str("=(");
-        Ok(RefInnerListSerializer { buffer: self })
+        RefInnerListSerializer { buffer: self }
     }
 
     pub fn finish(self) -> SFVResult<W> {
@@ -276,7 +276,7 @@ impl<T: BufferHolder> RefInnerListSerializer<T> {
 
     pub fn inner_list_parameter<'b>(
         mut self,
-        name: &str,
+        name: &KeyRef,
         value: impl Into<RefBareItem<'b>>,
     ) -> SFVResult<Self> {
         let buffer = self.buffer.get_mut();
@@ -320,13 +320,13 @@ impl BufferHolder for String {
 #[cfg(test)]
 mod alternative_serializer_tests {
     use super::*;
-    use crate::{string_ref, token_ref, Decimal, FromPrimitive};
+    use crate::{key_ref, string_ref, token_ref, Decimal, FromPrimitive};
 
     #[test]
     fn test_fast_serialize_item() -> SFVResult<()> {
         let output = RefItemSerializer::new()
             .bare_item(token_ref("hello"))?
-            .parameter("abc", true)?
+            .parameter(key_ref("abc"), true)?
             .finish();
         assert_eq!("hello;abc", output);
         Ok(())
@@ -336,14 +336,14 @@ mod alternative_serializer_tests {
     fn test_fast_serialize_list() -> SFVResult<()> {
         let output = RefListSerializer::new()
             .bare_item(token_ref("hello"))?
-            .parameter("key1", true)?
-            .parameter("key2", false)?
+            .parameter(key_ref("key1"), true)?
+            .parameter(key_ref("key2"), false)?
             .open_inner_list()
             .inner_list_bare_item(string_ref("some_string"))?
             .inner_list_bare_item(12)?
-            .inner_list_parameter("inner-member-key", true)?
+            .inner_list_parameter(key_ref("inner-member-key"), true)?
             .close_inner_list()
-            .parameter("inner-list-param", token_ref("*"))?
+            .parameter(key_ref("inner-list-param"), token_ref("*"))?
             .finish()?;
         assert_eq!(
             "hello;key1;key2=?0, (\"some_string\" 12;inner-member-key);inner-list-param=*",
@@ -355,23 +355,23 @@ mod alternative_serializer_tests {
     #[test]
     fn test_fast_serialize_dict() -> SFVResult<()> {
         let output = RefDictSerializer::new()
-            .bare_item_member("member1", token_ref("hello"))?
-            .parameter("key1", true)?
-            .parameter("key2", false)?
-            .bare_item_member("member2", true)?
-            .parameter("key3", Decimal::from_f64(45.4586).unwrap())?
-            .parameter("key4", string_ref("str"))?
-            .open_inner_list("key5")?
+            .bare_item_member(key_ref("member1"), token_ref("hello"))?
+            .parameter(key_ref("key1"), true)?
+            .parameter(key_ref("key2"), false)?
+            .bare_item_member(key_ref("member2"), true)?
+            .parameter(key_ref("key3"), Decimal::from_f64(45.4586).unwrap())?
+            .parameter(key_ref("key4"), string_ref("str"))?
+            .open_inner_list(key_ref("key5"))
             .inner_list_bare_item(45)?
             .inner_list_bare_item(0)?
             .close_inner_list()
-            .bare_item_member("key6", string_ref("foo"))?
-            .open_inner_list("key7")?
+            .bare_item_member(key_ref("key6"), string_ref("foo"))?
+            .open_inner_list(key_ref("key7"))
             .inner_list_bare_item("some_string".as_bytes())?
             .inner_list_bare_item("other_string".as_bytes())?
             .close_inner_list()
-            .parameter("lparam", 10)?
-            .bare_item_member("key8", true)?
+            .parameter(key_ref("lparam"), 10)?
+            .bare_item_member(key_ref("key8"), true)?
             .finish()?;
         assert_eq!(
             "member1=hello;key1;key2=?0, member2;key3=45.459;key4=\"str\", key5=(45 0), key6=\"foo\", key7=(:c29tZV9zdHJpbmc=: :b3RoZXJfc3RyaW5n:);lparam=10, key8",
@@ -404,7 +404,7 @@ mod alternative_serializer_tests {
         assert_eq!(output, " 1");
 
         let mut output = String::from(" ");
-        RefDictSerializer::with_buffer(&mut output).bare_item_member("key1", 1)?;
+        RefDictSerializer::with_buffer(&mut output).bare_item_member(key_ref("key1"), 1)?;
         assert_eq!(output, " key1=1");
 
         Ok(())
