@@ -118,9 +118,9 @@ assert_eq!(int_item.serialize_value().unwrap(), "99;key=13.457");
 
 Creates `List` field value with `Item` and parametrized `InnerList` as members:
 ```
-use sfv::{Item, BareItem, InnerList, List, SerializeValue, Parameters};
+use sfv::{token_ref, Item, BareItem, InnerList, List, SerializeValue, Parameters};
 
-let tok_item = BareItem::Token("tok".into());
+let tok_item = BareItem::Token(token_ref("tok").to_owned());
 
 // Creates Item.
 let str_item = Item::new(BareItem::String(String::from("foo")));
@@ -169,6 +169,7 @@ mod integer;
 mod parser;
 mod ref_serializer;
 mod serializer;
+mod token;
 mod utils;
 
 #[cfg(test)]
@@ -177,6 +178,8 @@ mod test_integer;
 mod test_parser;
 #[cfg(test)]
 mod test_serializer;
+#[cfg(test)]
+mod test_token;
 
 use indexmap::IndexMap;
 
@@ -193,6 +196,7 @@ pub use ref_serializer::{
     RefParameterSerializer,
 };
 pub use serializer::SerializeValue;
+pub use token::{token_ref, Token, TokenError, TokenRef};
 
 type SFVResult<T> = std::result::Result<T, Error>;
 
@@ -316,7 +320,7 @@ pub enum BareItem {
     // boolean    = "0" / "1"
     Boolean(bool),
     // sf-token = ( ALPHA / "*" ) *( tchar / ":" / "/" )
-    Token(String),
+    Token(Token),
 }
 
 impl BareItem {
@@ -381,14 +385,14 @@ impl BareItem {
             _ => None,
         }
     }
-    /// If `BareItem` is a `Token`, returns `&str`, otherwise returns `None`.
+    /// If `BareItem` is a `Token`, returns `&Token`, otherwise returns `None`.
     /// ```
-    /// use sfv::BareItem;
+    /// use sfv::{token_ref, BareItem};
     ///
-    /// let bare_item = BareItem::Token("*bar".into());
-    /// assert_eq!(bare_item.as_token().unwrap(), "*bar");
+    /// let bare_item = BareItem::Token(token_ref("*bar").to_owned());
+    /// assert_eq!(bare_item.as_token().unwrap().as_str(), "*bar");
     /// ```
-    pub fn as_token(&self) -> Option<&str> {
+    pub fn as_token(&self) -> Option<&Token> {
         match *self {
             BareItem::Token(ref val) => Some(val),
             _ => None,
@@ -427,6 +431,12 @@ impl From<Vec<u8>> for BareItem {
     }
 }
 
+impl From<Token> for BareItem {
+    fn from(val: Token) -> BareItem {
+        BareItem::Token(val)
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub(crate) enum Num {
     Decimal(Decimal),
@@ -441,7 +451,7 @@ pub enum RefBareItem<'a> {
     String(&'a str),
     ByteSeq(&'a [u8]),
     Boolean(bool),
-    Token(&'a str),
+    Token(&'a TokenRef),
 }
 
 impl<'a> From<&'a BareItem> for RefBareItem<'a> {
@@ -478,5 +488,17 @@ impl<'a> From<Decimal> for RefBareItem<'a> {
 impl<'a> From<&'a [u8]> for RefBareItem<'a> {
     fn from(val: &'a [u8]) -> RefBareItem<'a> {
         RefBareItem::ByteSeq(val)
+    }
+}
+
+impl<'a> From<&'a Token> for RefBareItem<'a> {
+    fn from(val: &'a Token) -> RefBareItem<'a> {
+        RefBareItem::Token(val)
+    }
+}
+
+impl<'a> From<&'a TokenRef> for RefBareItem<'a> {
+    fn from(val: &'a TokenRef) -> RefBareItem<'a> {
+        RefBareItem::Token(val)
     }
 }

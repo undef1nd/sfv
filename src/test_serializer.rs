@@ -1,7 +1,9 @@
 use crate::serializer::Serializer;
 use crate::FromStr;
 use crate::SerializeValue;
-use crate::{integer, BareItem, Decimal, Dictionary, Error, InnerList, Item, List, Parameters};
+use crate::{
+    integer, token_ref, BareItem, Decimal, Dictionary, Error, InnerList, Item, List, Parameters,
+};
 use std::error::Error as StdError;
 use std::iter::FromIterator;
 
@@ -43,8 +45,7 @@ fn serialize_value_list_mixed_members_with_params() -> Result<(), Box<dyn StdErr
         "in2_p".to_owned(),
         BareItem::String(r#"valu\e"#.to_owned()),
     )]);
-    let inner_list_item2 =
-        Item::with_params(BareItem::Token("str2".to_owned()), inner_list_item2_param);
+    let inner_list_item2 = Item::with_params(token_ref("str2").to_owned(), inner_list_item2_param);
     let inner_list_param = Parameters::from_iter(vec![(
         "inner_list_param".to_owned(),
         BareItem::ByteSeq("weather".as_bytes().to_vec()),
@@ -89,7 +90,10 @@ fn serialize_value_errors() -> Result<(), Box<dyn StdError>> {
 fn serialize_item_byteseq_with_param() -> Result<(), Box<dyn StdError>> {
     let mut buf = String::new();
 
-    let item_param = ("a".to_owned(), BareItem::Token("*ab_1".into()));
+    let item_param = (
+        "a".to_owned(),
+        BareItem::Token(token_ref("*ab_1").to_owned()),
+    );
     let item_param = Parameters::from_iter(vec![item_param]);
     let item = Item::with_params(b"parser".to_vec(), item_param);
     Serializer::serialize_item(&item, &mut buf)?;
@@ -119,7 +123,10 @@ fn serialize_item_with_bool_true_param() -> Result<(), Box<dyn StdError>> {
 #[test]
 fn serialize_item_with_token_param() -> Result<(), Box<dyn StdError>> {
     let mut buf = String::new();
-    let param = Parameters::from_iter(vec![("a1".to_owned(), BareItem::Token("*tok".to_owned()))]);
+    let param = Parameters::from_iter(vec![(
+        "a1".to_owned(),
+        BareItem::Token(token_ref("*tok").to_owned()),
+    )]);
     let item = Item::with_params(BareItem::String("12.35".to_owned()), param);
     Serializer::serialize_item(&item, &mut buf)?;
     assert_eq!(r#""12.35";a1=*tok"#, &buf);
@@ -253,48 +260,22 @@ fn serialize_string_errors() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn serialize_token() -> Result<(), Box<dyn StdError>> {
+fn serialize_token() {
     let mut buf = String::new();
-    Serializer::serialize_token("*", &mut buf)?;
+    Serializer::serialize_token(token_ref("*"), &mut buf);
     assert_eq!("*", &buf);
 
     buf.clear();
-    Serializer::serialize_token("abc", &mut buf)?;
+    Serializer::serialize_token(token_ref("abc"), &mut buf);
     assert_eq!("abc", &buf);
 
     buf.clear();
-    Serializer::serialize_token("abc:de", &mut buf)?;
+    Serializer::serialize_token(token_ref("abc:de"), &mut buf);
     assert_eq!("abc:de", &buf);
 
     buf.clear();
-    Serializer::serialize_token("smth/#!else", &mut buf)?;
+    Serializer::serialize_token(token_ref("smth/#!else"), &mut buf);
     assert_eq!("smth/#!else", &buf);
-    Ok(())
-}
-
-#[test]
-fn serialize_token_errors() -> Result<(), Box<dyn StdError>> {
-    let mut buf = String::new();
-
-    assert_eq!(
-        Err(Error::new("serialize_token: token is empty")),
-        Serializer::serialize_token("", &mut buf)
-    );
-    assert_eq!(
-        Err(Error::new(
-            "serialize_token: first character is not ALPHA or '*'"
-        )),
-        Serializer::serialize_token("#some", &mut buf)
-    );
-    assert_eq!(
-        Err(Error::new("serialize_token: disallowed character")),
-        Serializer::serialize_token("s ", &mut buf)
-    );
-    assert_eq!(
-        Err(Error::new("serialize_token: disallowed character")),
-        Serializer::serialize_token("abc:de\t", &mut buf)
-    );
-    Ok(())
 }
 
 #[test]
@@ -450,8 +431,8 @@ fn serialize_list_of_items_and_inner_list() -> Result<(), Box<dyn StdError>> {
 
     let item1 = Item::new(12);
     let item2 = Item::new(14);
-    let item3 = Item::new(BareItem::Token("a".to_owned()));
-    let item4 = Item::new(BareItem::Token("b".to_owned()));
+    let item3 = Item::new(token_ref("a").to_owned());
+    let item4 = Item::new(token_ref("b").to_owned());
     let inner_list_param = Parameters::from_iter(vec![(
         "param".to_owned(),
         BareItem::String("param_value_1".to_owned()),
@@ -490,7 +471,7 @@ fn serialize_list_with_bool_item_and_bool_params() -> Result<(), Box<dyn StdErro
         ("b".to_owned(), BareItem::Boolean(false)),
     ]);
     let item1 = Item::with_params(false, item1_params);
-    let item2 = Item::new(BareItem::Token("cde_456".to_owned()));
+    let item2 = Item::new(token_ref("cde_456").to_owned());
 
     let input: List = vec![item1.into(), item2.into()];
     Serializer::serialize_list(&input, &mut buf)?;

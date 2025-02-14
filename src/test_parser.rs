@@ -1,6 +1,6 @@
 use crate::{
-    integer, BareItem, Decimal, Dictionary, Error, FromStr, InnerList, Item, List, Num, Parameters,
-    ParseMore, Parser,
+    integer, token_ref, BareItem, Decimal, Dictionary, Error, FromStr, InnerList, Item, List, Num,
+    Parameters, ParseMore, Parser,
 };
 use std::error::Error as StdError;
 use std::iter::FromIterator;
@@ -98,8 +98,10 @@ fn parse_list_of_lists_with_param_and_spaces() -> Result<(), Box<dyn StdError>> 
     let input = "(  1  42  ); k=*";
     let item1 = Item::new(1);
     let item2 = Item::new(42);
-    let inner_list_param =
-        Parameters::from_iter(vec![("k".to_owned(), BareItem::Token("*".to_owned()))]);
+    let inner_list_param = Parameters::from_iter(vec![(
+        "k".to_owned(),
+        BareItem::Token(token_ref("*").to_owned()),
+    )]);
     let inner_list = InnerList::with_params(vec![item1, item2], inner_list_param);
     let expected_list: List = vec![inner_list.into()];
     assert_eq!(expected_list, Parser::from_str(input).parse_list()?);
@@ -111,8 +113,8 @@ fn parse_list_of_items_and_lists_with_param() -> Result<(), Box<dyn StdError>> {
     let input = r#"12, 14, (a  b); param="param_value_1", ()"#;
     let item1 = Item::new(12);
     let item2 = Item::new(14);
-    let item3 = Item::new(BareItem::Token("a".to_owned()));
-    let item4 = Item::new(BareItem::Token("b".to_owned()));
+    let item3 = Item::new(token_ref("a").to_owned());
+    let item4 = Item::new(token_ref("b").to_owned());
     let inner_list_param = Parameters::from_iter(vec![(
         "param".to_owned(),
         BareItem::String("param_value_1".to_owned()),
@@ -209,8 +211,8 @@ fn parse_inner_list_with_param_and_spaces() -> Result<(), Box<dyn StdError>> {
     let input = "(c b); a=1";
     let inner_list_param = Parameters::from_iter(vec![("a".to_owned(), 1.into())]);
 
-    let item1 = Item::new(BareItem::Token("c".to_owned()));
-    let item2 = Item::new(BareItem::Token("b".to_owned()));
+    let item1 = Item::new(token_ref("c").to_owned());
+    let item2 = Item::new(token_ref("b").to_owned());
     let expected = InnerList::with_params(vec![item1, item2], inner_list_param);
     assert_eq!(expected, Parser::from_str(input).parse_inner_list()?);
     Ok(())
@@ -236,7 +238,10 @@ fn parse_item_decimal_with_bool_param_and_space() -> Result<(), Box<dyn StdError
 
 #[test]
 fn parse_item_number_with_param() -> Result<(), Box<dyn StdError>> {
-    let param = Parameters::from_iter(vec![("a1".to_owned(), BareItem::Token("*".to_owned()))]);
+    let param = Parameters::from_iter(vec![(
+        "a1".to_owned(),
+        BareItem::Token(token_ref("*").to_owned()),
+    )]);
     assert_eq!(
         Item::with_params(BareItem::String("12.35".to_owned()), param),
         Parser::from_str(r#""12.35";a1=*"#).parse_item()?
@@ -304,8 +309,10 @@ fn parse_dict_empty_value() -> Result<(), Box<dyn StdError>> {
 #[test]
 fn parse_dict_with_token_param() -> Result<(), Box<dyn StdError>> {
     let input = "a=1, b;foo=*, c=3";
-    let item2_params =
-        Parameters::from_iter(vec![("foo".to_owned(), BareItem::Token("*".to_owned()))]);
+    let item2_params = Parameters::from_iter(vec![(
+        "foo".to_owned(),
+        BareItem::Token(token_ref("*").to_owned()),
+    )]);
     let item1 = Item::new(1);
     let item2 = Item::with_params(true, item2_params);
     let item3 = Item::new(3);
@@ -349,7 +356,7 @@ fn parse_bare_item() -> Result<(), Box<dyn StdError>> {
         Parser::from_str(r#""test string""#).parse_bare_item()?
     );
     assert_eq!(
-        BareItem::Token("*token".to_owned()),
+        BareItem::Token(token_ref("*token").to_owned()),
         Parser::from_str("*token").parse_bare_item()?
     );
     assert_eq!(
@@ -454,29 +461,29 @@ fn parse_string_errors() -> Result<(), Box<dyn StdError>> {
 #[test]
 fn parse_token() -> Result<(), Box<dyn StdError>> {
     let mut parser = Parser::from_str("*some:token}not token");
-    assert_eq!("*some:token".to_owned(), parser.parse_token()?);
+    assert_eq!(token_ref("*some:token"), parser.parse_token()?);
     assert_eq!(parser.remaining(), b"}not token");
 
-    assert_eq!("token".to_owned(), Parser::from_str("token").parse_token()?);
+    assert_eq!(token_ref("token"), Parser::from_str("token").parse_token()?);
     assert_eq!(
-        "a_b-c.d3:f%00/*".to_owned(),
+        token_ref("a_b-c.d3:f%00/*"),
         Parser::from_str("a_b-c.d3:f%00/*").parse_token()?
     );
     assert_eq!(
-        "TestToken".to_owned(),
+        token_ref("TestToken"),
         Parser::from_str("TestToken").parse_token()?
     );
     assert_eq!(
-        "some".to_owned(),
+        token_ref("some"),
         Parser::from_str("some@token").parse_token()?
     );
     assert_eq!(
-        "*TestToken*".to_owned(),
+        token_ref("*TestToken*"),
         Parser::from_str("*TestToken*").parse_token()?
     );
-    assert_eq!("*".to_owned(), Parser::from_str("*[@:token").parse_token()?);
+    assert_eq!(token_ref("*"), Parser::from_str("*[@:token").parse_token()?);
     assert_eq!(
-        "test".to_owned(),
+        token_ref("test"),
         Parser::from_str("test token").parse_token()?
     );
 
@@ -816,8 +823,10 @@ fn parse_more_list() -> Result<(), Box<dyn StdError>> {
 
 #[test]
 fn parse_more_dict() -> Result<(), Box<dyn StdError>> {
-    let item2_params =
-        Parameters::from_iter(vec![("foo".to_owned(), BareItem::Token("*".to_owned()))]);
+    let item2_params = Parameters::from_iter(vec![(
+        "foo".to_owned(),
+        BareItem::Token(token_ref("*").to_owned()),
+    )]);
     let item1 = Item::new(1);
     let item2 = Item::with_params(true, item2_params);
     let item3 = Item::new(3);

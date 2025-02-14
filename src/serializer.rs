@@ -1,7 +1,7 @@
 use crate::utils;
 use crate::{
     BareItem, Decimal, Dictionary, Error, InnerList, Integer, Item, List, ListEntry, Parameters,
-    RefBareItem, SFVResult,
+    RefBareItem, SFVResult, TokenRef,
 };
 use std::fmt::Write as _;
 
@@ -154,7 +154,7 @@ impl Serializer {
             RefBareItem::Boolean(value) => Self::serialize_bool(value, output),
             RefBareItem::String(value) => Self::serialize_string(value, output)?,
             RefBareItem::ByteSeq(value) => Self::serialize_byte_sequence(value, output),
-            RefBareItem::Token(value) => Self::serialize_token(value, output)?,
+            RefBareItem::Token(value) => Self::serialize_token(value, output),
             RefBareItem::Integer(value) => Self::serialize_integer(value, output),
             RefBareItem::Decimal(value) => Self::serialize_decimal(value, output)?,
         };
@@ -267,32 +267,10 @@ impl Serializer {
         Ok(())
     }
 
-    pub(crate) fn serialize_token(value: &str, output: &mut String) -> SFVResult<()> {
+    pub(crate) fn serialize_token(value: &TokenRef, output: &mut String) {
         // https://httpwg.org/specs/rfc8941.html#ser-token
 
-        if !value.is_ascii() {
-            return Err(Error::new("serialize_token: non-ascii character"));
-        }
-
-        let mut bytes = value.bytes();
-
-        match bytes.next() {
-            None => return Err(Error::new("serialize_token: token is empty")),
-            Some(c) => {
-                if !utils::is_allowed_start_token_char(c) {
-                    return Err(Error::new(
-                        "serialize_token: first character is not ALPHA or '*'",
-                    ));
-                }
-            }
-        }
-
-        if bytes.any(|c| !utils::is_allowed_inner_token_char(c)) {
-            return Err(Error::new("serialize_token: disallowed character"));
-        }
-
-        output.push_str(value);
-        Ok(())
+        output.push_str(value.as_str());
     }
 
     pub(crate) fn serialize_byte_sequence(value: &[u8], output: &mut String) {

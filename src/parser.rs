@@ -1,7 +1,7 @@
 use crate::utils;
 use crate::{
     BareItem, Decimal, Dictionary, Error, InnerList, Integer, Item, List, ListEntry, Num,
-    Parameters, SFVResult,
+    Parameters, SFVResult, Token,
 };
 
 use std::convert::TryFrom;
@@ -340,7 +340,7 @@ impl<'a> Parser<'a> {
         self.error("unterminated string")
     }
 
-    pub(crate) fn parse_token(&mut self) -> SFVResult<String> {
+    pub(crate) fn parse_token(&mut self) -> SFVResult<Token> {
         // https://httpwg.org/specs/rfc8941.html#parse-token
 
         let mut output_string = String::new();
@@ -359,7 +359,7 @@ impl<'a> Parser<'a> {
                     self.next();
                     output_string.push(c as char);
                 }
-                _ => return Ok(output_string),
+                _ => return Ok(Token::from_string(output_string).unwrap()),
             }
         }
     }

@@ -12,7 +12,7 @@ fn test_report_to_header() -> Result<(), Box<dyn Error>> {
         .bare_item
         .as_token()
         .ok_or("unexpected BareItem variant")?;
-    assert_eq!(token, "require-corp");
+    assert_eq!(token.as_str(), "require-corp");
 
     let coep_endpoint = coep_parsed
         .params

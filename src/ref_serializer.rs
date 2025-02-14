@@ -79,16 +79,16 @@ fn maybe_write_separator(buffer: &mut String, first: &mut bool) {
 
 /// Serializes `List` field value components incrementally.
 /// ```
-/// use sfv::{RefBareItem, RefListSerializer};
+/// use sfv::{token_ref, RefBareItem, RefListSerializer};
 ///
 /// # fn main() -> Result<(), sfv::Error> {
 /// let serialized_list = RefListSerializer::new()
 ///     .bare_item(11)?
 ///     .parameter("foo", true)?
 ///     .open_inner_list()
-///     .inner_list_bare_item(RefBareItem::Token("abc"))?
+///     .inner_list_bare_item(token_ref("abc"))?
 ///     .inner_list_parameter("abc_param", false)?
-///     .inner_list_bare_item(RefBareItem::Token("def"))?
+///     .inner_list_bare_item(token_ref("def"))?
 ///     .close_inner_list()
 ///     .parameter("bar", RefBareItem::String("val"))?
 ///     .finish()?;
@@ -161,16 +161,16 @@ impl<W: BorrowMut<String>> RefListSerializer<W> {
 
 /// Serializes `Dictionary` field value components incrementally.
 /// ```
-/// use sfv::{Decimal, FromPrimitive, RefBareItem, RefDictSerializer};
+/// use sfv::{token_ref, Decimal, FromPrimitive, RefBareItem, RefDictSerializer};
 ///
 /// # fn main() -> Result<(), sfv::Error> {
 /// let serialized_dict = RefDictSerializer::new()
 ///    .bare_item_member("member1", 11)?
 ///    .parameter("foo", true)?
 ///    .open_inner_list("member2")?
-///    .inner_list_bare_item(RefBareItem::Token("abc"))?
+///    .inner_list_bare_item(token_ref("abc"))?
 ///    .inner_list_parameter("abc_param", false)?
-///    .inner_list_bare_item(RefBareItem::Token("def"))?
+///    .inner_list_bare_item(token_ref("def"))?
 ///    .close_inner_list()
 ///    .parameter("bar", RefBareItem::String("val"))?
 ///    .bare_item_member(
@@ -320,12 +320,12 @@ impl BufferHolder for String {
 #[cfg(test)]
 mod alternative_serializer_tests {
     use super::*;
-    use crate::{Decimal, FromPrimitive};
+    use crate::{token_ref, Decimal, FromPrimitive};
 
     #[test]
     fn test_fast_serialize_item() -> SFVResult<()> {
         let output = RefItemSerializer::new()
-            .bare_item(RefBareItem::Token("hello"))?
+            .bare_item(token_ref("hello"))?
             .parameter("abc", true)?
             .finish();
         assert_eq!("hello;abc", output);
@@ -335,7 +335,7 @@ mod alternative_serializer_tests {
     #[test]
     fn test_fast_serialize_list() -> SFVResult<()> {
         let output = RefListSerializer::new()
-            .bare_item(RefBareItem::Token("hello"))?
+            .bare_item(token_ref("hello"))?
             .parameter("key1", true)?
             .parameter("key2", false)?
             .open_inner_list()
@@ -343,7 +343,7 @@ mod alternative_serializer_tests {
             .inner_list_bare_item(12)?
             .inner_list_parameter("inner-member-key", true)?
             .close_inner_list()
-            .parameter("inner-list-param", RefBareItem::Token("*"))?
+            .parameter("inner-list-param", token_ref("*"))?
             .finish()?;
         assert_eq!(
             "hello;key1;key2=?0, (\"some_string\" 12;inner-member-key);inner-list-param=*",
@@ -355,7 +355,7 @@ mod alternative_serializer_tests {
     #[test]
     fn test_fast_serialize_dict() -> SFVResult<()> {
         let output = RefDictSerializer::new()
-            .bare_item_member("member1", RefBareItem::Token("hello"))?
+            .bare_item_member("member1", token_ref("hello"))?
             .parameter("key1", true)?
             .parameter("key2", false)?
             .bare_item_member("member2", true)?

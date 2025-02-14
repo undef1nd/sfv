@@ -4,8 +4,8 @@ extern crate criterion;
 use criterion::{BenchmarkId, Criterion};
 use rust_decimal::prelude::FromPrimitive;
 use sfv::{
-    integer, Decimal, Parser, RefBareItem, RefDictSerializer, RefItemSerializer, RefListSerializer,
-    SerializeValue,
+    integer, token_ref, Decimal, Parser, RefBareItem, RefDictSerializer, RefItemSerializer,
+    RefListSerializer, SerializeValue,
 };
 
 criterion_main!(parsing, serializing, ref_serializing);
@@ -116,9 +116,9 @@ fn serializing_ref_list(c: &mut Criterion) {
     c.bench_function("serializing_ref_list", move |bench| {
         bench.iter(|| {
             let ser = RefListSerializer::new();
-            ser.bare_item(RefBareItem::Token("a"))
+            ser.bare_item(token_ref("a"))
                 .unwrap()
-                .bare_item(RefBareItem::Token("abcdefghigklmnoprst"))
+                .bare_item(token_ref("abcdefghigklmnoprst"))
                 .unwrap()
                 .bare_item(integer(123456785686457))
                 .unwrap()
@@ -150,7 +150,7 @@ fn serializing_ref_dict(c: &mut Criterion) {
             RefDictSerializer::new()
                 .bare_item_member("a", true)
                 .unwrap()
-                .bare_item_member("dict_key2", RefBareItem::Token("abcdefghigklmnoprst"))
+                .bare_item_member("dict_key2", token_ref("abcdefghigklmnoprst"))
                 .unwrap()
                 .bare_item_member("dict_key3", integer(123456785686457))
                 .unwrap()
@@ -161,7 +161,7 @@ fn serializing_ref_dict(c: &mut Criterion) {
                 .inner_list_bare_item("inner-list-member".as_bytes())
                 .unwrap()
                 .close_inner_list()
-                .parameter("key", RefBareItem::Token("aW5uZXItbGlzdC1wYXJhbWV0ZXJz"))
+                .parameter("key", token_ref("aW5uZXItbGlzdC1wYXJhbWV0ZXJz"))
                 .unwrap()
                 .finish()
         });
