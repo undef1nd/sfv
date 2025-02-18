@@ -311,4 +311,24 @@ mod alternative_serializer_tests {
         );
         Ok(())
     }
+
+    #[test]
+    fn test_missing_separator_list() -> SFVResult<()> {
+        let mut output = String::from(" ");
+        let ser = RefListSerializer::new(&mut output);
+        ser.bare_item(1)?;
+        // TODO(https://github.com/undef1nd/sfv/issues/131): This is wrong.
+        assert_eq!(output, " , 1");
+        Ok(())
+    }
+
+    #[test]
+    fn test_missing_separator_dict() -> SFVResult<()> {
+        let mut output = String::from(" ");
+        let ser = RefDictSerializer::new(&mut output);
+        ser.bare_item_member("key1", 1)?;
+        // TODO(https://github.com/undef1nd/sfv/issues/131): This is wrong.
+        assert_eq!(output, " , key1=1");
+        Ok(())
+    }
 }
