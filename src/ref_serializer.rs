@@ -39,7 +39,7 @@ pub struct RefParameterSerializer<'a> {
     buffer: &'a mut String,
 }
 
-impl<'a> RefParameterSerializer<'a> {
+impl RefParameterSerializer<'_> {
     pub fn parameter(self, name: &str, value: impl AsRefBareItem) -> SFVResult<Self> {
         Serializer::serialize_parameter(name, value, self.buffer)?;
         Ok(self)
