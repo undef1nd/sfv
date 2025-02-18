@@ -181,7 +181,10 @@ pub use rust_decimal::{
 };
 
 pub use parser::{ParseMore, Parser};
-pub use ref_serializer::{RefDictSerializer, RefItemSerializer, RefListSerializer};
+pub use ref_serializer::{
+    RefDictSerializer, RefInnerListSerializer, RefItemSerializer, RefListSerializer,
+    RefParameterSerializer,
+};
 pub use serializer::SerializeValue;
 
 type SFVResult<T> = std::result::Result<T, &'static str>;
