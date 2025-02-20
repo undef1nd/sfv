@@ -327,16 +327,17 @@ impl<'a> Parser<'a> {
             return Err("parse_byte_seq: first char is not ':'");
         }
 
-        let mut b64_content = vec![];
+        let start = self.index;
+
         loop {
             match self.next() {
                 Some(b':') => break,
-                Some(c) => b64_content.push(c),
+                Some(_) => {}
                 None => return Err("parse_byte_seq: no closing ':'"),
             }
         }
 
-        match base64::Engine::decode(&utils::BASE64, b64_content) {
+        match base64::Engine::decode(&utils::BASE64, &self.input[start..self.index - 1]) {
             Ok(content) => Ok(content),
             Err(_) => Err("parse_byte_seq: decoding error"),
         }
