@@ -107,10 +107,11 @@ assert_eq!(str_item.serialize_value().unwrap(), r#""foo""#);
 
 Creates `Item` field value with parameters:
 ```
-use sfv::{key_ref, Item, BareItem, SerializeValue, Parameters, Decimal, FromPrimitive};
+use std::convert::TryFrom;
+use sfv::{key_ref, Item, BareItem, SerializeValue, Parameters, Decimal};
 
 let mut params = Parameters::new();
-let decimal = Decimal::from_f64(13.45655).unwrap();
+let decimal = Decimal::try_from(13.45655).unwrap();
 params.insert(key_ref("key").to_owned(), BareItem::Decimal(decimal));
 let int_item = Item::with_params(99, params);
 assert_eq!(int_item.serialize_value().unwrap(), "99;key=13.457");
@@ -164,6 +165,7 @@ assert_eq!(
 ```
 */
 
+mod decimal;
 mod error;
 mod integer;
 mod key;
@@ -174,6 +176,8 @@ mod string;
 mod token;
 mod utils;
 
+#[cfg(test)]
+mod test_decimal;
 #[cfg(test)]
 mod test_integer;
 #[cfg(test)]
@@ -189,11 +193,7 @@ mod test_token;
 
 use indexmap::IndexMap;
 
-pub use rust_decimal::{
-    prelude::{FromPrimitive, FromStr},
-    Decimal,
-};
-
+pub use decimal::{Decimal, DecimalError};
 pub use error::Error;
 pub use integer::{integer, Integer, OutOfRangeError};
 pub use key::{key_ref, Key, KeyError, KeyRef};
@@ -334,8 +334,9 @@ pub enum BareItem {
 impl BareItem {
     /// If `BareItem` is a decimal, returns `Decimal`, otherwise returns `None`.
     /// ```
-    /// # use sfv::{BareItem, Decimal, FromPrimitive};
-    /// let decimal_number = Decimal::from_f64(415.566).unwrap();
+    /// # use std::convert::TryFrom;
+    /// # use sfv::{BareItem, Decimal};
+    /// let decimal_number = Decimal::try_from(415.566).unwrap();
     /// let bare_item: BareItem = decimal_number.into();
     /// assert_eq!(bare_item.as_decimal().unwrap(), decimal_number);
     /// ```
@@ -423,8 +424,9 @@ impl From<bool> for BareItem {
 impl From<Decimal> for BareItem {
     /// Converts `Decimal` into `BareItem::Decimal`.
     /// ```
-    /// # use sfv::{BareItem, Decimal, FromPrimitive};
-    /// let decimal_number = Decimal::from_f64(48.01).unwrap();
+    /// # use std::convert::TryFrom;
+    /// # use sfv::{BareItem, Decimal};
+    /// let decimal_number = Decimal::try_from(48.01).unwrap();
     /// let bare_item: BareItem = decimal_number.into();
     /// assert_eq!(bare_item.as_decimal().unwrap(), decimal_number);
     /// ```

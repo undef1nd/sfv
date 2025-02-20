@@ -43,7 +43,7 @@ impl SerializeValue for List {
 impl SerializeValue for Item {
     fn serialize_value(&self) -> SFVResult<String> {
         let mut output = String::new();
-        Serializer::serialize_item(self, &mut output)?;
+        Serializer::serialize_item(self, &mut output);
         Ok(output)
     }
 }
@@ -52,11 +52,11 @@ impl SerializeValue for Item {
 pub(crate) struct Serializer;
 
 impl Serializer {
-    pub(crate) fn serialize_item(input_item: &Item, output: &mut String) -> SFVResult<()> {
+    pub(crate) fn serialize_item(input_item: &Item, output: &mut String) {
         // https://httpwg.org/specs/rfc8941.html#ser-item
 
-        Self::serialize_bare_item(&input_item.bare_item, output)?;
-        Self::serialize_parameters(&input_item.params, output)
+        Self::serialize_bare_item(&input_item.bare_item, output);
+        Self::serialize_parameters(&input_item.params, output);
     }
 
     pub(crate) fn serialize_list(input_list: &List, output: &mut String) -> SFVResult<()> {
@@ -70,10 +70,10 @@ impl Serializer {
         for (idx, member) in input_list.iter().enumerate() {
             match member {
                 ListEntry::Item(item) => {
-                    Self::serialize_item(item, output)?;
+                    Self::serialize_item(item, output);
                 }
                 ListEntry::InnerList(inner_list) => {
-                    Self::serialize_inner_list(inner_list, output)?;
+                    Self::serialize_inner_list(inner_list, output);
                 }
             }
 
@@ -103,15 +103,15 @@ impl Serializer {
                     // If dict member is boolean true, no need to serialize it: only its params must be serialized
                     // Otherwise serialize entire item with its params
                     if item.bare_item == BareItem::Boolean(true) {
-                        Self::serialize_parameters(&item.params, output)?;
+                        Self::serialize_parameters(&item.params, output);
                     } else {
                         output.push('=');
-                        Self::serialize_item(item, output)?;
+                        Self::serialize_item(item, output);
                     }
                 }
                 ListEntry::InnerList(inner_list) => {
                     output.push('=');
-                    Self::serialize_inner_list(inner_list, output)?;
+                    Self::serialize_inner_list(inner_list, output);
                 }
             }
 
@@ -125,7 +125,7 @@ impl Serializer {
         Ok(())
     }
 
-    fn serialize_inner_list(input_inner_list: &InnerList, output: &mut String) -> SFVResult<()> {
+    fn serialize_inner_list(input_inner_list: &InnerList, output: &mut String) {
         // https://httpwg.org/specs/rfc8941.html#ser-innerlist
 
         let items = &input_inner_list.items;
@@ -133,7 +133,7 @@ impl Serializer {
 
         output.push('(');
         for (idx, item) in items.iter().enumerate() {
-            Self::serialize_item(item, output)?;
+            Self::serialize_item(item, output);
 
             // If more values remain in inner_list, append a single SP to output
             if idx < items.len() - 1 {
@@ -141,13 +141,10 @@ impl Serializer {
             }
         }
         output.push(')');
-        Self::serialize_parameters(inner_list_parameters, output)
+        Self::serialize_parameters(inner_list_parameters, output);
     }
 
-    pub(crate) fn serialize_bare_item<'b>(
-        value: impl Into<RefBareItem<'b>>,
-        output: &mut String,
-    ) -> SFVResult<()> {
+    pub(crate) fn serialize_bare_item<'b>(value: impl Into<RefBareItem<'b>>, output: &mut String) {
         // https://httpwg.org/specs/rfc8941.html#ser-bare-item
 
         match value.into() {
@@ -156,37 +153,31 @@ impl Serializer {
             RefBareItem::ByteSeq(value) => Self::serialize_byte_sequence(value, output),
             RefBareItem::Token(value) => Self::serialize_token(value, output),
             RefBareItem::Integer(value) => Self::serialize_integer(value, output),
-            RefBareItem::Decimal(value) => Self::serialize_decimal(value, output)?,
-        };
-        Ok(())
+            RefBareItem::Decimal(value) => Self::serialize_decimal(value, output),
+        }
     }
 
-    pub(crate) fn serialize_parameters(
-        input_params: &Parameters,
-        output: &mut String,
-    ) -> SFVResult<()> {
+    pub(crate) fn serialize_parameters(input_params: &Parameters, output: &mut String) {
         // https://httpwg.org/specs/rfc8941.html#ser-params
 
         for (param_name, param_value) in input_params {
-            Self::serialize_parameter(param_name, param_value, output)?;
+            Self::serialize_parameter(param_name, param_value, output);
         }
-        Ok(())
     }
 
     pub(crate) fn serialize_parameter<'b>(
         name: &KeyRef,
         value: impl Into<RefBareItem<'b>>,
         output: &mut String,
-    ) -> SFVResult<()> {
+    ) {
         output.push(';');
         Self::serialize_key(name, output);
 
         let value = value.into();
         if value != RefBareItem::Boolean(true) {
             output.push('=');
-            Self::serialize_bare_item(value, output)?;
+            Self::serialize_bare_item(value, output);
         }
-        Ok(())
     }
 
     pub(crate) fn serialize_key(input_key: &KeyRef, output: &mut String) {
@@ -201,28 +192,10 @@ impl Serializer {
         write!(output, "{}", value).unwrap();
     }
 
-    pub(crate) fn serialize_decimal(value: Decimal, output: &mut String) -> SFVResult<()> {
+    pub(crate) fn serialize_decimal(value: Decimal, output: &mut String) {
         // https://httpwg.org/specs/rfc8941.html#ser-decimal
 
-        let fraction_length = 3;
-
-        let decimal = value.round_dp(fraction_length).normalize();
-        let int_comp = decimal.trunc();
-        let fract_comp = decimal.fract();
-
-        if int_comp.abs() > Decimal::from(999_999_999_999_i64) {
-            return Err(Error::new(
-                "serialize_decimal: integer component > 12 digits",
-            ));
-        }
-
-        if fract_comp.is_zero() {
-            write!(output, "{}.0", int_comp).unwrap();
-        } else {
-            write!(output, "{}", decimal).unwrap();
-        }
-
-        Ok(())
+        write!(output, "{}", value).unwrap();
     }
 
     pub(crate) fn serialize_string(value: &StringRef, output: &mut String) {

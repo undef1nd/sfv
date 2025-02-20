@@ -15,6 +15,11 @@ impl Integer {
     /// The maximum value for a parsed or serialized integer: `999_999_999_999_999`.
     pub const MAX: Self = Self(999_999_999_999_999);
 
+    /// `0`.
+    ///
+    /// Equivalent to `Integer::constant(0)`.
+    pub const ZERO: Self = Self(0);
+
     /// Creates an `Integer`, panicking if the value is out of range.
     ///
     /// This method is intended to be called from `const` contexts in which the

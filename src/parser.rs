@@ -449,26 +449,26 @@ impl<'a> Parser<'a> {
             }
         }
 
-        digits = 0;
+        magnitude *= 1000;
+        let mut scale = 100;
 
         while let Some(c @ b'0'..=b'9') = self.peek() {
-            if digits == 3 {
+            if scale == 0 {
                 return self.error("too many digits after decimal point");
             }
 
             self.next();
-            magnitude = magnitude * 10 + char_to_i64(c);
-            digits += 1;
+            magnitude += char_to_i64(c) * scale;
+            scale /= 10;
         }
 
-        if digits == 0 {
+        if scale == 100 {
             // Report the error at the position of the decimal itself, rather
             // than the next position.
             Err(Error::with_index("trailing decimal point", self.index - 1))
         } else {
-            Ok(Num::Decimal(Decimal::from_i128_with_scale(
-                (sign * magnitude) as i128,
-                digits,
+            Ok(Num::Decimal(Decimal::from_integer_scaled_1000(
+                Integer::try_from(sign * magnitude).unwrap(),
             )))
         }
     }

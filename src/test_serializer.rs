@@ -1,10 +1,10 @@
 use crate::serializer::Serializer;
-use crate::FromStr;
 use crate::SerializeValue;
 use crate::{
     integer, key_ref, string_ref, token_ref, BareItem, Decimal, Dictionary, Error, InnerList, Item,
     List, Parameters,
 };
+use std::convert::TryFrom;
 use std::error::Error as StdError;
 use std::iter::FromIterator;
 
@@ -34,7 +34,7 @@ fn serialize_value_empty_list() -> Result<(), Box<dyn StdError>> {
 
 #[test]
 fn serialize_value_list_mixed_members_with_params() -> Result<(), Box<dyn StdError>> {
-    let item1 = Item::new(Decimal::from_str("42.4568")?);
+    let item1 = Item::new(Decimal::try_from(42.4568)?);
     let item2_param = Parameters::from_iter(vec![(
         key_ref("itm2_p").to_owned(),
         BareItem::Boolean(true),
@@ -65,19 +65,7 @@ fn serialize_value_list_mixed_members_with_params() -> Result<(), Box<dyn StdErr
 }
 
 #[test]
-fn serialize_value_errors() -> Result<(), Box<dyn StdError>> {
-    let disallowed_item = Item::new(Decimal::from_str("12345678912345.123")?);
-    assert_eq!(
-        Err(Error::new(
-            "serialize_decimal: integer component > 12 digits"
-        )),
-        disallowed_item.serialize_value()
-    );
-    Ok(())
-}
-
-#[test]
-fn serialize_item_byteseq_with_param() -> Result<(), Box<dyn StdError>> {
+fn serialize_item_byteseq_with_param() {
     let mut buf = String::new();
 
     let item_param = (
@@ -86,41 +74,38 @@ fn serialize_item_byteseq_with_param() -> Result<(), Box<dyn StdError>> {
     );
     let item_param = Parameters::from_iter(vec![item_param]);
     let item = Item::with_params(b"parser".to_vec(), item_param);
-    Serializer::serialize_item(&item, &mut buf)?;
+    Serializer::serialize_item(&item, &mut buf);
     assert_eq!(":cGFyc2Vy:;a=*ab_1", &buf);
-    Ok(())
 }
 
 #[test]
-fn serialize_item_without_params() -> Result<(), Box<dyn StdError>> {
+fn serialize_item_without_params() {
     let mut buf = String::new();
     let item = Item::new(1);
-    Serializer::serialize_item(&item, &mut buf)?;
+    Serializer::serialize_item(&item, &mut buf);
     assert_eq!("1", &buf);
-    Ok(())
 }
 
 #[test]
 fn serialize_item_with_bool_true_param() -> Result<(), Box<dyn StdError>> {
     let mut buf = String::new();
     let param = Parameters::from_iter(vec![(key_ref("a").to_owned(), BareItem::Boolean(true))]);
-    let item = Item::with_params(Decimal::from_str("12.35")?, param);
-    Serializer::serialize_item(&item, &mut buf)?;
+    let item = Item::with_params(Decimal::try_from(12.35)?, param);
+    Serializer::serialize_item(&item, &mut buf);
     assert_eq!("12.35;a", &buf);
     Ok(())
 }
 
 #[test]
-fn serialize_item_with_token_param() -> Result<(), Box<dyn StdError>> {
+fn serialize_item_with_token_param() {
     let mut buf = String::new();
     let param = Parameters::from_iter(vec![(
         key_ref("a1").to_owned(),
         BareItem::Token(token_ref("*tok").to_owned()),
     )]);
     let item = Item::with_params(string_ref("12.35").to_owned(), param);
-    Serializer::serialize_item(&item, &mut buf)?;
+    Serializer::serialize_item(&item, &mut buf);
     assert_eq!(r#""12.35";a1=*tok"#, &buf);
-    Ok(())
 }
 
 #[test]
@@ -145,55 +130,40 @@ fn serialize_integer() {
 #[test]
 fn serialize_decimal() -> Result<(), Box<dyn StdError>> {
     let mut buf = String::new();
-    Serializer::serialize_decimal(Decimal::from_str("-99.1346897")?, &mut buf)?;
+    Serializer::serialize_decimal(Decimal::try_from(-99.1346897)?, &mut buf);
     assert_eq!("-99.135", &buf);
 
     buf.clear();
-    Serializer::serialize_decimal(Decimal::from_str("-1.00")?, &mut buf)?;
+    Serializer::serialize_decimal(Decimal::try_from(-1.00)?, &mut buf);
     assert_eq!("-1.0", &buf);
 
     buf.clear();
-    Serializer::serialize_decimal(
-        Decimal::from_str("-00000000000000000000000099.1346897")?,
-        &mut buf,
-    )?;
+    Serializer::serialize_decimal(Decimal::try_from(-99.1346897)?, &mut buf);
     assert_eq!("-99.135", &buf);
 
     buf.clear();
-    Serializer::serialize_decimal(Decimal::from_str("100.13")?, &mut buf)?;
+    Serializer::serialize_decimal(Decimal::try_from(100.13)?, &mut buf);
     assert_eq!("100.13", &buf);
 
     buf.clear();
-    Serializer::serialize_decimal(Decimal::from_str("-100.130")?, &mut buf)?;
+    Serializer::serialize_decimal(Decimal::try_from(-100.130)?, &mut buf);
     assert_eq!("-100.13", &buf);
 
     buf.clear();
-    Serializer::serialize_decimal(Decimal::from_str("-100.100")?, &mut buf)?;
+    Serializer::serialize_decimal(Decimal::try_from(-100.100)?, &mut buf);
     assert_eq!("-100.1", &buf);
 
     buf.clear();
-    Serializer::serialize_decimal(Decimal::from_str("-137.0")?, &mut buf)?;
+    Serializer::serialize_decimal(Decimal::try_from(-137.0)?, &mut buf);
     assert_eq!("-137.0", &buf);
 
     buf.clear();
-    Serializer::serialize_decimal(Decimal::from_str("137121212112.123")?, &mut buf)?;
+    Serializer::serialize_decimal(Decimal::try_from(137121212112.123)?, &mut buf);
     assert_eq!("137121212112.123", &buf);
 
     buf.clear();
-    Serializer::serialize_decimal(Decimal::from_str("137121212112.1238")?, &mut buf)?;
+    Serializer::serialize_decimal(Decimal::try_from(137121212112.1238)?, &mut buf);
     assert_eq!("137121212112.124", &buf);
-    Ok(())
-}
-
-#[test]
-fn serialize_decimal_errors() -> Result<(), Box<dyn StdError>> {
-    let mut buf = String::new();
-    assert_eq!(
-        Err(Error::new(
-            "serialize_decimal: integer component > 12 digits"
-        )),
-        Serializer::serialize_decimal(Decimal::from_str("1371212121121.1")?, &mut buf)
-    );
     Ok(())
 }
 
@@ -290,7 +260,7 @@ fn serialize_bool() {
 }
 
 #[test]
-fn serialize_params_bool() -> Result<(), Box<dyn StdError>> {
+fn serialize_params_bool() {
     let mut buf = String::new();
 
     let input = Parameters::from_iter(vec![
@@ -298,22 +268,20 @@ fn serialize_params_bool() -> Result<(), Box<dyn StdError>> {
         (key_ref("a.a").to_owned(), BareItem::Boolean(true)),
     ]);
 
-    Serializer::serialize_parameters(&input, &mut buf)?;
+    Serializer::serialize_parameters(&input, &mut buf);
     assert_eq!(";*b;a.a", &buf);
-    Ok(())
 }
 
 #[test]
-fn serialize_params_string() -> Result<(), Box<dyn StdError>> {
+fn serialize_params_string() {
     let mut buf = String::new();
 
     let input = Parameters::from_iter(vec![(
         key_ref("b").to_owned(),
         BareItem::String(string_ref("param_val").to_owned()),
     )]);
-    Serializer::serialize_parameters(&input, &mut buf)?;
+    Serializer::serialize_parameters(&input, &mut buf);
     assert_eq!(r#";b="param_val""#, &buf);
-    Ok(())
 }
 
 #[test]
@@ -323,11 +291,11 @@ fn serialize_params_numbers() -> Result<(), Box<dyn StdError>> {
     let input = Parameters::from_iter(vec![
         (
             key_ref("key1").to_owned(),
-            Decimal::from_str("746.15")?.into(),
+            Decimal::try_from(746.15)?.into(),
         ),
         (key_ref("key2").to_owned(), 11111.into()),
     ]);
-    Serializer::serialize_parameters(&input, &mut buf)?;
+    Serializer::serialize_parameters(&input, &mut buf);
     assert_eq!(";key1=746.15;key2=11111", &buf);
     Ok(())
 }
@@ -340,10 +308,10 @@ fn serialize_params_mixed_types() -> Result<(), Box<dyn StdError>> {
         (key_ref("key1").to_owned(), BareItem::Boolean(false)),
         (
             key_ref("key2").to_owned(),
-            Decimal::from_str("1354.091878")?.into(),
+            Decimal::try_from(1354.091878)?.into(),
         ),
     ]);
-    Serializer::serialize_parameters(&input, &mut buf)?;
+    Serializer::serialize_parameters(&input, &mut buf);
     assert_eq!(";key1=?0;key2=1354.092", &buf);
     Ok(())
 }
