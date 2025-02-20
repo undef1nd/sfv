@@ -112,7 +112,7 @@ use sfv::{Item, BareItem, SerializeValue, Parameters, Decimal, FromPrimitive};
 let mut params = Parameters::new();
 let decimal = Decimal::from_f64(13.45655).unwrap();
 params.insert("key".into(), BareItem::Decimal(decimal));
-let int_item = Item::with_params(BareItem::Integer(99), params);
+let int_item = Item::with_params(99, params);
 assert_eq!(int_item.serialize_value().unwrap(), "99;key=13.457");
 ```
 
@@ -128,7 +128,7 @@ let str_item = Item::new(BareItem::String(String::from("foo")));
 // Creates InnerList members.
 let mut int_item_params = Parameters::new();
 int_item_params.insert("key".into(), BareItem::Boolean(false));
-let int_item = Item::with_params(BareItem::Integer(99), int_item_params);
+let int_item = Item::with_params(99, int_item_params);
 
 // Creates InnerList.
 let mut inner_list_params = Parameters::new();
@@ -148,8 +148,8 @@ Creates `Dictionary` field value:
 use sfv::{Parser, Item, BareItem, SerializeValue, Dictionary};
 
 let member_value1 = Item::new(BareItem::String(String::from("apple")));
-let member_value2 = Item::new(BareItem::Boolean(true));
-let member_value3 = Item::new(BareItem::Boolean(false));
+let member_value2 = Item::new(true);
+let member_value3 = Item::new(false);
 
 let mut dict = Dictionary::new();
 dict.insert("key1".into(), member_value1.into());
@@ -206,15 +206,18 @@ pub struct Item {
 
 impl Item {
     /// Returns new `Item` with empty `Parameters`.
-    pub fn new(bare_item: BareItem) -> Item {
+    pub fn new(bare_item: impl Into<BareItem>) -> Item {
         Item {
-            bare_item,
+            bare_item: bare_item.into(),
             params: Parameters::new(),
         }
     }
     /// Returns new `Item` with specified `Parameters`.
-    pub fn with_params(bare_item: BareItem, params: Parameters) -> Item {
-        Item { bare_item, params }
+    pub fn with_params(bare_item: impl Into<BareItem>, params: Parameters) -> Item {
+        Item {
+            bare_item: bare_item.into(),
+            params,
+        }
     }
 }
 
@@ -400,6 +403,12 @@ impl From<i64> for BareItem {
     }
 }
 
+impl From<bool> for BareItem {
+    fn from(val: bool) -> BareItem {
+        BareItem::Boolean(val)
+    }
+}
+
 impl From<Decimal> for BareItem {
     /// Converts `Decimal` into `BareItem::Decimal`.
     /// ```
@@ -410,6 +419,12 @@ impl From<Decimal> for BareItem {
     /// ```
     fn from(item: Decimal) -> Self {
         BareItem::Decimal(item)
+    }
+}
+
+impl From<Vec<u8>> for BareItem {
+    fn from(val: Vec<u8>) -> BareItem {
+        BareItem::ByteSeq(val)
     }
 }
 
@@ -430,13 +445,9 @@ pub enum RefBareItem<'a> {
     Token(&'a str),
 }
 
-pub trait AsRefBareItem {
-    fn as_ref_bare_item(&self) -> RefBareItem;
-}
-
-impl AsRefBareItem for BareItem {
-    fn as_ref_bare_item(&self) -> RefBareItem {
-        match self {
+impl<'a> From<&'a BareItem> for RefBareItem<'a> {
+    fn from(val: &'a BareItem) -> RefBareItem<'a> {
+        match val {
             BareItem::Integer(val) => RefBareItem::Integer(*val),
             BareItem::Decimal(val) => RefBareItem::Decimal(*val),
             BareItem::String(val) => RefBareItem::String(val),
@@ -447,38 +458,26 @@ impl AsRefBareItem for BareItem {
     }
 }
 
-impl AsRefBareItem for RefBareItem<'_> {
-    fn as_ref_bare_item(&self) -> RefBareItem {
-        *self
+impl<'a> From<i64> for RefBareItem<'a> {
+    fn from(val: i64) -> RefBareItem<'a> {
+        RefBareItem::Integer(val)
     }
 }
 
-impl<T: ?Sized + AsRefBareItem> AsRefBareItem for &T {
-    fn as_ref_bare_item(&self) -> RefBareItem {
-        T::as_ref_bare_item(self)
+impl<'a> From<bool> for RefBareItem<'a> {
+    fn from(val: bool) -> RefBareItem<'a> {
+        RefBareItem::Boolean(val)
     }
 }
 
-impl AsRefBareItem for i64 {
-    fn as_ref_bare_item(&self) -> RefBareItem {
-        RefBareItem::Integer(*self)
+impl<'a> From<Decimal> for RefBareItem<'a> {
+    fn from(val: Decimal) -> RefBareItem<'a> {
+        RefBareItem::Decimal(val)
     }
 }
 
-impl AsRefBareItem for bool {
-    fn as_ref_bare_item(&self) -> RefBareItem {
-        RefBareItem::Boolean(*self)
-    }
-}
-
-impl AsRefBareItem for Decimal {
-    fn as_ref_bare_item(&self) -> RefBareItem {
-        RefBareItem::Decimal(*self)
-    }
-}
-
-impl AsRefBareItem for [u8] {
-    fn as_ref_bare_item(&self) -> RefBareItem {
-        RefBareItem::ByteSeq(self)
+impl<'a> From<&'a [u8]> for RefBareItem<'a> {
+    fn from(val: &'a [u8]) -> RefBareItem<'a> {
+        RefBareItem::ByteSeq(val)
     }
 }

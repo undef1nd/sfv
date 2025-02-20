@@ -14,7 +14,7 @@ fn parse() -> Result<(), Box<dyn StdError>> {
 
     let input = "12.35;a ";
     let params = Parameters::from_iter(vec![("a".to_owned(), BareItem::Boolean(true))]);
-    let expected = Item::with_params(Decimal::from_str("12.35")?.into(), params);
+    let expected = Item::with_params(Decimal::from_str("12.35")?, params);
 
     assert_eq!(expected, Parser::from_str(input).parse_item()?);
     Ok(())
@@ -45,8 +45,8 @@ fn parse_errors() -> Result<(), Box<dyn StdError>> {
 #[test]
 fn parse_list_of_numbers() -> Result<(), Box<dyn StdError>> {
     let input = "1,42";
-    let item1 = Item::new(1.into());
-    let item2 = Item::new(42.into());
+    let item1 = Item::new(1);
+    let item2 = Item::new(42);
     let expected_list: List = vec![item1.into(), item2.into()];
     assert_eq!(expected_list, Parser::from_str(input).parse_list()?);
     Ok(())
@@ -55,8 +55,8 @@ fn parse_list_of_numbers() -> Result<(), Box<dyn StdError>> {
 #[test]
 fn parse_list_with_multiple_spaces() -> Result<(), Box<dyn StdError>> {
     let input = "1  ,  42";
-    let item1 = Item::new(1.into());
-    let item2 = Item::new(42.into());
+    let item1 = Item::new(1);
+    let item2 = Item::new(42);
     let expected_list: List = vec![item1.into(), item2.into()];
     assert_eq!(expected_list, Parser::from_str(input).parse_list()?);
     Ok(())
@@ -65,10 +65,10 @@ fn parse_list_with_multiple_spaces() -> Result<(), Box<dyn StdError>> {
 #[test]
 fn parse_list_of_lists() -> Result<(), Box<dyn StdError>> {
     let input = "(1 2), (42 43)";
-    let item1 = Item::new(1.into());
-    let item2 = Item::new(2.into());
-    let item3 = Item::new(42.into());
-    let item4 = Item::new(43.into());
+    let item1 = Item::new(1);
+    let item2 = Item::new(2);
+    let item3 = Item::new(42);
+    let item4 = Item::new(43);
     let inner_list_1 = InnerList::new(vec![item1, item2]);
     let inner_list_2 = InnerList::new(vec![item3, item4]);
     let expected_list: List = vec![inner_list_1.into(), inner_list_2.into()];
@@ -96,8 +96,8 @@ fn parse_list_empty() -> Result<(), Box<dyn StdError>> {
 #[test]
 fn parse_list_of_lists_with_param_and_spaces() -> Result<(), Box<dyn StdError>> {
     let input = "(  1  42  ); k=*";
-    let item1 = Item::new(1.into());
-    let item2 = Item::new(42.into());
+    let item1 = Item::new(1);
+    let item2 = Item::new(42);
     let inner_list_param =
         Parameters::from_iter(vec![("k".to_owned(), BareItem::Token("*".to_owned()))]);
     let inner_list = InnerList::with_params(vec![item1, item2], inner_list_param);
@@ -109,8 +109,8 @@ fn parse_list_of_lists_with_param_and_spaces() -> Result<(), Box<dyn StdError>> 
 #[test]
 fn parse_list_of_items_and_lists_with_param() -> Result<(), Box<dyn StdError>> {
     let input = r#"12, 14, (a  b); param="param_value_1", ()"#;
-    let item1 = Item::new(12.into());
-    let item2 = Item::new(14.into());
+    let item1 = Item::new(12);
+    let item2 = Item::new(14);
     let item3 = Item::new(BareItem::Token("a".to_owned()));
     let item4 = Item::new(BareItem::Token("b".to_owned()));
     let inner_list_param = Parameters::from_iter(vec![(
@@ -219,7 +219,7 @@ fn parse_inner_list_with_param_and_spaces() -> Result<(), Box<dyn StdError>> {
 #[test]
 fn parse_item_int_with_space() -> Result<(), Box<dyn StdError>> {
     let input = "12 ";
-    assert_eq!(Item::new(12.into()), Parser::from_str(input).parse_item()?);
+    assert_eq!(Item::new(12), Parser::from_str(input).parse_item()?);
     Ok(())
 }
 
@@ -228,7 +228,7 @@ fn parse_item_decimal_with_bool_param_and_space() -> Result<(), Box<dyn StdError
     let input = "12.35;a ";
     let param = Parameters::from_iter(vec![("a".to_owned(), BareItem::Boolean(true))]);
     assert_eq!(
-        Item::with_params(Decimal::from_str("12.35")?.into(), param),
+        Item::with_params(Decimal::from_str("12.35")?, param),
         Parser::from_str(input).parse_item()?
     );
     Ok(())
@@ -278,9 +278,9 @@ fn parse_dict_with_spaces_and_params() -> Result<(), Box<dyn StdError>> {
         ("r".to_owned(), BareItem::String("+w".to_owned())),
     ]);
 
-    let item1 = Item::with_params(123.into(), item1_params);
-    let item2 = Item::new(456.into());
-    let item3 = Item::with_params(789.into(), item3_params);
+    let item1 = Item::with_params(123, item1_params);
+    let item2 = Item::new(456);
+    let item3 = Item::with_params(789, item3_params);
 
     let expected_dict = Dictionary::from_iter(vec![
         ("abc".to_owned(), item1.into()),
@@ -306,9 +306,9 @@ fn parse_dict_with_token_param() -> Result<(), Box<dyn StdError>> {
     let input = "a=1, b;foo=*, c=3";
     let item2_params =
         Parameters::from_iter(vec![("foo".to_owned(), BareItem::Token("*".to_owned()))]);
-    let item1 = Item::new(1.into());
-    let item2 = Item::with_params(BareItem::Boolean(true), item2_params);
-    let item3 = Item::new(3.into());
+    let item1 = Item::new(1);
+    let item2 = Item::with_params(true, item2_params);
+    let item3 = Item::new(3);
     let expected_dict = Dictionary::from_iter(vec![
         ("a".to_owned(), item1.into()),
         ("b".to_owned(), item2.into()),
@@ -321,8 +321,8 @@ fn parse_dict_with_token_param() -> Result<(), Box<dyn StdError>> {
 #[test]
 fn parse_dict_multiple_spaces() -> Result<(), Box<dyn StdError>> {
     // input1, input2, input3 must be parsed into the same structure
-    let item1 = Item::new(1.into());
-    let item2 = Item::new(2.into());
+    let item1 = Item::new(1);
+    let item2 = Item::new(2);
     let expected_dict = Dictionary::from_iter(vec![
         ("a".to_owned(), item1.into()),
         ("b".to_owned(), item2.into()),
@@ -781,9 +781,9 @@ fn parse_key_errors() -> Result<(), Box<dyn StdError>> {
 
 #[test]
 fn parse_more_list() -> Result<(), Box<dyn StdError>> {
-    let item1 = Item::new(1.into());
-    let item2 = Item::new(2.into());
-    let item3 = Item::new(42.into());
+    let item1 = Item::new(1);
+    let item2 = Item::new(2);
+    let item3 = Item::new(42);
     let inner_list_1 = InnerList::new(vec![item1, item2]);
     let expected_list: List = vec![inner_list_1.into(), item3.into()];
 
@@ -797,9 +797,9 @@ fn parse_more_list() -> Result<(), Box<dyn StdError>> {
 fn parse_more_dict() -> Result<(), Box<dyn StdError>> {
     let item2_params =
         Parameters::from_iter(vec![("foo".to_owned(), BareItem::Token("*".to_owned()))]);
-    let item1 = Item::new(1.into());
-    let item2 = Item::with_params(BareItem::Boolean(true), item2_params);
-    let item3 = Item::new(3.into());
+    let item1 = Item::new(1);
+    let item2 = Item::with_params(true, item2_params);
+    let item3 = Item::new(3);
     let expected_dict = Dictionary::from_iter(vec![
         ("a".to_owned(), item1.into()),
         ("b".to_owned(), item2.into()),

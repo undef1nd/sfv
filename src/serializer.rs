@@ -1,7 +1,7 @@
 use crate::utils;
 use crate::{
-    AsRefBareItem, BareItem, Decimal, Dictionary, Error, InnerList, Item, List, ListEntry,
-    Parameters, RefBareItem, SFVResult,
+    BareItem, Decimal, Dictionary, Error, InnerList, Item, List, ListEntry, Parameters,
+    RefBareItem, SFVResult,
 };
 use std::fmt::Write as _;
 
@@ -144,13 +144,13 @@ impl Serializer {
         Self::serialize_parameters(inner_list_parameters, output)
     }
 
-    pub(crate) fn serialize_bare_item(
-        value: impl AsRefBareItem,
+    pub(crate) fn serialize_bare_item<'b>(
+        value: impl Into<RefBareItem<'b>>,
         output: &mut String,
     ) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc8941.html#ser-bare-item
 
-        match value.as_ref_bare_item() {
+        match value.into() {
             RefBareItem::Boolean(value) => Self::serialize_bool(value, output),
             RefBareItem::String(value) => Self::serialize_string(value, output)?,
             RefBareItem::ByteSeq(value) => Self::serialize_byte_sequence(value, output),
@@ -173,15 +173,15 @@ impl Serializer {
         Ok(())
     }
 
-    pub(crate) fn serialize_parameter(
+    pub(crate) fn serialize_parameter<'b>(
         name: &str,
-        value: impl AsRefBareItem,
+        value: impl Into<RefBareItem<'b>>,
         output: &mut String,
     ) -> SFVResult<()> {
         output.push(';');
         Self::serialize_key(name, output)?;
 
-        let value = value.as_ref_bare_item();
+        let value = value.into();
         if value != RefBareItem::Boolean(true) {
             output.push('=');
             Self::serialize_bare_item(value, output)?;

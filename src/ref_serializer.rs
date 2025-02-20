@@ -1,5 +1,5 @@
 use crate::serializer::Serializer;
-use crate::{AsRefBareItem, Error, RefBareItem, SFVResult};
+use crate::{Error, RefBareItem, SFVResult};
 
 use std::borrow::BorrowMut;
 
@@ -37,9 +37,9 @@ impl<'a> RefItemSerializer<&'a mut String> {
 }
 
 impl<W: BorrowMut<String>> RefItemSerializer<W> {
-    pub fn bare_item(
+    pub fn bare_item<'b>(
         mut self,
-        bare_item: impl AsRefBareItem,
+        bare_item: impl Into<RefBareItem<'b>>,
     ) -> SFVResult<RefParameterSerializer<W>> {
         Serializer::serialize_bare_item(bare_item, self.buffer.borrow_mut())?;
         Ok(RefParameterSerializer {
@@ -55,7 +55,11 @@ pub struct RefParameterSerializer<T> {
 }
 
 impl<T: BufferHolder> RefParameterSerializer<T> {
-    pub fn parameter(mut self, name: &str, value: impl AsRefBareItem) -> SFVResult<Self> {
+    pub fn parameter<'b>(
+        mut self,
+        name: &str,
+        value: impl Into<RefBareItem<'b>>,
+    ) -> SFVResult<Self> {
         Serializer::serialize_parameter(name, value, self.buffer.get_mut())?;
         Ok(self)
     }
@@ -121,13 +125,17 @@ impl<'a> RefListSerializer<&'a mut String> {
 }
 
 impl<W: BorrowMut<String>> RefListSerializer<W> {
-    pub fn bare_item(mut self, bare_item: impl AsRefBareItem) -> SFVResult<Self> {
+    pub fn bare_item<'b>(mut self, bare_item: impl Into<RefBareItem<'b>>) -> SFVResult<Self> {
         maybe_write_separator(self.buffer.borrow_mut(), &mut self.first);
         Serializer::serialize_bare_item(bare_item, self.buffer.borrow_mut())?;
         Ok(self)
     }
 
-    pub fn parameter(mut self, name: &str, value: impl AsRefBareItem) -> SFVResult<Self> {
+    pub fn parameter<'b>(
+        mut self,
+        name: &str,
+        value: impl Into<RefBareItem<'b>>,
+    ) -> SFVResult<Self> {
         if self.first {
             return Err(Error::new(
                 "parameters must be serialized after bare item or inner list",
@@ -203,10 +211,14 @@ impl<'a> RefDictSerializer<&'a mut String> {
 }
 
 impl<W: BorrowMut<String>> RefDictSerializer<W> {
-    pub fn bare_item_member(mut self, name: &str, value: impl AsRefBareItem) -> SFVResult<Self> {
+    pub fn bare_item_member<'b>(
+        mut self,
+        name: &str,
+        value: impl Into<RefBareItem<'b>>,
+    ) -> SFVResult<Self> {
         maybe_write_separator(self.buffer.borrow_mut(), &mut self.first);
         Serializer::serialize_key(name, self.buffer.borrow_mut())?;
-        let value = value.as_ref_bare_item();
+        let value = value.into();
         if value != RefBareItem::Boolean(true) {
             self.buffer.borrow_mut().push('=');
             Serializer::serialize_bare_item(value, self.buffer.borrow_mut())?;
@@ -214,7 +226,11 @@ impl<W: BorrowMut<String>> RefDictSerializer<W> {
         Ok(self)
     }
 
-    pub fn parameter(mut self, name: &str, value: impl AsRefBareItem) -> SFVResult<Self> {
+    pub fn parameter<'b>(
+        mut self,
+        name: &str,
+        value: impl Into<RefBareItem<'b>>,
+    ) -> SFVResult<Self> {
         if self.first {
             return Err(Error::new(
                 "parameters must be serialized after bare item or inner list",
@@ -246,7 +262,10 @@ pub struct RefInnerListSerializer<T> {
 }
 
 impl<T: BufferHolder> RefInnerListSerializer<T> {
-    pub fn inner_list_bare_item(mut self, bare_item: impl AsRefBareItem) -> SFVResult<Self> {
+    pub fn inner_list_bare_item<'b>(
+        mut self,
+        bare_item: impl Into<RefBareItem<'b>>,
+    ) -> SFVResult<Self> {
         let buffer = self.buffer.get_mut();
         if !buffer.is_empty() & !buffer.ends_with('(') {
             buffer.push(' ');
@@ -255,10 +274,10 @@ impl<T: BufferHolder> RefInnerListSerializer<T> {
         Ok(self)
     }
 
-    pub fn inner_list_parameter(
+    pub fn inner_list_parameter<'b>(
         mut self,
         name: &str,
-        value: impl AsRefBareItem,
+        value: impl Into<RefBareItem<'b>>,
     ) -> SFVResult<Self> {
         let buffer = self.buffer.get_mut();
         if buffer.is_empty() {
