@@ -21,3 +21,11 @@ pub(crate) fn is_allowed_start_token_char(c: u8) -> bool {
 pub(crate) fn is_allowed_inner_token_char(c: u8) -> bool {
     is_tchar(c) || c == b':' || c == b'/'
 }
+
+pub(crate) fn is_allowed_start_key_char(c: u8) -> bool {
+    c.is_ascii_lowercase() || c == b'*'
+}
+
+pub(crate) fn is_allowed_inner_key_char(c: u8) -> bool {
+    c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, b'_' | b'-' | b'*' | b'.')
+}

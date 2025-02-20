@@ -193,10 +193,12 @@ impl Serializer {
     pub(crate) fn serialize_key(input_key: &str, output: &mut String) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc8941.html#ser-key
 
-        match input_key.chars().next() {
+        let mut bytes = input_key.bytes();
+
+        match bytes.next() {
             None => return Err(Error::new("serialize_key: key is empty")),
-            Some(char) => {
-                if !(char.is_ascii_lowercase() || char == '*') {
+            Some(c) => {
+                if !utils::is_allowed_start_key_char(c) {
                     return Err(Error::new(
                         "serialize_key: first character is not lcalpha or '*'",
                     ));
@@ -204,11 +206,8 @@ impl Serializer {
             }
         }
 
-        let disallowed_chars =
-            |c: char| !(c.is_ascii_lowercase() || c.is_ascii_digit() || "_-*.".contains(c));
-
-        if input_key.chars().any(disallowed_chars) {
-            return Err(Error::new("serialize_key: disallowed character in input"));
+        if bytes.any(|c| !utils::is_allowed_inner_key_char(c)) {
+            return Err(Error::new("serialize_key: disallowed character"));
         }
 
         output.push_str(input_key);

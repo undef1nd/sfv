@@ -446,7 +446,7 @@ fn serialize_key_errors() -> Result<(), Box<dyn StdError>> {
         Serializer::serialize_key("", &mut buf)
     );
     assert_eq!(
-        Err(Error::new("serialize_key: disallowed character in input")),
+        Err(Error::new("serialize_key: disallowed character")),
         Serializer::serialize_key("aND", &mut buf)
     );
     assert_eq!(

@@ -55,18 +55,21 @@ impl ParseValue for List {
                 return Ok(members);
             }
 
-            if let Some(c) = parser.next() {
+            let comma_index = parser.index;
+
+            if let Some(c) = parser.peek() {
                 if c != b',' {
-                    return Err(Error::new(
-                        "parse_list: trailing characters after list member",
-                    ));
+                    return parser.error("trailing characters after list member");
                 }
+                parser.next();
             }
 
             parser.consume_ows_chars();
 
             if parser.peek().is_none() {
-                return Err("parse_list: trailing comma");
+                // Report the error at the position of the comma itself, rather
+                // than at the end of input.
+                return Err(Error::with_index("trailing comma", comma_index));
             }
         }
 
@@ -101,18 +104,21 @@ impl ParseValue for Dictionary {
                 return Ok(dict);
             }
 
-            if let Some(c) = parser.next() {
+            let comma_index = parser.index;
+
+            if let Some(c) = parser.peek() {
                 if c != b',' {
-                    return Err(Error::new(
-                        "parse_dict: trailing characters after dictionary member",
-                    ));
+                    return parser.error("trailing characters after dictionary member");
                 }
+                parser.next();
             }
 
             parser.consume_ows_chars();
 
             if parser.peek().is_none() {
-                return Err("parse_dict: trailing comma");
+                // Report the error at the position of the comma itself, rather
+                // than at the end of input.
+                return Err(Error::with_index("trailing comma", comma_index));
             }
         }
         Ok(dict)
@@ -174,6 +180,10 @@ impl<'a> Parser<'a> {
         self.peek().inspect(|_| self.index += 1)
     }
 
+    fn error<T>(&self, msg: &'static str) -> SFVResult<T> {
+        Err(Error::with_index(msg, self.index))
+    }
+
     // Generic parse method for checking input before parsing
     // and handling trailing text error
     fn parse<T: ParseValue>(mut self) -> SFVResult<T> {
@@ -186,9 +196,10 @@ impl<'a> Parser<'a> {
         self.consume_sp_chars();
 
         if self.peek().is_some() {
-            return Err("parse: trailing characters after parsed value");
-        };
-        Ok(output)
+            self.error("trailing characters after parsed value")
+        } else {
+            Ok(output)
+        }
     }
 
     fn parse_list_entry(&mut self) -> SFVResult<ListEntry> {
@@ -210,9 +221,11 @@ impl<'a> Parser<'a> {
     pub(crate) fn parse_inner_list(&mut self) -> SFVResult<InnerList> {
         // https://httpwg.org/specs/rfc8941.html#parse-innerlist
 
-        if Some(b'(') != self.next() {
-            return Err("parse_inner_list: input does not start with '('");
+        if Some(b'(') != self.peek() {
+            return self.error("expected start of inner list");
         }
+
+        self.next();
 
         let mut inner_list = Vec::new();
         while self.peek().is_some() {
@@ -232,21 +245,16 @@ impl<'a> Parser<'a> {
 
             if let Some(c) = self.peek() {
                 if c != b' ' && c != b')' {
-                    return Err("parse_inner_list: bad delimitation");
+                    return self.error("expected inner list delimiter (' ' or ')')");
                 }
             }
         }
 
-        Err(Error::new(
-            "parse_inner_list: the end of the inner list was not found",
-        ))
+        self.error("unterminated inner list")
     }
 
     pub(crate) fn parse_bare_item(&mut self) -> SFVResult<BareItem> {
         // https://httpwg.org/specs/rfc8941.html#parse-bare-item
-        if self.peek().is_none() {
-            return Err("parse_bare_item: empty item");
-        }
 
         match self.peek() {
             Some(b'?') => Ok(BareItem::Boolean(self.parse_bool()?)),
@@ -259,94 +267,131 @@ impl<'a> Parser<'a> {
                 Num::Decimal(val) => Ok(BareItem::Decimal(val)),
                 Num::Integer(val) => Ok(BareItem::Integer(val)),
             },
-            _ => Err(Error::new("parse_bare_item: item type can't be identified")),
+            _ => self.error("expected start of bare item"),
         }
     }
 
     pub(crate) fn parse_bool(&mut self) -> SFVResult<bool> {
         // https://httpwg.org/specs/rfc8941.html#parse-boolean
 
-        if self.next() != Some(b'?') {
-            return Err("parse_bool: first character is not '?'");
+        if self.peek() != Some(b'?') {
+            return self.error("expected start of boolean ('?')");
         }
 
-        match self.next() {
-            Some(b'0') => Ok(false),
-            Some(b'1') => Ok(true),
-            _ => Err(Error::new("parse_bool: invalid variant")),
+        self.next();
+
+        match self.peek() {
+            Some(b'0') => {
+                self.next();
+                Ok(false)
+            }
+            Some(b'1') => {
+                self.next();
+                Ok(true)
+            }
+            _ => self.error("expected boolean ('0' or '1')"),
         }
     }
 
     pub(crate) fn parse_string(&mut self) -> SFVResult<String> {
         // https://httpwg.org/specs/rfc8941.html#parse-string
 
-        if self.next() != Some(b'"') {
-            return Err("parse_string: first character is not '\"'");
+        if self.peek() != Some(b'"') {
+            return self.error("expected start of string ('\"')");
         }
 
+        self.next();
+
         let mut output_string = String::from("");
-        while let Some(curr_char) = self.next() {
+        while let Some(curr_char) = self.peek() {
             match curr_char {
-                b'"' => return Ok(output_string),
-                0x00..=0x1f | 0x7f..=0xff => return Err("parse_string: invalid string character"),
-                b'\\' => match self.next() {
-                    Some(c @ b'\\' | c @ b'\"') => {
-                        output_string.push(c as char);
+                b'"' => {
+                    self.next();
+                    return Ok(output_string);
+                }
+                0x00..=0x1f | 0x7f..=0xff => {
+                    return self.error("invalid string character");
+                }
+                b'\\' => {
+                    self.next();
+                    match self.peek() {
+                        Some(c @ b'\\' | c @ b'\"') => {
+                            self.next();
+                            output_string.push(c as char);
+                        }
+                        None => return self.error("unterminated escape sequence"),
+                        Some(_) => return self.error("invalid escape sequence"),
                     }
-                    None => return Err(Error::new("parse_string: last input character is '\\'")),
-                    _ => return Err(Error::new("parse_string: disallowed character after '\\'")),
-                },
-                _ => output_string.push(curr_char as char),
+                }
+                _ => {
+                    self.next();
+                    output_string.push(curr_char as char);
+                }
             }
         }
-        Err(Error::new("parse_string: no closing '\"'"))
+        self.error("unterminated string")
     }
 
     pub(crate) fn parse_token(&mut self) -> SFVResult<String> {
         // https://httpwg.org/specs/rfc8941.html#parse-token
 
-        if let Some(first_char) = self.peek() {
-            if !utils::is_allowed_start_token_char(first_char) {
-                return Err("parse_token: first character is not ALPHA or '*'");
+        let mut output_string = String::new();
+
+        match self.peek() {
+            Some(c) if utils::is_allowed_start_token_char(c) => {
+                self.next();
+                output_string.push(c as char);
             }
-        } else {
-            return Err(Error::new("parse_token: empty input string"));
+            _ => return self.error("expected start of token"),
         }
 
-        let mut output_string = String::from("");
-        while let Some(curr_char) = self.peek() {
-            if !utils::is_allowed_inner_token_char(curr_char) {
-                return Ok(output_string);
-            }
-
-            match self.next() {
-                Some(c) => output_string.push(c as char),
-                None => return Err(Error::new("parse_token: end of the string")),
+        loop {
+            match self.peek() {
+                Some(c) if utils::is_allowed_inner_token_char(c) => {
+                    self.next();
+                    output_string.push(c as char);
+                }
+                _ => return Ok(output_string),
             }
         }
-        Ok(output_string)
     }
 
     pub(crate) fn parse_byte_sequence(&mut self) -> SFVResult<Vec<u8>> {
         // https://httpwg.org/specs/rfc8941.html#parse-binary
 
-        if self.next() != Some(b':') {
-            return Err("parse_byte_seq: first char is not ':'");
+        if self.peek() != Some(b':') {
+            return self.error("expected start of byte sequence (':')");
         }
 
+        self.next();
         let start = self.index;
 
         loop {
             match self.next() {
                 Some(b':') => break,
                 Some(_) => {}
-                None => return Err("parse_byte_seq: no closing ':'"),
+                None => return self.error("unterminated byte sequence"),
             }
         }
 
-        match base64::Engine::decode(&utils::BASE64, &self.input[start..self.index - 1]) {
+        let colon_index = self.index - 1;
+
+        match base64::Engine::decode(&utils::BASE64, &self.input[start..colon_index]) {
             Ok(content) => Ok(content),
-            Err(_) => Err(Error::new("parse_byte_seq: decoding error")),
+            Err(err) => {
+                let index = match err {
+                    base64::DecodeError::InvalidByte(offset, _)
+                    | base64::DecodeError::InvalidLastSymbol(offset, _) => start + offset,
+                    // Report these two at the position of the last base64
+                    // character, since they correspond to errors in the input
+                    // as a whole.
+                    base64::DecodeError::InvalidLength(_) | base64::DecodeError::InvalidPadding => {
+                        colon_index - 1
+                    }
+                };
+
+                Err(Error::with_index("invalid byte sequence", index))
+            }
         }
     }
 
@@ -369,7 +414,7 @@ impl<'a> Parser<'a> {
                 self.next();
                 char_to_i64(c)
             }
-            _ => return Err(Error::new("parse_number: expected digit")),
+            _ => return self.error("expected digit"),
         };
 
         let mut digits = 1;
@@ -378,9 +423,7 @@ impl<'a> Parser<'a> {
             match self.peek() {
                 Some(b'.') => {
                     if digits > 12 {
-                        return Err(Error::new(
-                            "parse_number: too many digits before decimal point",
-                        ));
+                        return self.error("too many digits before decimal point");
                     }
                     self.next();
                     break;
@@ -388,7 +431,7 @@ impl<'a> Parser<'a> {
                 Some(c @ b'0'..=b'9') => {
                     digits += 1;
                     if digits > 15 {
-                        return Err(Error::new("parse_number: too many digits"));
+                        return self.error("too many digits");
                     }
                     self.next();
                     magnitude = magnitude * 10 + char_to_i64(c);
@@ -401,9 +444,7 @@ impl<'a> Parser<'a> {
 
         while let Some(c @ b'0'..=b'9') = self.peek() {
             if digits == 3 {
-                return Err(Error::new(
-                    "parse_number: too many digits after decimal point",
-                ));
+                return self.error("too many digits after decimal point");
             }
 
             self.next();
@@ -412,7 +453,9 @@ impl<'a> Parser<'a> {
         }
 
         if digits == 0 {
-            Err(Error::new("parse_number: trailing decimal point"))
+            // Report the error at the position of the decimal itself, rather
+            // than the next position.
+            Err(Error::with_index("trailing decimal point", self.index - 1))
         } else {
             Ok(Num::Decimal(Decimal::from_i128_with_scale(
                 (sign * magnitude) as i128,
@@ -452,24 +495,25 @@ impl<'a> Parser<'a> {
     }
 
     pub(crate) fn parse_key(&mut self) -> SFVResult<String> {
-        match self.peek() {
-            Some(c) if c == b'*' || c.is_ascii_lowercase() => (),
-            _ => return Err("parse_key: first character is not lcalpha or '*'"),
-        }
-
         let mut output = String::new();
-        while let Some(curr_char) = self.peek() {
-            if !curr_char.is_ascii_lowercase()
-                && !curr_char.is_ascii_digit()
-                && !b"_-*.".contains(&curr_char)
-            {
-                return Ok(output);
-            }
 
-            output.push(curr_char as char);
-            self.next();
+        match self.peek() {
+            Some(c) if utils::is_allowed_start_key_char(c) => {
+                self.next();
+                output.push(c as char);
+            }
+            _ => return self.error("expected start of key ('a'-'z' or '*')"),
         }
-        Ok(output)
+
+        loop {
+            match self.peek() {
+                Some(c) if utils::is_allowed_inner_key_char(c) => {
+                    self.next();
+                    output.push(c as char);
+                }
+                _ => return Ok(output),
+            }
+        }
     }
 
     fn consume_ows_chars(&mut self) {
