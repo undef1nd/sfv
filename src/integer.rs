@@ -2,18 +2,27 @@ use crate::{BareItem, RefBareItem};
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 
+const RANGE_I64: std::ops::RangeInclusive<i64> = -999_999_999_999_999..=999_999_999_999_999;
+
 /// A structured field value [integer].
 ///
 /// [integer]: <https://httpwg.org/specs/rfc8941.html#integer>
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Integer(i64);
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+pub struct Integer(
+    #[cfg_attr(
+        feature = "arbitrary",
+        arbitrary(with = |u: &mut arbitrary::Unstructured| u.int_in_range(RANGE_I64))
+    )]
+    i64,
+);
 
 impl Integer {
     /// The minimum value for a parsed or serialized integer: `-999_999_999_999_999`.
-    pub const MIN: Self = Self(-999_999_999_999_999);
+    pub const MIN: Self = Self(*RANGE_I64.start());
 
     /// The maximum value for a parsed or serialized integer: `999_999_999_999_999`.
-    pub const MAX: Self = Self(999_999_999_999_999);
+    pub const MAX: Self = Self(*RANGE_I64.end());
 
     /// `0`.
     ///
@@ -86,7 +95,7 @@ macro_rules! impl_conversion {
 
             fn try_from(v: $t) -> Result<Integer, OutOfRangeError> {
                 match i64::try_from(v) {
-                    Ok(v) if (Integer::MIN.0..=Integer::MAX.0).contains(&v) => Ok(Integer(v)),
+                    Ok(v) if RANGE_I64.contains(&v) => Ok(Integer(v)),
                     _ => Err(OutOfRangeError),
                 }
             }

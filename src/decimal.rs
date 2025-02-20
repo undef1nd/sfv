@@ -8,6 +8,7 @@ use std::fmt;
 ///
 /// [decimal]: <https://httpwg.org/specs/rfc8941.html#decimal>
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Decimal(Integer);
 
 impl Decimal {

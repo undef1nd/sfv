@@ -217,3 +217,25 @@ impl Borrow<str> for KeyRef {
         self.as_str()
     }
 }
+
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for &'a KeyRef {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        KeyRef::from_str(<&str>::arbitrary(u)?).map_err(|_| arbitrary::Error::IncorrectFormat)
+    }
+
+    fn size_hint(_depth: usize) -> (usize, Option<usize>) {
+        (1, None)
+    }
+}
+
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for Key {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        <&KeyRef>::arbitrary(u).map(ToOwned::to_owned)
+    }
+
+    fn size_hint(_depth: usize) -> (usize, Option<usize>) {
+        (1, None)
+    }
+}

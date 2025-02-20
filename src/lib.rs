@@ -214,6 +214,7 @@ type SFVResult<T> = std::result::Result<T, Error>;
 // bare-item = sf-integer / sf-decimal / sf-string / sf-token
 //             / sf-binary / sf-boolean
 #[derive(Debug, PartialEq, Clone)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Item {
     /// Value of `Item`.
     pub bare_item: BareItem,
@@ -262,6 +263,7 @@ pub type Parameters = IndexMap<Key, BareItem>;
 
 /// Represents a member of `List` or `Dictionary` structured field value.
 #[derive(Debug, PartialEq, Clone)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum ListEntry {
     /// Member of `Item` type.
     Item(Item),
@@ -285,6 +287,7 @@ impl From<InnerList> for ListEntry {
 // inner-list    = "(" *SP [ sf-item *( 1*SP sf-item ) *SP ] ")"
 //                 parameters
 #[derive(Debug, PartialEq, Clone)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct InnerList {
     /// `Items` that `InnerList` contains. Can be empty.
     pub items: Vec<Item>,
@@ -309,6 +312,7 @@ impl InnerList {
 
 /// `BareItem` type is used to construct `Items` or `Parameters` values.
 #[derive(Debug, PartialEq, Clone)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum BareItem {
     /// Decimal number
     // sf-decimal  = ["-"] 1*12DIGIT "." 1*3DIGIT
@@ -461,6 +465,7 @@ pub(crate) enum Num {
 
 /// Similar to `BareItem`, but used to serialize values via `RefItemSerializer`, `RefListSerializer`, `RefDictSerializer`.
 #[derive(Debug, PartialEq, Clone, Copy)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum RefBareItem<'a> {
     Integer(Integer),
     Decimal(Decimal),
