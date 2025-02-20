@@ -132,14 +132,13 @@ impl ParseMore for Dictionary {
 
 /// Exposes methods for parsing input into structured field value.
 pub struct Parser<'a> {
-    input: std::iter::Peekable<std::iter::Copied<std::slice::Iter<'a, u8>>>,
+    input: &'a [u8],
+    index: usize,
 }
 
 impl<'a> Parser<'a> {
     pub fn from_bytes(input: &'a [u8]) -> Self {
-        Self {
-            input: input.iter().copied().peekable(),
-        }
+        Self { input, index: 0 }
     }
 
     #[allow(clippy::should_implement_trait)]
@@ -162,12 +161,12 @@ impl<'a> Parser<'a> {
         self.parse()
     }
 
-    fn peek(&mut self) -> Option<u8> {
-        self.input.peek().copied()
+    fn peek(&self) -> Option<u8> {
+        self.input.get(self.index).copied()
     }
 
     fn next(&mut self) -> Option<u8> {
-        self.input.next()
+        self.peek().inspect(|_| self.index += 1)
     }
 
     // Generic parse method for checking input before parsing
@@ -474,7 +473,7 @@ impl<'a> Parser<'a> {
     }
 
     #[cfg(test)]
-    pub(crate) fn remaining(self) -> Vec<u8> {
-        self.input.collect()
+    pub(crate) fn remaining(&self) -> &[u8] {
+        &self.input[self.index..]
     }
 }
