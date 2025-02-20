@@ -361,7 +361,7 @@ impl BareItem {
     }
     /// If `BareItem` is a `Boolean`, returns `bool`, otherwise returns `None`.
     /// ```
-    /// # use sfv::{BareItem, Decimal, FromPrimitive};
+    /// # use sfv::{BareItem};
     /// let bare_item = BareItem::Boolean(true);
     /// assert_eq!(bare_item.as_bool().unwrap(), true);
     /// ```

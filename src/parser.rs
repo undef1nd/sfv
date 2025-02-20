@@ -22,6 +22,7 @@ pub trait ParseMore {
     /// list_field.parse_more("\"foo\",        \"bar\"".as_bytes()).unwrap();
     ///
     /// assert_eq!(list_field.serialize_value().unwrap(), "11, (12 13), \"foo\", \"bar\"");
+    /// ```
     fn parse_more(&mut self, input_bytes: &[u8]) -> SFVResult<()>
     where
         Self: Sized;
