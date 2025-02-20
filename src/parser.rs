@@ -141,6 +141,7 @@ impl<'a> Parser<'a> {
         }
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(input: &'a str) -> Self {
         Self::from_bytes(input.as_bytes())
     }

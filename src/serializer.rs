@@ -59,7 +59,6 @@ impl Serializer {
         Ok(())
     }
 
-    #[allow(clippy::ptr_arg)]
     pub(crate) fn serialize_list(input_list: &List, output: &mut String) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc8941.html#ser-list
         if input_list.is_empty() {
