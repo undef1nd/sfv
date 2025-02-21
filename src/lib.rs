@@ -100,7 +100,7 @@ Creates `Item` with empty parameters:
 ```
 use sfv::{string_ref, Item, SerializeValue};
 
-let str_item = Item::new(string_ref("foo").to_owned());
+let str_item = Item::new(string_ref("foo"));
 assert_eq!(str_item.serialize_value().unwrap(), r#""foo""#);
 ```
 
@@ -124,7 +124,7 @@ use sfv::{key_ref, string_ref, token_ref, Item, BareItem, InnerList, List, Seria
 let tok_item = BareItem::Token(token_ref("tok").to_owned());
 
 // Creates Item.
-let str_item = Item::new(string_ref("foo").to_owned());
+let str_item = Item::new(string_ref("foo"));
 
 // Creates InnerList members.
 let mut int_item_params = Parameters::new();
@@ -148,7 +148,7 @@ Creates `Dictionary` field value:
 ```
 use sfv::{key_ref, string_ref, Parser, Item, SerializeValue, Dictionary};
 
-let member_value1 = Item::new(string_ref("apple").to_owned());
+let member_value1 = Item::new(string_ref("apple"));
 let member_value2 = Item::new(true);
 let member_value3 = Item::new(false);
 
@@ -377,7 +377,7 @@ impl BareItem {
     /// If `BareItem` is a `ByteSeq`, returns `&Vec<u8>`, otherwise returns `None`.
     /// ```
     /// # use sfv::BareItem;
-    /// let bare_item = BareItem::ByteSeq("foo".to_owned().into_bytes());
+    /// let bare_item = BareItem::ByteSeq(b"foo".to_vec());
     /// assert_eq!(bare_item.as_byte_seq().unwrap().as_slice(), "foo".as_bytes());
     /// ```
     pub fn as_byte_seq(&self) -> Option<&Vec<u8>> {
@@ -454,6 +454,24 @@ impl From<Token> for BareItem {
 impl From<String> for BareItem {
     fn from(val: String) -> BareItem {
         BareItem::String(val)
+    }
+}
+
+impl<'a> From<&'a [u8]> for BareItem {
+    fn from(val: &'a [u8]) -> BareItem {
+        BareItem::ByteSeq(val.to_owned())
+    }
+}
+
+impl<'a> From<&'a TokenRef> for BareItem {
+    fn from(val: &'a TokenRef) -> BareItem {
+        BareItem::Token(val.to_owned())
+    }
+}
+
+impl<'a> From<&'a StringRef> for BareItem {
+    fn from(val: &'a StringRef) -> BareItem {
+        BareItem::String(val.to_owned())
     }
 }
 

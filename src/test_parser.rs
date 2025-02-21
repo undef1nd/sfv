@@ -9,7 +9,7 @@ use std::iter::FromIterator;
 #[test]
 fn parse() -> Result<(), Box<dyn StdError>> {
     let input = r#""some_value""#;
-    let parsed_item = Item::new(string_ref("some_value").to_owned());
+    let parsed_item = Item::new(string_ref("some_value"));
     let expected = parsed_item;
     assert_eq!(expected, Parser::from_str(input).parse_item()?);
 
@@ -114,8 +114,8 @@ fn parse_list_of_items_and_lists_with_param() -> Result<(), Box<dyn StdError>> {
     let input = r#"12, 14, (a  b); param="param_value_1", ()"#;
     let item1 = Item::new(12);
     let item2 = Item::new(14);
-    let item3 = Item::new(token_ref("a").to_owned());
-    let item4 = Item::new(token_ref("b").to_owned());
+    let item3 = Item::new(token_ref("a"));
+    let item4 = Item::new(token_ref("b"));
     let inner_list_param = Parameters::from_iter(vec![(
         key_ref("param").to_owned(),
         BareItem::String(string_ref("param_value_1").to_owned()),
@@ -212,8 +212,8 @@ fn parse_inner_list_with_param_and_spaces() -> Result<(), Box<dyn StdError>> {
     let input = "(c b); a=1";
     let inner_list_param = Parameters::from_iter(vec![(key_ref("a").to_owned(), 1.into())]);
 
-    let item1 = Item::new(token_ref("c").to_owned());
-    let item2 = Item::new(token_ref("b").to_owned());
+    let item1 = Item::new(token_ref("c"));
+    let item2 = Item::new(token_ref("b"));
     let expected = InnerList::with_params(vec![item1, item2], inner_list_param);
     assert_eq!(expected, Parser::from_str(input).parse_inner_list()?);
     Ok(())
@@ -244,7 +244,7 @@ fn parse_item_number_with_param() -> Result<(), Box<dyn StdError>> {
         BareItem::Token(token_ref("*").to_owned()),
     )]);
     assert_eq!(
-        Item::with_params(string_ref("12.35").to_owned(), param),
+        Item::with_params(string_ref("12.35"), param),
         Parser::from_str(r#""12.35";a1=*"#).parse_item()?
     );
     Ok(())
@@ -366,7 +366,7 @@ fn parse_bare_item() -> Result<(), Box<dyn StdError>> {
         Parser::from_str("*token").parse_bare_item()?
     );
     assert_eq!(
-        BareItem::ByteSeq("base_64 encoding test".to_owned().into_bytes()),
+        BareItem::ByteSeq(b"base_64 encoding test".to_vec()),
         Parser::from_str(":YmFzZV82NCBlbmNvZGluZyB0ZXN0:").parse_bare_item()?
     );
     assert_eq!(
@@ -519,28 +519,22 @@ fn parse_token_errors() -> Result<(), Box<dyn StdError>> {
 #[test]
 fn parse_byte_sequence() -> Result<(), Box<dyn StdError>> {
     let mut parser = Parser::from_str(":aGVsbG8:rest_of_str");
-    assert_eq!(
-        "hello".to_owned().into_bytes(),
-        parser.parse_byte_sequence()?
-    );
+    assert_eq!("hello".as_bytes(), parser.parse_byte_sequence()?);
     assert_eq!(parser.remaining(), b"rest_of_str");
 
     assert_eq!(
-        "hello".to_owned().into_bytes(),
+        "hello".as_bytes(),
         Parser::from_str(":aGVsbG8:").parse_byte_sequence()?
     );
     assert_eq!(
-        "test_encode".to_owned().into_bytes(),
+        "test_encode".as_bytes(),
         Parser::from_str(":dGVzdF9lbmNvZGU:").parse_byte_sequence()?
     );
     assert_eq!(
-        "new:year tree".to_owned().into_bytes(),
+        "new:year tree".as_bytes(),
         Parser::from_str(":bmV3OnllYXIgdHJlZQ==:").parse_byte_sequence()?
     );
-    assert_eq!(
-        "".to_owned().into_bytes(),
-        Parser::from_str("::").parse_byte_sequence()?
-    );
+    assert_eq!("".as_bytes(), Parser::from_str("::").parse_byte_sequence()?);
     Ok(())
 }
 
