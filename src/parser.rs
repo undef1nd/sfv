@@ -45,16 +45,16 @@ impl ParseValue for List {
 
         let mut members = vec![];
 
-        while parser.input.peek().is_some() {
+        while parser.peek().is_some() {
             members.push(parser.parse_list_entry()?);
 
             parser.consume_ows_chars();
 
-            if parser.input.peek().is_none() {
+            if parser.peek().is_none() {
                 return Ok(members);
             }
 
-            if let Some(c) = parser.input.next() {
+            if let Some(c) = parser.next() {
                 if c != b',' {
                     return Err("parse_list: trailing characters after list member");
                 }
@@ -62,7 +62,7 @@ impl ParseValue for List {
 
             parser.consume_ows_chars();
 
-            if parser.input.peek().is_none() {
+            if parser.peek().is_none() {
                 return Err("parse_list: trailing comma");
             }
         }
@@ -75,11 +75,11 @@ impl ParseValue for Dictionary {
     fn parse(parser: &mut Parser) -> SFVResult<Dictionary> {
         let mut dict = Dictionary::new();
 
-        while parser.input.peek().is_some() {
+        while parser.peek().is_some() {
             let this_key = parser.parse_key()?;
 
-            if let Some(b'=') = parser.input.peek() {
-                parser.input.next();
+            if let Some(b'=') = parser.peek() {
+                parser.next();
                 let member = parser.parse_list_entry()?;
                 dict.insert(this_key, member);
             } else {
@@ -94,11 +94,11 @@ impl ParseValue for Dictionary {
 
             parser.consume_ows_chars();
 
-            if parser.input.peek().is_none() {
+            if parser.peek().is_none() {
                 return Ok(dict);
             }
 
-            if let Some(c) = parser.input.next() {
+            if let Some(c) = parser.next() {
                 if c != b',' {
                     return Err("parse_dict: trailing characters after dictionary member");
                 }
@@ -106,7 +106,7 @@ impl ParseValue for Dictionary {
 
             parser.consume_ows_chars();
 
-            if parser.input.peek().is_none() {
+            if parser.peek().is_none() {
                 return Err("parse_dict: trailing comma");
             }
         }
@@ -132,14 +132,13 @@ impl ParseMore for Dictionary {
 
 /// Exposes methods for parsing input into structured field value.
 pub struct Parser<'a> {
-    input: std::iter::Peekable<std::iter::Copied<std::slice::Iter<'a, u8>>>,
+    input: &'a [u8],
+    index: usize,
 }
 
 impl<'a> Parser<'a> {
     pub fn from_bytes(input: &'a [u8]) -> Self {
-        Self {
-            input: input.iter().copied().peekable(),
-        }
+        Self { input, index: 0 }
     }
 
     #[allow(clippy::should_implement_trait)]
@@ -162,6 +161,14 @@ impl<'a> Parser<'a> {
         self.parse()
     }
 
+    fn peek(&self) -> Option<u8> {
+        self.input.get(self.index).copied()
+    }
+
+    fn next(&mut self) -> Option<u8> {
+        self.peek().inspect(|_| self.index += 1)
+    }
+
     // Generic parse method for checking input before parsing
     // and handling trailing text error
     fn parse<T: ParseValue>(mut self) -> SFVResult<T> {
@@ -173,7 +180,7 @@ impl<'a> Parser<'a> {
 
         self.consume_sp_chars();
 
-        if self.input.peek().is_some() {
+        if self.peek().is_some() {
             return Err("parse: trailing characters after parsed value");
         };
         Ok(output)
@@ -183,7 +190,7 @@ impl<'a> Parser<'a> {
         // https://httpwg.org/specs/rfc8941.html#parse-item-or-list
         // ListEntry represents a tuple (item_or_inner_list, parameters)
 
-        match self.input.peek() {
+        match self.peek() {
             Some(b'(') => {
                 let parsed = self.parse_inner_list()?;
                 Ok(ListEntry::InnerList(parsed))
@@ -198,16 +205,16 @@ impl<'a> Parser<'a> {
     pub(crate) fn parse_inner_list(&mut self) -> SFVResult<InnerList> {
         // https://httpwg.org/specs/rfc8941.html#parse-innerlist
 
-        if Some(b'(') != self.input.next() {
+        if Some(b'(') != self.next() {
             return Err("parse_inner_list: input does not start with '('");
         }
 
         let mut inner_list = Vec::new();
-        while self.input.peek().is_some() {
+        while self.peek().is_some() {
             self.consume_sp_chars();
 
-            if Some(&b')') == self.input.peek() {
-                self.input.next();
+            if Some(b')') == self.peek() {
+                self.next();
                 let params = self.parse_parameters()?;
                 return Ok(InnerList {
                     items: inner_list,
@@ -218,8 +225,8 @@ impl<'a> Parser<'a> {
             let parsed_item = Item::parse(self)?;
             inner_list.push(parsed_item);
 
-            if let Some(c) = self.input.peek() {
-                if c != &b' ' && c != &b')' {
+            if let Some(c) = self.peek() {
+                if c != b' ' && c != b')' {
                     return Err("parse_inner_list: bad delimitation");
                 }
             }
@@ -230,18 +237,18 @@ impl<'a> Parser<'a> {
 
     pub(crate) fn parse_bare_item(&mut self) -> SFVResult<BareItem> {
         // https://httpwg.org/specs/rfc8941.html#parse-bare-item
-        if self.input.peek().is_none() {
+        if self.peek().is_none() {
             return Err("parse_bare_item: empty item");
         }
 
-        match self.input.peek() {
+        match self.peek() {
             Some(b'?') => Ok(BareItem::Boolean(self.parse_bool()?)),
             Some(b'"') => Ok(BareItem::String(self.parse_string()?)),
             Some(b':') => Ok(BareItem::ByteSeq(self.parse_byte_sequence()?)),
-            Some(&c) if c == b'*' || c.is_ascii_alphabetic() => {
+            Some(c) if c == b'*' || c.is_ascii_alphabetic() => {
                 Ok(BareItem::Token(self.parse_token()?))
             }
-            Some(&c) if c == b'-' || c.is_ascii_digit() => match self.parse_number()? {
+            Some(c) if c == b'-' || c.is_ascii_digit() => match self.parse_number()? {
                 Num::Decimal(val) => Ok(BareItem::Decimal(val)),
                 Num::Integer(val) => Ok(BareItem::Integer(val)),
             },
@@ -252,11 +259,11 @@ impl<'a> Parser<'a> {
     pub(crate) fn parse_bool(&mut self) -> SFVResult<bool> {
         // https://httpwg.org/specs/rfc8941.html#parse-boolean
 
-        if self.input.next() != Some(b'?') {
+        if self.next() != Some(b'?') {
             return Err("parse_bool: first character is not '?'");
         }
 
-        match self.input.next() {
+        match self.next() {
             Some(b'0') => Ok(false),
             Some(b'1') => Ok(true),
             _ => Err("parse_bool: invalid variant"),
@@ -266,16 +273,16 @@ impl<'a> Parser<'a> {
     pub(crate) fn parse_string(&mut self) -> SFVResult<String> {
         // https://httpwg.org/specs/rfc8941.html#parse-string
 
-        if self.input.next() != Some(b'"') {
+        if self.next() != Some(b'"') {
             return Err("parse_string: first character is not '\"'");
         }
 
         let mut output_string = String::from("");
-        while let Some(curr_char) = self.input.next() {
+        while let Some(curr_char) = self.next() {
             match curr_char {
                 b'"' => return Ok(output_string),
                 0x00..=0x1f | 0x7f..=0xff => return Err("parse_string: invalid string character"),
-                b'\\' => match self.input.next() {
+                b'\\' => match self.next() {
                     Some(c @ b'\\' | c @ b'\"') => {
                         output_string.push(c as char);
                     }
@@ -291,8 +298,8 @@ impl<'a> Parser<'a> {
     pub(crate) fn parse_token(&mut self) -> SFVResult<String> {
         // https://httpwg.org/specs/rfc8941.html#parse-token
 
-        if let Some(first_char) = self.input.peek() {
-            if !utils::is_allowed_start_token_char(*first_char) {
+        if let Some(first_char) = self.peek() {
+            if !utils::is_allowed_start_token_char(first_char) {
                 return Err("parse_token: first character is not ALPHA or '*'");
             }
         } else {
@@ -300,12 +307,12 @@ impl<'a> Parser<'a> {
         }
 
         let mut output_string = String::from("");
-        while let Some(curr_char) = self.input.peek() {
-            if !utils::is_allowed_inner_token_char(*curr_char) {
+        while let Some(curr_char) = self.peek() {
+            if !utils::is_allowed_inner_token_char(curr_char) {
                 return Ok(output_string);
             }
 
-            match self.input.next() {
+            match self.next() {
                 Some(c) => output_string.push(c as char),
                 None => return Err("parse_token: end of the string"),
             }
@@ -316,20 +323,21 @@ impl<'a> Parser<'a> {
     pub(crate) fn parse_byte_sequence(&mut self) -> SFVResult<Vec<u8>> {
         // https://httpwg.org/specs/rfc8941.html#parse-binary
 
-        if self.input.next() != Some(b':') {
+        if self.next() != Some(b':') {
             return Err("parse_byte_seq: first char is not ':'");
         }
 
-        let mut b64_content = vec![];
+        let start = self.index;
+
         loop {
-            match self.input.next() {
+            match self.next() {
                 Some(b':') => break,
-                Some(c) => b64_content.push(c),
+                Some(_) => {}
                 None => return Err("parse_byte_seq: no closing ':'"),
             }
         }
 
-        match base64::Engine::decode(&utils::BASE64, b64_content) {
+        match base64::Engine::decode(&utils::BASE64, &self.input[start..self.index - 1]) {
             Ok(content) => Ok(content),
             Err(_) => Err("parse_byte_seq: decoding error"),
         }
@@ -342,16 +350,16 @@ impl<'a> Parser<'a> {
             (c - b'0') as i64
         }
 
-        let sign = if let Some(b'-') = self.input.peek() {
-            self.input.next();
+        let sign = if let Some(b'-') = self.peek() {
+            self.next();
             -1
         } else {
             1
         };
 
-        let mut magnitude = match self.input.peek() {
-            Some(&c @ b'0'..=b'9') => {
-                self.input.next();
+        let mut magnitude = match self.peek() {
+            Some(c @ b'0'..=b'9') => {
+                self.next();
                 char_to_i64(c)
             }
             _ => return Err("parse_number: expected digit"),
@@ -360,20 +368,20 @@ impl<'a> Parser<'a> {
         let mut digits = 1;
 
         loop {
-            match self.input.peek() {
+            match self.peek() {
                 Some(b'.') => {
                     if digits > 12 {
                         return Err("parse_number: too many digits before decimal point");
                     }
-                    self.input.next();
+                    self.next();
                     break;
                 }
-                Some(&c @ b'0'..=b'9') => {
+                Some(c @ b'0'..=b'9') => {
                     digits += 1;
                     if digits > 15 {
                         return Err("parse_number: too many digits");
                     }
-                    self.input.next();
+                    self.next();
                     magnitude = magnitude * 10 + char_to_i64(c);
                 }
                 _ => return Ok(Num::Integer(sign * magnitude)),
@@ -382,12 +390,12 @@ impl<'a> Parser<'a> {
 
         digits = 0;
 
-        while let Some(&c @ b'0'..=b'9') = self.input.peek() {
+        while let Some(c @ b'0'..=b'9') = self.peek() {
             if digits == 3 {
                 return Err("parse_number: too many digits after decimal point");
             }
 
-            self.input.next();
+            self.next();
             magnitude = magnitude * 10 + char_to_i64(c);
             digits += 1;
         }
@@ -407,9 +415,9 @@ impl<'a> Parser<'a> {
 
         let mut params = Parameters::new();
 
-        while let Some(curr_char) = self.input.peek() {
-            if curr_char == &b';' {
-                self.input.next();
+        while let Some(curr_char) = self.peek() {
+            if curr_char == b';' {
+                self.next();
             } else {
                 break;
             }
@@ -417,9 +425,9 @@ impl<'a> Parser<'a> {
             self.consume_sp_chars();
 
             let param_name = self.parse_key()?;
-            let param_value = match self.input.peek() {
+            let param_value = match self.peek() {
                 Some(b'=') => {
-                    self.input.next();
+                    self.next();
                     self.parse_bare_item()?
                 }
                 _ => BareItem::Boolean(true),
@@ -433,40 +441,40 @@ impl<'a> Parser<'a> {
     }
 
     pub(crate) fn parse_key(&mut self) -> SFVResult<String> {
-        match self.input.peek() {
-            Some(c) if c == &b'*' || c.is_ascii_lowercase() => (),
+        match self.peek() {
+            Some(c) if c == b'*' || c.is_ascii_lowercase() => (),
             _ => return Err("parse_key: first character is not lcalpha or '*'"),
         }
 
         let mut output = String::new();
-        while let Some(curr_char) = self.input.peek() {
+        while let Some(curr_char) = self.peek() {
             if !curr_char.is_ascii_lowercase()
                 && !curr_char.is_ascii_digit()
-                && !b"_-*.".contains(curr_char)
+                && !b"_-*.".contains(&curr_char)
             {
                 return Ok(output);
             }
 
-            output.push(*curr_char as char);
-            self.input.next();
+            output.push(curr_char as char);
+            self.next();
         }
         Ok(output)
     }
 
     fn consume_ows_chars(&mut self) {
-        while let Some(b' ' | b'\t') = self.input.peek() {
-            self.input.next();
+        while let Some(b' ' | b'\t') = self.peek() {
+            self.next();
         }
     }
 
     fn consume_sp_chars(&mut self) {
-        while let Some(b' ') = self.input.peek() {
-            self.input.next();
+        while let Some(b' ') = self.peek() {
+            self.next();
         }
     }
 
     #[cfg(test)]
-    pub(crate) fn remaining(self) -> Vec<u8> {
-        self.input.collect()
+    pub(crate) fn remaining(&self) -> &[u8] {
+        &self.input[self.index..]
     }
 }
