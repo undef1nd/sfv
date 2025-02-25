@@ -302,7 +302,7 @@ impl<'a> Parser<'a> {
 
         self.next();
 
-        let mut output_string = String::from("");
+        let mut output_string = String::new();
         while let Some(curr_char) = self.peek() {
             match curr_char {
                 b'"' => {

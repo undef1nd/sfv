@@ -55,8 +55,7 @@ impl Serializer {
         // https://httpwg.org/specs/rfc8941.html#ser-item
 
         Self::serialize_bare_item(&input_item.bare_item, output)?;
-        Self::serialize_parameters(&input_item.params, output)?;
-        Ok(())
+        Self::serialize_parameters(&input_item.params, output)
     }
 
     pub(crate) fn serialize_list(input_list: &List, output: &mut String) -> SFVResult<()> {
@@ -75,7 +74,7 @@ impl Serializer {
                 ListEntry::InnerList(inner_list) => {
                     Self::serialize_inner_list(inner_list, output)?;
                 }
-            };
+            }
 
             // If more items remain in input_list:
             //      Append “,” to output.
@@ -99,7 +98,7 @@ impl Serializer {
             Serializer::serialize_key(member_name, output)?;
 
             match member_value {
-                ListEntry::Item(ref item) => {
+                ListEntry::Item(item) => {
                     // If dict member is boolean true, no need to serialize it: only its params must be serialized
                     // Otherwise serialize entire item with its params
                     if item.bare_item == BareItem::Boolean(true) {
@@ -141,8 +140,7 @@ impl Serializer {
             }
         }
         output.push(')');
-        Self::serialize_parameters(inner_list_parameters, output)?;
-        Ok(())
+        Self::serialize_parameters(inner_list_parameters, output)
     }
 
     pub(crate) fn serialize_bare_item(
@@ -168,7 +166,7 @@ impl Serializer {
     ) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc8941.html#ser-params
 
-        for (param_name, param_value) in input_params.iter() {
+        for (param_name, param_value) in input_params {
             Self::serialize_parameter(param_name, param_value, output)?;
         }
         Ok(())
