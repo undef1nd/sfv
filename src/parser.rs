@@ -469,13 +469,8 @@ impl<'a> Parser<'a> {
 
         let mut params = Parameters::new();
 
-        while let Some(curr_char) = self.peek() {
-            if curr_char == b';' {
-                self.next();
-            } else {
-                break;
-            }
-
+        while let Some(b';') = self.peek() {
+            self.next();
             self.consume_sp_chars();
 
             let param_name = self.parse_key()?;
