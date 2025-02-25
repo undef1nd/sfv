@@ -67,7 +67,7 @@ impl RefParameterSerializer<'_> {
 ///
 /// assert_eq!(
 ///     serialized_item,
-///     "11;foo, (abc;abc_param=?0 def);bar=\"val\""
+///     r#"11;foo, (abc;abc_param=?0 def);bar="val""#
 /// );
 /// # Ok(())
 /// # }
@@ -136,7 +136,7 @@ impl<'a> RefListSerializer<'a> {
 ///
 /// assert_eq!(
 ///    serialized_item,
-///    "member1=11;foo, member2=(abc;abc_param=?0 def);bar=\"val\", member3=12.346"
+///    r#"member1=11;foo, member2=(abc;abc_param=?0 def);bar="val", member3=12.346"#
 /// );
 /// # Ok(())
 /// # }
