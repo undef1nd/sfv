@@ -150,9 +150,9 @@ impl Serializer {
         // https://httpwg.org/specs/rfc8941.html#ser-bare-item
 
         match value.as_ref_bare_item() {
-            RefBareItem::Boolean(value) => Self::serialize_bool(value, output)?,
+            RefBareItem::Boolean(value) => Self::serialize_bool(value, output),
             RefBareItem::String(value) => Self::serialize_string(value, output)?,
-            RefBareItem::ByteSeq(value) => Self::serialize_byte_sequence(value, output)?,
+            RefBareItem::ByteSeq(value) => Self::serialize_byte_sequence(value, output),
             RefBareItem::Token(value) => Self::serialize_token(value, output)?,
             RefBareItem::Integer(value) => Self::serialize_integer(value, output)?,
             RefBareItem::Decimal(value) => Self::serialize_decimal(value, output)?,
@@ -299,20 +299,17 @@ impl Serializer {
         Ok(())
     }
 
-    pub(crate) fn serialize_byte_sequence(value: &[u8], output: &mut String) -> SFVResult<()> {
+    pub(crate) fn serialize_byte_sequence(value: &[u8], output: &mut String) {
         // https://httpwg.org/specs/rfc8941.html#ser-binary
 
         output.push(':');
         base64::Engine::encode_string(&utils::BASE64, value, output);
         output.push(':');
-        Ok(())
     }
 
-    pub(crate) fn serialize_bool(value: bool, output: &mut String) -> SFVResult<()> {
+    pub(crate) fn serialize_bool(value: bool, output: &mut String) {
         // https://httpwg.org/specs/rfc8941.html#ser-boolean
 
-        let val = if value { "?1" } else { "?0" };
-        output.push_str(val);
-        Ok(())
+        output.push_str(if value { "?1" } else { "?0" });
     }
 }

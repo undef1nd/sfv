@@ -315,52 +315,49 @@ fn serialize_token_errors() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn serialize_byte_sequence() -> Result<(), Box<dyn StdError>> {
+fn serialize_byte_sequence() {
     let mut buf = String::new();
-    Serializer::serialize_byte_sequence("hello".as_bytes(), &mut buf)?;
+    Serializer::serialize_byte_sequence("hello".as_bytes(), &mut buf);
     assert_eq!(":aGVsbG8=:", &buf);
 
     buf.clear();
-    Serializer::serialize_byte_sequence("test_encode".as_bytes(), &mut buf)?;
+    Serializer::serialize_byte_sequence("test_encode".as_bytes(), &mut buf);
     assert_eq!(":dGVzdF9lbmNvZGU=:", &buf);
 
     buf.clear();
-    Serializer::serialize_byte_sequence("".as_bytes(), &mut buf)?;
+    Serializer::serialize_byte_sequence("".as_bytes(), &mut buf);
     assert_eq!("::", &buf);
 
     buf.clear();
-    Serializer::serialize_byte_sequence("pleasure.".as_bytes(), &mut buf)?;
+    Serializer::serialize_byte_sequence("pleasure.".as_bytes(), &mut buf);
     assert_eq!(":cGxlYXN1cmUu:", &buf);
 
     buf.clear();
-    Serializer::serialize_byte_sequence("leasure.".as_bytes(), &mut buf)?;
+    Serializer::serialize_byte_sequence("leasure.".as_bytes(), &mut buf);
     assert_eq!(":bGVhc3VyZS4=:", &buf);
 
     buf.clear();
-    Serializer::serialize_byte_sequence("easure.".as_bytes(), &mut buf)?;
+    Serializer::serialize_byte_sequence("easure.".as_bytes(), &mut buf);
     assert_eq!(":ZWFzdXJlLg==:", &buf);
 
     buf.clear();
-    Serializer::serialize_byte_sequence("asure.".as_bytes(), &mut buf)?;
+    Serializer::serialize_byte_sequence("asure.".as_bytes(), &mut buf);
     assert_eq!(":YXN1cmUu:", &buf);
 
     buf.clear();
-    Serializer::serialize_byte_sequence("sure.".as_bytes(), &mut buf)?;
+    Serializer::serialize_byte_sequence("sure.".as_bytes(), &mut buf);
     assert_eq!(":c3VyZS4=:", &buf);
-
-    Ok(())
 }
 
 #[test]
-fn serialize_bool() -> Result<(), Box<dyn StdError>> {
+fn serialize_bool() {
     let mut buf = String::new();
-    Serializer::serialize_bool(true, &mut buf)?;
+    Serializer::serialize_bool(true, &mut buf);
     assert_eq!("?1", &buf);
 
     buf.clear();
-    Serializer::serialize_bool(false, &mut buf)?;
+    Serializer::serialize_bool(false, &mut buf);
     assert_eq!("?0", &buf);
-    Ok(())
 }
 
 #[test]
