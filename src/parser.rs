@@ -21,11 +21,11 @@ pub trait ParseMore {
     /// # fn main() -> Result<(), sfv::Error> {
     /// let mut list_field = Parser::from_str("11, (12 13)").parse_list()?;
     ///
-    /// list_field.parse_more("\"foo\",        \"bar\"".as_bytes())?;
+    /// list_field.parse_more(r#""foo",        "bar""#.as_bytes())?;
     ///
     /// assert_eq!(
     ///     list_field.serialize_value()?,
-    ///     "11, (12 13), \"foo\", \"bar\"",
+    ///     r#"11, (12 13), "foo", "bar""#,
     /// );
     /// # Ok(())
     /// # }

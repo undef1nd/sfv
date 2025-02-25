@@ -91,7 +91,7 @@ fn maybe_write_separator(buffer: &mut String, first: &mut bool) {
 ///
 /// assert_eq!(
 ///     serialized_list,
-///     "11;foo, (abc;abc_param=?0 def);bar=\"val\""
+///     r#"11;foo, (abc;abc_param=?0 def);bar="val""#
 /// );
 /// # Ok(())
 /// # }
@@ -173,7 +173,7 @@ impl<W: BorrowMut<String>> RefListSerializer<W> {
 ///
 /// assert_eq!(
 ///    serialized_dict,
-///    "member1=11;foo, member2=(abc;abc_param=?0 def);bar=\"val\", member3=12.346"
+///    r#"member1=11;foo, member2=(abc;abc_param=?0 def);bar="val", member3=12.346"#
 /// );
 /// # Ok(())
 /// # }
