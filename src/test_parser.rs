@@ -7,7 +7,7 @@ use std::iter::FromIterator;
 
 #[test]
 fn parse() -> Result<(), Box<dyn StdError>> {
-    let input = "\"some_value\"";
+    let input = r#""some_value""#;
     let parsed_item = Item::new(BareItem::String("some_value".to_owned()));
     let expected = parsed_item;
     assert_eq!(expected, Parser::from_str(input).parse_item()?);
@@ -22,12 +22,12 @@ fn parse() -> Result<(), Box<dyn StdError>> {
 
 #[test]
 fn parse_errors() -> Result<(), Box<dyn StdError>> {
-    let input = "\"some_value¢\"";
+    let input = r#""some_value¢""#;
     assert_eq!(
         Err(Error::with_index("invalid string character", 11)),
         Parser::from_str(input).parse_item()
     );
-    let input = "\"some_value\" trailing_text";
+    let input = r#""some_value" trailing_text""#;
     assert_eq!(
         Err(Error::with_index(
             "trailing characters after parsed value",
@@ -108,7 +108,7 @@ fn parse_list_of_lists_with_param_and_spaces() -> Result<(), Box<dyn StdError>> 
 
 #[test]
 fn parse_list_of_items_and_lists_with_param() -> Result<(), Box<dyn StdError>> {
-    let input = "12, 14, (a  b); param=\"param_value_1\", ()";
+    let input = r#"12, 14, (a  b); param="param_value_1", ()"#;
     let item1 = Item::new(12.into());
     let item2 = Item::new(14.into());
     let item3 = Item::new(BareItem::Token("a".to_owned()));
@@ -239,7 +239,7 @@ fn parse_item_number_with_param() -> Result<(), Box<dyn StdError>> {
     let param = Parameters::from_iter(vec![("a1".to_owned(), BareItem::Token("*".to_owned()))]);
     assert_eq!(
         Item::with_params(BareItem::String("12.35".to_owned()), param),
-        Parser::from_str("\"12.35\";a1=*").parse_item()?
+        Parser::from_str(r#""12.35";a1=*"#).parse_item()?
     );
     Ok(())
 }
@@ -270,7 +270,7 @@ fn parse_dict_errors() -> Result<(), Box<dyn StdError>> {
 
 #[test]
 fn parse_dict_with_spaces_and_params() -> Result<(), Box<dyn StdError>> {
-    let input = "abc=123;a=1;b=2, def=456, ghi=789;q=9;r=\"+w\"";
+    let input = r#"abc=123;a=1;b=2, def=456, ghi=789;q=9;r="+w""#;
     let item1_params =
         Parameters::from_iter(vec![("a".to_owned(), 1.into()), ("b".to_owned(), 2.into())]);
     let item3_params = Parameters::from_iter(vec![
@@ -346,7 +346,7 @@ fn parse_bare_item() -> Result<(), Box<dyn StdError>> {
     );
     assert_eq!(
         BareItem::String("test string".to_owned()),
-        Parser::from_str("\"test string\"").parse_bare_item()?
+        Parser::from_str(r#""test string""#).parse_bare_item()?
     );
     assert_eq!(
         BareItem::Token("*token".to_owned()),
@@ -406,22 +406,22 @@ fn parse_bool_errors() -> Result<(), Box<dyn StdError>> {
 
 #[test]
 fn parse_string() -> Result<(), Box<dyn StdError>> {
-    let mut parser = Parser::from_str("\"some string\" ;not string");
+    let mut parser = Parser::from_str(r#""some string" ;not string"#);
     assert_eq!("some string".to_owned(), parser.parse_string()?);
     assert_eq!(parser.remaining(), " ;not string".as_bytes());
 
     assert_eq!(
         "test".to_owned(),
-        Parser::from_str("\"test\"").parse_string()?
+        Parser::from_str(r#""test""#).parse_string()?
     );
     assert_eq!(
         r#"te\st"#.to_owned(),
-        Parser::from_str("\"te\\\\st\"").parse_string()?
+        Parser::from_str(r#""te\\st""#).parse_string()?
     );
-    assert_eq!("".to_owned(), Parser::from_str("\"\"").parse_string()?);
+    assert_eq!("".to_owned(), Parser::from_str(r#""""#).parse_string()?);
     assert_eq!(
         "some string".to_owned(),
-        Parser::from_str("\"some string\"").parse_string()?
+        Parser::from_str(r#""some string""#).parse_string()?
     );
     Ok(())
 }
@@ -429,16 +429,16 @@ fn parse_string() -> Result<(), Box<dyn StdError>> {
 #[test]
 fn parse_string_errors() -> Result<(), Box<dyn StdError>> {
     assert_eq!(
-        Err(Error::with_index("expected start of string ('\"')", 0)),
+        Err(Error::with_index(r#"expected start of string ('"')"#, 0)),
         Parser::from_str("test").parse_string()
     );
     assert_eq!(
         Err(Error::with_index("unterminated escape sequence", 2)),
-        Parser::from_str("\"\\").parse_string()
+        Parser::from_str(r#""\"#).parse_string()
     );
     assert_eq!(
         Err(Error::with_index("invalid escape sequence", 2)),
-        Parser::from_str("\"\\l\"").parse_string()
+        Parser::from_str(r#""\l""#).parse_string()
     );
     assert_eq!(
         Err(Error::with_index("invalid string character", 1)),
@@ -446,7 +446,7 @@ fn parse_string_errors() -> Result<(), Box<dyn StdError>> {
     );
     assert_eq!(
         Err(Error::with_index("unterminated string", 5)),
-        Parser::from_str("\"smth").parse_string()
+        Parser::from_str(r#""smth"#).parse_string()
     );
     Ok(())
 }
@@ -701,7 +701,7 @@ fn parse_number_errors() -> Result<(), Box<dyn StdError>> {
 
 #[test]
 fn parse_params_string() -> Result<(), Box<dyn StdError>> {
-    let input = ";b=\"param_val\"";
+    let input = r#";b="param_val""#;
     let expected = Parameters::from_iter(vec![(
         "b".to_owned(),
         BareItem::String("param_val".to_owned()),

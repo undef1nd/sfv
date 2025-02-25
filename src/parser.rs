@@ -297,7 +297,7 @@ impl<'a> Parser<'a> {
         // https://httpwg.org/specs/rfc8941.html#parse-string
 
         if self.peek() != Some(b'"') {
-            return self.error("expected start of string ('\"')");
+            return self.error(r#"expected start of string ('"')"#);
         }
 
         self.next();
@@ -315,7 +315,7 @@ impl<'a> Parser<'a> {
                 b'\\' => {
                     self.next();
                     match self.peek() {
-                        Some(c @ b'\\' | c @ b'\"') => {
+                        Some(c @ b'\\' | c @ b'"') => {
                             self.next();
                             output_string.push(c as char);
                         }

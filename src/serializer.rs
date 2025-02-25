@@ -259,14 +259,14 @@ impl Serializer {
             return Err(Error::new("serialize_string: not a visible character"));
         }
 
-        output.push('\"');
+        output.push('"');
         for char in value.chars() {
-            if char == '\\' || char == '\"' {
+            if char == '\\' || char == '"' {
                 output.push('\\');
             }
             output.push(char);
         }
-        output.push('\"');
+        output.push('"');
 
         Ok(())
     }
