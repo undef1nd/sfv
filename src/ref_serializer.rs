@@ -6,14 +6,16 @@ use std::marker::PhantomData;
 /// ```
 /// use sfv::RefItemSerializer;
 ///
+/// # fn main() -> Result<(), &'static str> {
 /// let mut serialized_item = String::new();
-/// let serializer = RefItemSerializer::new(&mut serialized_item);
-/// serializer
-/// .bare_item(11)
-/// .unwrap()
-/// .parameter("foo", true)
-/// .unwrap();
+///
+/// RefItemSerializer::new(&mut serialized_item)
+///   .bare_item(11)?
+///   .parameter("foo", true)?;
+///
 /// assert_eq!(serialized_item, "11;foo");
+/// # Ok(())
+/// # }
 /// ```
 #[derive(Debug)]
 pub struct RefItemSerializer<'a> {
@@ -50,27 +52,25 @@ impl RefParameterSerializer<'_> {
 /// ```
 /// use sfv::{RefBareItem, RefListSerializer};
 ///
+/// # fn main() -> Result<(), &'static str> {
 /// let mut serialized_item = String::new();
-/// let serializer = RefListSerializer::new(&mut serialized_item);
-/// serializer
-///     .bare_item(11)
-///     .unwrap()
-///     .parameter("foo", true)
-///     .unwrap()
+///
+/// RefListSerializer::new(&mut serialized_item)
+///     .bare_item(11)?
+///     .parameter("foo", true)?
 ///     .open_inner_list()
-///     .inner_list_bare_item(RefBareItem::Token("abc"))
-///     .unwrap()
-///     .inner_list_parameter("abc_param", false)
-///     .unwrap()
-///     .inner_list_bare_item(RefBareItem::Token("def"))
-///     .unwrap()
+///     .inner_list_bare_item(RefBareItem::Token("abc"))?
+///     .inner_list_parameter("abc_param", false)?
+///     .inner_list_bare_item(RefBareItem::Token("def"))?
 ///     .close_inner_list()
-///     .parameter("bar", RefBareItem::String("val"))
-///     .unwrap();
+///     .parameter("bar", RefBareItem::String("val"))?;
+///
 /// assert_eq!(
 ///     serialized_item,
 ///     "11;foo, (abc;abc_param=?0 def);bar=\"val\""
 /// );
+/// # Ok(())
+/// # }
 /// ```
 #[derive(Debug)]
 pub struct RefListSerializer<'a> {
@@ -115,35 +115,31 @@ impl<'a> RefListSerializer<'a> {
 
 /// Serializes `Dictionary` field value components incrementally.
 /// ```
-/// use sfv::{RefBareItem, RefDictSerializer, Decimal, FromPrimitive};
+/// use sfv::{Decimal, FromPrimitive, RefBareItem, RefDictSerializer};
 ///
+/// # fn main() -> Result<(), &'static str> {
 /// let mut serialized_item = String::new();
-/// let serializer = RefDictSerializer::new(&mut serialized_item);
-/// serializer
-///    .bare_item_member("member1", 11)
-///    .unwrap()
-///    .parameter("foo", true)
-///    .unwrap()
-///    .open_inner_list("member2")
-///    .unwrap()
-///    .inner_list_bare_item(RefBareItem::Token("abc"))
-///    .unwrap()
-///    .inner_list_parameter("abc_param", false)
-///    .unwrap()
-///    .inner_list_bare_item(RefBareItem::Token("def"))
-///    .unwrap()
+///
+/// RefDictSerializer::new(&mut serialized_item)
+///    .bare_item_member("member1", 11)?
+///    .parameter("foo", true)?
+///    .open_inner_list("member2")?
+///    .inner_list_bare_item(RefBareItem::Token("abc"))?
+///    .inner_list_parameter("abc_param", false)?
+///    .inner_list_bare_item(RefBareItem::Token("def"))?
 ///    .close_inner_list()
-///    .parameter("bar", RefBareItem::String("val"))
-///    .unwrap()
+///    .parameter("bar", RefBareItem::String("val"))?
 ///    .bare_item_member(
 ///         "member3",
 ///         Decimal::from_f64(12.34566).unwrap(),
-///    )
-///    .unwrap();
+///    )?;
+///
 /// assert_eq!(
 ///    serialized_item,
 ///    "member1=11;foo, member2=(abc;abc_param=?0 def);bar=\"val\", member3=12.346"
 /// );
+/// # Ok(())
+/// # }
 /// ```
 #[derive(Debug)]
 pub struct RefDictSerializer<'a> {
