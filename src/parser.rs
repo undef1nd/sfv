@@ -260,7 +260,7 @@ impl<'a> Parser<'a> {
             Some(b'?') => Ok(BareItem::Boolean(self.parse_bool()?)),
             Some(b'"') => Ok(BareItem::String(self.parse_string()?)),
             Some(b':') => Ok(BareItem::ByteSeq(self.parse_byte_sequence()?)),
-            Some(c) if c == b'*' || c.is_ascii_alphabetic() => {
+            Some(c) if utils::is_allowed_start_token_char(c) => {
                 Ok(BareItem::Token(self.parse_token()?))
             }
             Some(c) if c == b'-' || c.is_ascii_digit() => match self.parse_number()? {
