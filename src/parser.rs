@@ -1,8 +1,11 @@
 use crate::utils;
 use crate::{
-    BareItem, Decimal, Dictionary, Error, InnerList, Item, List, ListEntry, Num, Parameters,
-    SFVResult,
+    BareItem, Decimal, Dictionary, Error, InnerList, Integer, Item, Key, List, ListEntry, Num,
+    Parameters, SFVResult, String, Token,
 };
+
+use std::convert::TryFrom;
+use std::string::String as StdString;
 
 trait ParseValue {
     fn parse(parser: &mut Parser) -> SFVResult<Self>
@@ -308,12 +311,12 @@ impl<'a> Parser<'a> {
 
         self.next();
 
-        let mut output_string = String::new();
+        let mut output_string = StdString::new();
         while let Some(curr_char) = self.peek() {
             match curr_char {
                 b'"' => {
                     self.next();
-                    return Ok(output_string);
+                    return Ok(String::from_string(output_string).unwrap());
                 }
                 0x00..=0x1f | 0x7f..=0xff => {
                     return self.error("invalid string character");
@@ -338,10 +341,10 @@ impl<'a> Parser<'a> {
         self.error("unterminated string")
     }
 
-    pub(crate) fn parse_token(&mut self) -> SFVResult<String> {
+    pub(crate) fn parse_token(&mut self) -> SFVResult<Token> {
         // https://httpwg.org/specs/rfc8941.html#parse-token
 
-        let mut output_string = String::new();
+        let mut output_string = StdString::new();
 
         match self.peek() {
             Some(c) if utils::is_allowed_start_token_char(c) => {
@@ -357,7 +360,7 @@ impl<'a> Parser<'a> {
                     self.next();
                     output_string.push(c as char);
                 }
-                _ => return Ok(output_string),
+                _ => return Ok(Token::from_string(output_string).unwrap()),
             }
         }
     }
@@ -442,30 +445,30 @@ impl<'a> Parser<'a> {
                     self.next();
                     magnitude = magnitude * 10 + char_to_i64(c);
                 }
-                _ => return Ok(Num::Integer(sign * magnitude)),
+                _ => return Ok(Num::Integer(Integer::try_from(sign * magnitude).unwrap())),
             }
         }
 
-        digits = 0;
+        magnitude *= 1000;
+        let mut scale = 100;
 
         while let Some(c @ b'0'..=b'9') = self.peek() {
-            if digits == 3 {
+            if scale == 0 {
                 return self.error("too many digits after decimal point");
             }
 
             self.next();
-            magnitude = magnitude * 10 + char_to_i64(c);
-            digits += 1;
+            magnitude += char_to_i64(c) * scale;
+            scale /= 10;
         }
 
-        if digits == 0 {
+        if scale == 100 {
             // Report the error at the position of the decimal itself, rather
             // than the next position.
             Err(Error::with_index("trailing decimal point", self.index - 1))
         } else {
-            Ok(Num::Decimal(Decimal::from_i128_with_scale(
-                (sign * magnitude) as i128,
-                digits,
+            Ok(Num::Decimal(Decimal::from_integer_scaled_1000(
+                Integer::try_from(sign * magnitude).unwrap(),
             )))
         }
     }
@@ -495,8 +498,8 @@ impl<'a> Parser<'a> {
         Ok(params)
     }
 
-    pub(crate) fn parse_key(&mut self) -> SFVResult<String> {
-        let mut output = String::new();
+    pub(crate) fn parse_key(&mut self) -> SFVResult<Key> {
+        let mut output = StdString::new();
 
         match self.peek() {
             Some(c) if utils::is_allowed_start_key_char(c) => {
@@ -512,7 +515,7 @@ impl<'a> Parser<'a> {
                     self.next();
                     output.push(c as char);
                 }
-                _ => return Ok(output),
+                _ => return Ok(Key::from_string(output).unwrap()),
             }
         }
     }

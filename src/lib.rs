@@ -98,96 +98,123 @@ match dict.get("u") {
 ### Structured Field Value Construction and Serialization
 Creates `Item` with empty parameters:
 ```
-use sfv::{Item, BareItem, SerializeValue};
+use sfv::{StringRef, Item, SerializeValue};
 
-let str_item = Item::new(BareItem::String(String::from("foo")));
-assert_eq!(str_item.serialize_value().unwrap(), r#""foo""#);
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let str_item = Item::new(StringRef::from_str("foo")?);
+assert_eq!(str_item.serialize_value()?, r#""foo""#);
+# Ok(())
+# }
 ```
 
 
 Creates `Item` field value with parameters:
 ```
-use sfv::{Item, BareItem, SerializeValue, Parameters, Decimal, FromPrimitive};
+use std::convert::TryFrom;
+use sfv::{KeyRef, Item, BareItem, SerializeValue, Parameters, Decimal};
 
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
 let mut params = Parameters::new();
-let decimal = Decimal::from_f64(13.45655).unwrap();
-params.insert("key".into(), BareItem::Decimal(decimal));
-let int_item = Item::with_params(BareItem::Integer(99), params);
-assert_eq!(int_item.serialize_value().unwrap(), "99;key=13.457");
+let decimal = Decimal::try_from(13.45655)?;
+params.insert(KeyRef::from_str("key")?.to_owned(), BareItem::Decimal(decimal));
+let int_item = Item::with_params(99, params);
+assert_eq!(int_item.serialize_value()?, "99;key=13.457");
+# Ok(())
+# }
 ```
 
 Creates `List` field value with `Item` and parametrized `InnerList` as members:
 ```
-use sfv::{Item, BareItem, InnerList, List, SerializeValue, Parameters};
+use sfv::{KeyRef, StringRef, TokenRef, Item, BareItem, InnerList, List, SerializeValue, Parameters};
 
-let tok_item = BareItem::Token("tok".into());
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let tok_item = BareItem::Token(TokenRef::from_str("tok")?.to_owned());
 
 // Creates Item.
-let str_item = Item::new(BareItem::String(String::from("foo")));
+let str_item = Item::new(StringRef::from_str("foo")?);
 
 // Creates InnerList members.
 let mut int_item_params = Parameters::new();
-int_item_params.insert("key".into(), BareItem::Boolean(false));
-let int_item = Item::with_params(BareItem::Integer(99), int_item_params);
+int_item_params.insert(KeyRef::from_str("key")?.to_owned(), BareItem::Boolean(false));
+let int_item = Item::with_params(99, int_item_params);
 
 // Creates InnerList.
 let mut inner_list_params = Parameters::new();
-inner_list_params.insert("bar".into(), BareItem::Boolean(true));
+inner_list_params.insert(KeyRef::from_str("bar")?.to_owned(), BareItem::Boolean(true));
 let inner_list = InnerList::with_params(vec![int_item, str_item], inner_list_params);
-
 
 let list: List = vec![Item::new(tok_item).into(), inner_list.into()];
 assert_eq!(
-    list.serialize_value().unwrap(),
+    list.serialize_value()?,
     r#"tok, (99;key=?0 "foo");bar"#
 );
+# Ok(())
+# }
 ```
 
 Creates `Dictionary` field value:
 ```
-use sfv::{Parser, Item, BareItem, SerializeValue, Dictionary};
+use sfv::{KeyRef, StringRef, Parser, Item, SerializeValue, Dictionary};
 
-let member_value1 = Item::new(BareItem::String(String::from("apple")));
-let member_value2 = Item::new(BareItem::Boolean(true));
-let member_value3 = Item::new(BareItem::Boolean(false));
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let member_value1 = Item::new(StringRef::from_str("apple")?.to_owned());
+let member_value2 = Item::new(true);
+let member_value3 = Item::new(false);
 
 let mut dict = Dictionary::new();
-dict.insert("key1".into(), member_value1.into());
-dict.insert("key2".into(), member_value2.into());
-dict.insert("key3".into(), member_value3.into());
+dict.insert(KeyRef::from_str("key1")?.to_owned(), member_value1.into());
+dict.insert(KeyRef::from_str("key2")?.to_owned(), member_value2.into());
+dict.insert(KeyRef::from_str("key3")?.to_owned(), member_value3.into());
 
 assert_eq!(
-    dict.serialize_value().unwrap(),
+    dict.serialize_value()?,
     r#"key1="apple", key2, key3=?0"#
 );
-
+# Ok(())
+# }
 ```
 */
 
+mod decimal;
 mod error;
+mod integer;
+mod key;
 mod parser;
 mod ref_serializer;
 mod serializer;
+mod string;
+mod token;
 mod utils;
 
+#[cfg(test)]
+mod test_decimal;
+#[cfg(test)]
+mod test_integer;
+#[cfg(test)]
+mod test_key;
 #[cfg(test)]
 mod test_parser;
 #[cfg(test)]
 mod test_serializer;
+#[cfg(test)]
+mod test_string;
+#[cfg(test)]
+mod test_token;
+
 use indexmap::IndexMap;
 
-pub use rust_decimal::{
-    prelude::{FromPrimitive, FromStr},
-    Decimal,
-};
-
+pub use decimal::{Decimal, DecimalError};
 pub use error::Error;
+pub use integer::{integer, Integer, OutOfRangeError};
+pub use key::{key_ref, Key, KeyError, KeyRef};
 pub use parser::{ParseMore, Parser};
 pub use ref_serializer::{
     RefDictSerializer, RefInnerListSerializer, RefItemSerializer, RefListSerializer,
     RefParameterSerializer,
 };
 pub use serializer::SerializeValue;
+pub use string::{string_ref, String, StringError, StringRef};
+pub use token::{token_ref, Token, TokenError, TokenRef};
 
 type SFVResult<T> = std::result::Result<T, Error>;
 
@@ -197,6 +224,7 @@ type SFVResult<T> = std::result::Result<T, Error>;
 // bare-item = sf-integer / sf-decimal / sf-string / sf-token
 //             / sf-binary / sf-boolean
 #[derive(Debug, PartialEq, Clone)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Item {
     /// Value of `Item`.
     pub bare_item: BareItem,
@@ -206,15 +234,18 @@ pub struct Item {
 
 impl Item {
     /// Returns new `Item` with empty `Parameters`.
-    pub fn new(bare_item: BareItem) -> Item {
+    pub fn new(bare_item: impl Into<BareItem>) -> Item {
         Item {
-            bare_item,
+            bare_item: bare_item.into(),
             params: Parameters::new(),
         }
     }
     /// Returns new `Item` with specified `Parameters`.
-    pub fn with_params(bare_item: BareItem, params: Parameters) -> Item {
-        Item { bare_item, params }
+    pub fn with_params(bare_item: impl Into<BareItem>, params: Parameters) -> Item {
+        Item {
+            bare_item: bare_item.into(),
+            params,
+        }
     }
 }
 
@@ -223,7 +254,7 @@ impl Item {
 // dict-member    = member-name [ "=" member-value ]
 // member-name    = key
 // member-value   = sf-item / inner-list
-pub type Dictionary = IndexMap<String, ListEntry>;
+pub type Dictionary = IndexMap<Key, ListEntry>;
 
 /// Represents `List` type structured field value.
 // sf-list       = list-member *( OWS "," OWS list-member )
@@ -238,10 +269,11 @@ pub type List = Vec<ListEntry>;
 //                 *( lcalpha / DIGIT / "_" / "-" / "." / "*" )
 // lcalpha       = %x61-7A ; a-z
 // param-value   = bare-item
-pub type Parameters = IndexMap<String, BareItem>;
+pub type Parameters = IndexMap<Key, BareItem>;
 
 /// Represents a member of `List` or `Dictionary` structured field value.
 #[derive(Debug, PartialEq, Clone)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum ListEntry {
     /// Member of `Item` type.
     Item(Item),
@@ -265,6 +297,7 @@ impl From<InnerList> for ListEntry {
 // inner-list    = "(" *SP [ sf-item *( 1*SP sf-item ) *SP ] ")"
 //                 parameters
 #[derive(Debug, PartialEq, Clone)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct InnerList {
     /// `Items` that `InnerList` contains. Can be empty.
     pub items: Vec<Item>,
@@ -289,13 +322,14 @@ impl InnerList {
 
 /// `BareItem` type is used to construct `Items` or `Parameters` values.
 #[derive(Debug, PartialEq, Clone)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum BareItem {
     /// Decimal number
     // sf-decimal  = ["-"] 1*12DIGIT "." 1*3DIGIT
     Decimal(Decimal),
     /// Integer number
     // sf-integer = ["-"] 1*15DIGIT
-    Integer(i64),
+    Integer(Integer),
     // sf-string = DQUOTE *chr DQUOTE
     // chr       = unescaped / escaped
     // unescaped = %x20-21 / %x23-5B / %x5D-7E
@@ -308,14 +342,15 @@ pub enum BareItem {
     // boolean    = "0" / "1"
     Boolean(bool),
     // sf-token = ( ALPHA / "*" ) *( tchar / ":" / "/" )
-    Token(String),
+    Token(Token),
 }
 
 impl BareItem {
     /// If `BareItem` is a decimal, returns `Decimal`, otherwise returns `None`.
     /// ```
-    /// # use sfv::{BareItem, Decimal, FromPrimitive};
-    /// let decimal_number = Decimal::from_f64(415.566).unwrap();
+    /// # use std::convert::TryFrom;
+    /// # use sfv::{BareItem, Decimal};
+    /// let decimal_number = Decimal::try_from(415.566).unwrap();
     /// let bare_item: BareItem = decimal_number.into();
     /// assert_eq!(bare_item.as_decimal().unwrap(), decimal_number);
     /// ```
@@ -325,13 +360,13 @@ impl BareItem {
             _ => None,
         }
     }
-    /// If `BareItem` is an integer, returns `i64`, otherwise returns `None`.
+    /// If `BareItem` is an integer, returns `Integer`, otherwise returns `None`.
     /// ```
-    /// # use sfv::BareItem;
+    /// # use sfv::{integer, BareItem};
     /// let bare_item: BareItem = 100.into();
-    /// assert_eq!(bare_item.as_int().unwrap(), 100);
+    /// assert_eq!(bare_item.as_int().unwrap(), integer(100));
     /// ```
-    pub fn as_int(&self) -> Option<i64> {
+    pub fn as_int(&self) -> Option<Integer> {
         match *self {
             BareItem::Integer(val) => Some(val),
             _ => None,
@@ -339,11 +374,11 @@ impl BareItem {
     }
     /// If `BareItem` is `String`, returns `&str`, otherwise returns `None`.
     /// ```
-    /// # use sfv::BareItem;
-    /// let bare_item = BareItem::String("foo".into());
-    /// assert_eq!(bare_item.as_str().unwrap(), "foo");
+    /// # use sfv::{string_ref, BareItem};
+    /// let bare_item = BareItem::String(string_ref("foo").to_owned());
+    /// assert_eq!(bare_item.as_str().unwrap().as_str(), "foo");
     /// ```
-    pub fn as_str(&self) -> Option<&str> {
+    pub fn as_str(&self) -> Option<&String> {
         match *self {
             BareItem::String(ref val) => Some(val),
             _ => None,
@@ -352,7 +387,7 @@ impl BareItem {
     /// If `BareItem` is a `ByteSeq`, returns `&Vec<u8>`, otherwise returns `None`.
     /// ```
     /// # use sfv::BareItem;
-    /// let bare_item = BareItem::ByteSeq("foo".to_owned().into_bytes());
+    /// let bare_item = BareItem::ByteSeq(b"foo".to_vec());
     /// assert_eq!(bare_item.as_byte_seq().unwrap().as_slice(), "foo".as_bytes());
     /// ```
     pub fn as_byte_seq(&self) -> Option<&Vec<u8>> {
@@ -373,14 +408,14 @@ impl BareItem {
             _ => None,
         }
     }
-    /// If `BareItem` is a `Token`, returns `&str`, otherwise returns `None`.
+    /// If `BareItem` is a `Token`, returns `&Token`, otherwise returns `None`.
     /// ```
-    /// use sfv::BareItem;
+    /// use sfv::{token_ref, BareItem};
     ///
-    /// let bare_item = BareItem::Token("*bar".into());
-    /// assert_eq!(bare_item.as_token().unwrap(), "*bar");
+    /// let bare_item = BareItem::Token(token_ref("*bar").to_owned());
+    /// assert_eq!(bare_item.as_token().unwrap().as_str(), "*bar");
     /// ```
-    pub fn as_token(&self) -> Option<&str> {
+    pub fn as_token(&self) -> Option<&Token> {
         match *self {
             BareItem::Token(ref val) => Some(val),
             _ => None,
@@ -388,23 +423,24 @@ impl BareItem {
     }
 }
 
-impl From<i64> for BareItem {
-    /// Converts `i64` into `BareItem::Integer`.
-    /// ```
-    /// # use sfv::BareItem;
-    /// let bare_item: BareItem = 456.into();
-    /// assert_eq!(bare_item.as_int().unwrap(), 456);
-    /// ```
-    fn from(item: i64) -> Self {
-        BareItem::Integer(item)
+impl From<Integer> for BareItem {
+    fn from(val: Integer) -> BareItem {
+        BareItem::Integer(val)
+    }
+}
+
+impl From<bool> for BareItem {
+    fn from(val: bool) -> BareItem {
+        BareItem::Boolean(val)
     }
 }
 
 impl From<Decimal> for BareItem {
     /// Converts `Decimal` into `BareItem::Decimal`.
     /// ```
-    /// # use sfv::{BareItem, Decimal, FromPrimitive};
-    /// let decimal_number = Decimal::from_f64(48.01).unwrap();
+    /// # use std::convert::TryFrom;
+    /// # use sfv::{BareItem, Decimal};
+    /// let decimal_number = Decimal::try_from(48.01).unwrap();
     /// let bare_item: BareItem = decimal_number.into();
     /// assert_eq!(bare_item.as_decimal().unwrap(), decimal_number);
     /// ```
@@ -413,30 +449,63 @@ impl From<Decimal> for BareItem {
     }
 }
 
+impl From<Vec<u8>> for BareItem {
+    fn from(val: Vec<u8>) -> BareItem {
+        BareItem::ByteSeq(val)
+    }
+}
+
+impl From<Token> for BareItem {
+    fn from(val: Token) -> BareItem {
+        BareItem::Token(val)
+    }
+}
+
+impl From<String> for BareItem {
+    fn from(val: String) -> BareItem {
+        BareItem::String(val)
+    }
+}
+
+impl<'a> From<&'a [u8]> for BareItem {
+    fn from(val: &'a [u8]) -> BareItem {
+        BareItem::ByteSeq(val.to_owned())
+    }
+}
+
+impl<'a> From<&'a TokenRef> for BareItem {
+    fn from(val: &'a TokenRef) -> BareItem {
+        BareItem::Token(val.to_owned())
+    }
+}
+
+impl<'a> From<&'a StringRef> for BareItem {
+    fn from(val: &'a StringRef) -> BareItem {
+        BareItem::String(val.to_owned())
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub(crate) enum Num {
     Decimal(Decimal),
-    Integer(i64),
+    Integer(Integer),
 }
 
 /// Similar to `BareItem`, but used to serialize values via `RefItemSerializer`, `RefListSerializer`, `RefDictSerializer`.
 #[derive(Debug, PartialEq, Clone, Copy)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum RefBareItem<'a> {
-    Integer(i64),
+    Integer(Integer),
     Decimal(Decimal),
-    String(&'a str),
+    String(&'a StringRef),
     ByteSeq(&'a [u8]),
     Boolean(bool),
-    Token(&'a str),
+    Token(&'a TokenRef),
 }
 
-pub trait AsRefBareItem {
-    fn as_ref_bare_item(&self) -> RefBareItem;
-}
-
-impl AsRefBareItem for BareItem {
-    fn as_ref_bare_item(&self) -> RefBareItem {
-        match self {
+impl<'a> From<&'a BareItem> for RefBareItem<'a> {
+    fn from(val: &'a BareItem) -> RefBareItem<'a> {
+        match val {
             BareItem::Integer(val) => RefBareItem::Integer(*val),
             BareItem::Decimal(val) => RefBareItem::Decimal(*val),
             BareItem::String(val) => RefBareItem::String(val),
@@ -447,38 +516,50 @@ impl AsRefBareItem for BareItem {
     }
 }
 
-impl AsRefBareItem for RefBareItem<'_> {
-    fn as_ref_bare_item(&self) -> RefBareItem {
-        *self
+impl<'a> From<Integer> for RefBareItem<'a> {
+    fn from(val: Integer) -> RefBareItem<'a> {
+        RefBareItem::Integer(val)
     }
 }
 
-impl<T: ?Sized + AsRefBareItem> AsRefBareItem for &T {
-    fn as_ref_bare_item(&self) -> RefBareItem {
-        T::as_ref_bare_item(self)
+impl<'a> From<bool> for RefBareItem<'a> {
+    fn from(val: bool) -> RefBareItem<'a> {
+        RefBareItem::Boolean(val)
     }
 }
 
-impl AsRefBareItem for i64 {
-    fn as_ref_bare_item(&self) -> RefBareItem {
-        RefBareItem::Integer(*self)
+impl<'a> From<Decimal> for RefBareItem<'a> {
+    fn from(val: Decimal) -> RefBareItem<'a> {
+        RefBareItem::Decimal(val)
     }
 }
 
-impl AsRefBareItem for bool {
-    fn as_ref_bare_item(&self) -> RefBareItem {
-        RefBareItem::Boolean(*self)
+impl<'a> From<&'a [u8]> for RefBareItem<'a> {
+    fn from(val: &'a [u8]) -> RefBareItem<'a> {
+        RefBareItem::ByteSeq(val)
     }
 }
 
-impl AsRefBareItem for Decimal {
-    fn as_ref_bare_item(&self) -> RefBareItem {
-        RefBareItem::Decimal(*self)
+impl<'a> From<&'a Token> for RefBareItem<'a> {
+    fn from(val: &'a Token) -> RefBareItem<'a> {
+        RefBareItem::Token(val)
     }
 }
 
-impl AsRefBareItem for [u8] {
-    fn as_ref_bare_item(&self) -> RefBareItem {
-        RefBareItem::ByteSeq(self)
+impl<'a> From<&'a TokenRef> for RefBareItem<'a> {
+    fn from(val: &'a TokenRef) -> RefBareItem<'a> {
+        RefBareItem::Token(val)
+    }
+}
+
+impl<'a> From<&'a String> for RefBareItem<'a> {
+    fn from(val: &'a String) -> RefBareItem<'a> {
+        RefBareItem::String(val)
+    }
+}
+
+impl<'a> From<&'a StringRef> for RefBareItem<'a> {
+    fn from(val: &'a StringRef) -> RefBareItem<'a> {
+        RefBareItem::String(val)
     }
 }

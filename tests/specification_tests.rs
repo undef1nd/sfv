@@ -1,9 +1,12 @@
 use serde::Deserialize;
 use serde_json::Value;
-use sfv::FromStr;
 use sfv::Parser;
 use sfv::SerializeValue;
-use sfv::{BareItem, Decimal, Dictionary, InnerList, Item, List, ListEntry, Parameters};
+use sfv::{
+    BareItem, Decimal, Dictionary, InnerList, Item, KeyRef, List, ListEntry, Parameters, StringRef,
+    TokenRef,
+};
+use std::convert::{TryFrom, TryInto};
 use std::error::Error;
 use std::path::PathBuf;
 use std::{env, fs};
@@ -89,7 +92,13 @@ fn run_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
 }
 
 fn run_test_case_serialization_only(test_case: &TestData) -> Result<(), Box<dyn Error>> {
-    let expected_field_value = build_expected_field_value(test_case)?;
+    let expected_field_value = match build_expected_field_value(test_case) {
+        Ok(v) => v,
+        Err(_) => {
+            assert!(test_case.must_fail);
+            return Ok(());
+        }
+    };
     let actual_result = expected_field_value.serialize();
 
     if test_case.must_fail {
@@ -161,9 +170,11 @@ fn build_dict(expected_value: &Value) -> Result<Dictionary, Box<dyn Error>> {
         let member = member
             .as_array()
             .ok_or("build_dict: expected dict member is not an array")?;
-        let member_name = member[0]
-            .as_str()
-            .ok_or("build_dict: expected dict member name is not a str")?;
+        let member_name = KeyRef::from_str(
+            member[0]
+                .as_str()
+                .ok_or("build_dict: expected dict member name is not a str")?,
+        )?;
         let member_value = &member[1];
         let item_or_inner_list: ListEntry = build_list_or_item(member_value)?;
         dict.insert(member_name.to_owned(), item_or_inner_list);
@@ -233,10 +244,11 @@ fn build_bare_item(bare_item_value: &Value) -> Result<BareItem, Box<dyn Error>> 
         bare_item if bare_item.is_i64() => Ok(BareItem::Integer(
             bare_item
                 .as_i64()
-                .ok_or("build_bare_item: bare_item value is not an i64")?,
+                .ok_or("build_bare_item: bare_item value is not an i64")?
+                .try_into()?,
         )),
         bare_item if bare_item.is_f64() => {
-            let decimal = Decimal::from_str(&serde_json::to_string(bare_item)?)?;
+            let decimal = Decimal::try_from(bare_item.as_f64().unwrap())?;
             Ok(BareItem::Decimal(decimal))
         }
         bare_item if bare_item.is_boolean() => Ok(BareItem::Boolean(
@@ -245,17 +257,21 @@ fn build_bare_item(bare_item_value: &Value) -> Result<BareItem, Box<dyn Error>> 
                 .ok_or("build_bare_item: bare_item value is not a bool")?,
         )),
         bare_item if bare_item.is_string() => Ok(BareItem::String(
-            bare_item
-                .as_str()
-                .ok_or("build_bare_item: bare_item value is not a str")?
-                .to_owned(),
+            StringRef::from_str(
+                bare_item
+                    .as_str()
+                    .ok_or("build_bare_item: bare_item value is not a str")?,
+            )?
+            .to_owned(),
         )),
         bare_item if (bare_item.is_object() && bare_item["__type"] == "token") => {
             Ok(BareItem::Token(
-                bare_item["value"]
-                    .as_str()
-                    .ok_or("build_bare_item: bare_item value is not a str")?
-                    .to_owned(),
+                TokenRef::from_str(
+                    bare_item["value"]
+                        .as_str()
+                        .ok_or("build_bare_item: bare_item value is not a str")?,
+                )?
+                .to_owned(),
             ))
         }
         bare_item if (bare_item.is_object() && bare_item["__type"] == "binary") => {
@@ -285,9 +301,11 @@ fn build_parameters(params_value: &Value) -> Result<Parameters, Box<dyn Error>> 
         let member = member
             .as_array()
             .ok_or("build_parameters: expected parameter is not an array")?;
-        let key = member[0]
-            .as_str()
-            .ok_or("build_parameters: expected parameter name is not a str")?;
+        let key = KeyRef::from_str(
+            member[0]
+                .as_str()
+                .ok_or("build_parameters: expected parameter name is not a str")?,
+        )?;
         let value = &member[1];
         let itm = build_bare_item(value)?;
         parameters.insert(key.to_owned(), itm);
