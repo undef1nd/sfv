@@ -17,18 +17,12 @@ pub trait ParseMore {
     /// parses and merges next line into a single structured field value.
     /// # Examples
     /// ```
-    /// # use sfv::{ParseMore, Parser, SerializeValue};
-    /// # fn main() -> Result<(), &'static str> {
-    /// let mut list_field = Parser::from_str("11, (12 13)").parse_list()?;
+    /// # use sfv::{Parser, SerializeValue, ParseMore};
     ///
-    /// list_field.parse_more(r#""foo",        "bar""#.as_bytes())?;
+    /// let mut list_field = Parser::from_str("11, (12 13)").parse_list().unwrap();
+    /// list_field.parse_more("\"foo\",        \"bar\"".as_bytes()).unwrap();
     ///
-    /// assert_eq!(
-    ///     list_field.serialize_value()?,
-    ///     r#"11, (12 13), "foo", "bar""#,
-    /// );
-    /// # Ok(())
-    /// # }
+    /// assert_eq!(list_field.serialize_value().unwrap(), "11, (12 13), \"foo\", \"bar\"");
     /// ```
     fn parse_more(&mut self, input_bytes: &[u8]) -> SFVResult<()>
     where
