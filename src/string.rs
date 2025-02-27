@@ -65,6 +65,7 @@ impl StringRef {
     }
 
     /// Creates a `&StringRef` from a `&str`.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(v: &str) -> Result<&Self, StringError> {
         validate(v.as_bytes())?;
         Ok(Self::cast(v))

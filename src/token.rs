@@ -83,6 +83,7 @@ impl TokenRef {
     const fn cast(v: &str) -> &Self;
 
     /// Creates a `&TokenRef` from a `&str`.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(v: &str) -> Result<&Self, TokenError> {
         validate(v.as_bytes())?;
         Ok(Self::cast(v))

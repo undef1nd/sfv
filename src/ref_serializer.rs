@@ -22,6 +22,12 @@ pub struct RefItemSerializer<W> {
     buffer: W,
 }
 
+impl Default for RefItemSerializer<String> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RefItemSerializer<String> {
     pub fn new() -> Self {
         Self {
@@ -99,6 +105,12 @@ fn maybe_write_separator(buffer: &mut String, first: &mut bool) {
 pub struct RefListSerializer<W> {
     buffer: W,
     first: bool,
+}
+
+impl Default for RefListSerializer<String> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl RefListSerializer<String> {
@@ -182,6 +194,12 @@ impl<W: BorrowMut<String>> RefListSerializer<W> {
 pub struct RefDictSerializer<W> {
     buffer: W,
     first: bool,
+}
+
+impl Default for RefDictSerializer<String> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl RefDictSerializer<String> {
