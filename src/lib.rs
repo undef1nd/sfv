@@ -30,7 +30,7 @@ assert!(item.is_ok());
 println!("{:#?}", item);
 
 // Parsing structured field value of List type.
-let list_header_input = "1;a=tok, (\"foo\" \"bar\");baz, ()";
+let list_header_input = r#"1;a=tok, ("foo" "bar");baz, ()"#;
 let list = Parser::from_str(list_header_input).parse_list();
 assert!(list.is_ok());
 println!("{:#?}", list);
@@ -101,7 +101,7 @@ Creates `Item` with empty parameters:
 use sfv::{Item, BareItem, SerializeValue};
 
 let str_item = Item::new(BareItem::String(String::from("foo")));
-assert_eq!(str_item.serialize_value().unwrap(), "\"foo\"");
+assert_eq!(str_item.serialize_value().unwrap(), r#""foo""#);
 ```
 
 
@@ -139,7 +139,7 @@ let inner_list = InnerList::with_params(vec![int_item, str_item], inner_list_par
 let list: List = vec![Item::new(tok_item).into(), inner_list.into()];
 assert_eq!(
     list.serialize_value().unwrap(),
-    "tok, (99;key=?0 \"foo\");bar"
+    r#"tok, (99;key=?0 "foo");bar"#
 );
 ```
 
@@ -158,7 +158,7 @@ dict.insert("key3".into(), member_value3.into());
 
 assert_eq!(
     dict.serialize_value().unwrap(),
-    "key1=\"apple\", key2, key3=?0"
+    r#"key1="apple", key2, key3=?0"#
 );
 
 ```
