@@ -23,7 +23,7 @@ fn parsing_item(c: &mut Criterion) {
 }
 
 fn parsing_list(c: &mut Criterion) {
-    let fixture = "a, abcdefghigklmnoprst, 123456785686457, 99999999999.999, (), (\"somelongstringvalue\" \"anotherlongstringvalue\";key=:c29tZXZlciBsb25nc3RyaW5ndmFsdWVyZXByZXNlbnRlZGFzYnl0ZXM: 145)";
+    let fixture = r#"a, abcdefghigklmnoprst, 123456785686457, 99999999999.999, (), ("somelongstringvalue" "anotherlongstringvalue";key=:c29tZXZlciBsb25nc3RyaW5ndmFsdWVyZXByZXNlbnRlZGFzYnl0ZXM: 145)"#;
     c.bench_with_input(
         BenchmarkId::new("parsing_list", fixture),
         &fixture,
@@ -34,7 +34,7 @@ fn parsing_list(c: &mut Criterion) {
 }
 
 fn parsing_dict(c: &mut Criterion) {
-    let fixture = "a, dict_key2=abcdefghigklmnoprst, dict_key3=123456785686457, dict_key4=(\"inner-list-member\" :aW5uZXItbGlzdC1tZW1iZXI=:);key=aW5uZXItbGlzdC1wYXJhbWV0ZXJz";
+    let fixture = r#"a, dict_key2=abcdefghigklmnoprst, dict_key3=123456785686457, dict_key4=("inner-list-member" :aW5uZXItbGlzdC1tZW1iZXI=:);key=aW5uZXItbGlzdC1wYXJhbWV0ZXJz"#;
     c.bench_with_input(
         BenchmarkId::new("parsing_dict", fixture),
         &fixture,
@@ -65,7 +65,7 @@ fn serializing_item(c: &mut Criterion) {
 }
 
 fn serializing_list(c: &mut Criterion) {
-    let fixture = "a, abcdefghigklmnoprst, 123456785686457, 99999999999.999, (), (\"somelongstringvalue\" \"anotherlongstringvalue\";key=:c29tZXZlciBsb25nc3RyaW5ndmFsdWVyZXByZXNlbnRlZGFzYnl0ZXM: 145)";
+    let fixture = r#"a, abcdefghigklmnoprst, 123456785686457, 99999999999.999, (), ("somelongstringvalue" "anotherlongstringvalue";key=:c29tZXZlciBsb25nc3RyaW5ndmFsdWVyZXByZXNlbnRlZGFzYnl0ZXM: 145)"#;
     c.bench_with_input(
         BenchmarkId::new("serializing_list", fixture),
         &fixture,
@@ -77,7 +77,7 @@ fn serializing_list(c: &mut Criterion) {
 }
 
 fn serializing_dict(c: &mut Criterion) {
-    let fixture = "a, dict_key2=abcdefghigklmnoprst, dict_key3=123456785686457, dict_key4=(\"inner-list-member\" :aW5uZXItbGlzdC1tZW1iZXI=:);key=aW5uZXItbGlzdC1wYXJhbWV0ZXJz";
+    let fixture = r#"a, dict_key2=abcdefghigklmnoprst, dict_key3=123456785686457, dict_key4=("inner-list-member" :aW5uZXItbGlzdC1tZW1iZXI=:);key=aW5uZXItbGlzdC1wYXJhbWV0ZXJz"#;
     c.bench_with_input(
         BenchmarkId::new("serializing_dict", fixture),
         &fixture,

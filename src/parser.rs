@@ -260,7 +260,7 @@ impl<'a> Parser<'a> {
             Some(b'?') => Ok(BareItem::Boolean(self.parse_bool()?)),
             Some(b'"') => Ok(BareItem::String(self.parse_string()?)),
             Some(b':') => Ok(BareItem::ByteSeq(self.parse_byte_sequence()?)),
-            Some(c) if c == b'*' || c.is_ascii_alphabetic() => {
+            Some(c) if utils::is_allowed_start_token_char(c) => {
                 Ok(BareItem::Token(self.parse_token()?))
             }
             Some(c) if c == b'-' || c.is_ascii_digit() => match self.parse_number()? {
@@ -297,12 +297,12 @@ impl<'a> Parser<'a> {
         // https://httpwg.org/specs/rfc8941.html#parse-string
 
         if self.peek() != Some(b'"') {
-            return self.error("expected start of string ('\"')");
+            return self.error(r#"expected start of string ('"')"#);
         }
 
         self.next();
 
-        let mut output_string = String::from("");
+        let mut output_string = String::new();
         while let Some(curr_char) = self.peek() {
             match curr_char {
                 b'"' => {
@@ -315,7 +315,7 @@ impl<'a> Parser<'a> {
                 b'\\' => {
                     self.next();
                     match self.peek() {
-                        Some(c @ b'\\' | c @ b'\"') => {
+                        Some(c @ b'\\' | c @ b'"') => {
                             self.next();
                             output_string.push(c as char);
                         }
@@ -469,13 +469,8 @@ impl<'a> Parser<'a> {
 
         let mut params = Parameters::new();
 
-        while let Some(curr_char) = self.peek() {
-            if curr_char == b';' {
-                self.next();
-            } else {
-                break;
-            }
-
+        while let Some(b';') = self.peek() {
+            self.next();
             self.consume_sp_chars();
 
             let param_name = self.parse_key()?;

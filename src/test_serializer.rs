@@ -41,7 +41,7 @@ fn serialize_value_list_mixed_members_with_params() -> Result<(), Box<dyn StdErr
         Item::with_params(BareItem::String("str1".to_owned()), inner_list_item1_param);
     let inner_list_item2_param = Parameters::from_iter(vec![(
         "in2_p".to_owned(),
-        BareItem::String("valu\\e".to_owned()),
+        BareItem::String(r#"valu\e"#.to_owned()),
     )]);
     let inner_list_item2 =
         Item::with_params(BareItem::Token("str2".to_owned()), inner_list_item2_param);
@@ -53,7 +53,7 @@ fn serialize_value_list_mixed_members_with_params() -> Result<(), Box<dyn StdErr
         InnerList::with_params(vec![inner_list_item1, inner_list_item2], inner_list_param);
 
     let list_field_value: List = vec![item1.into(), item2.into(), inner_list.into()];
-    let expected = "42.457, 17;itm2_p, (\"str1\";in1_p=?0 str2;in2_p=\"valu\\\\e\");inner_list_param=:d2VhdGhlcg==:";
+    let expected = r#"42.457, 17;itm2_p, ("str1";in1_p=?0 str2;in2_p="valu\\e");inner_list_param=:d2VhdGhlcg==:"#;
     assert_eq!(expected, list_field_value.serialize_value()?);
     Ok(())
 }
@@ -122,7 +122,7 @@ fn serialize_item_with_token_param() -> Result<(), Box<dyn StdError>> {
     let param = Parameters::from_iter(vec![("a1".to_owned(), BareItem::Token("*tok".to_owned()))]);
     let item = Item::with_params(BareItem::String("12.35".to_owned()), param);
     Serializer::serialize_item(&item, &mut buf)?;
-    assert_eq!("\"12.35\";a1=*tok", &buf);
+    assert_eq!(r#""12.35";a1=*tok"#, &buf);
     Ok(())
 }
 
@@ -221,27 +221,27 @@ fn serialize_decimal_errors() -> Result<(), Box<dyn StdError>> {
 fn serialize_string() -> Result<(), Box<dyn StdError>> {
     let mut buf = String::new();
     Serializer::serialize_string("1.1 text", &mut buf)?;
-    assert_eq!("\"1.1 text\"", &buf);
+    assert_eq!(r#""1.1 text""#, &buf);
 
     buf.clear();
-    Serializer::serialize_string("hello \"name\"", &mut buf)?;
-    assert_eq!("\"hello \\\"name\\\"\"", &buf);
+    Serializer::serialize_string(r#"hello "name""#, &mut buf)?;
+    assert_eq!(r#""hello \"name\"""#, &buf);
 
     buf.clear();
-    Serializer::serialize_string("something\\nothing", &mut buf)?;
-    assert_eq!("\"something\\\\nothing\"", &buf);
+    Serializer::serialize_string(r#"something\nothing"#, &mut buf)?;
+    assert_eq!(r#""something\\nothing""#, &buf);
 
     buf.clear();
     Serializer::serialize_string("", &mut buf)?;
-    assert_eq!("\"\"", &buf);
+    assert_eq!(r#""""#, &buf);
 
     buf.clear();
     Serializer::serialize_string(" ", &mut buf)?;
-    assert_eq!("\" \"", &buf);
+    assert_eq!(r#"" ""#, &buf);
 
     buf.clear();
     Serializer::serialize_string("    ", &mut buf)?;
-    assert_eq!("\"    \"", &buf);
+    assert_eq!(r#""    ""#, &buf);
     Ok(())
 }
 
@@ -315,52 +315,49 @@ fn serialize_token_errors() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn serialize_byte_sequence() -> Result<(), Box<dyn StdError>> {
+fn serialize_byte_sequence() {
     let mut buf = String::new();
-    Serializer::serialize_byte_sequence("hello".as_bytes(), &mut buf)?;
+    Serializer::serialize_byte_sequence("hello".as_bytes(), &mut buf);
     assert_eq!(":aGVsbG8=:", &buf);
 
     buf.clear();
-    Serializer::serialize_byte_sequence("test_encode".as_bytes(), &mut buf)?;
+    Serializer::serialize_byte_sequence("test_encode".as_bytes(), &mut buf);
     assert_eq!(":dGVzdF9lbmNvZGU=:", &buf);
 
     buf.clear();
-    Serializer::serialize_byte_sequence("".as_bytes(), &mut buf)?;
+    Serializer::serialize_byte_sequence("".as_bytes(), &mut buf);
     assert_eq!("::", &buf);
 
     buf.clear();
-    Serializer::serialize_byte_sequence("pleasure.".as_bytes(), &mut buf)?;
+    Serializer::serialize_byte_sequence("pleasure.".as_bytes(), &mut buf);
     assert_eq!(":cGxlYXN1cmUu:", &buf);
 
     buf.clear();
-    Serializer::serialize_byte_sequence("leasure.".as_bytes(), &mut buf)?;
+    Serializer::serialize_byte_sequence("leasure.".as_bytes(), &mut buf);
     assert_eq!(":bGVhc3VyZS4=:", &buf);
 
     buf.clear();
-    Serializer::serialize_byte_sequence("easure.".as_bytes(), &mut buf)?;
+    Serializer::serialize_byte_sequence("easure.".as_bytes(), &mut buf);
     assert_eq!(":ZWFzdXJlLg==:", &buf);
 
     buf.clear();
-    Serializer::serialize_byte_sequence("asure.".as_bytes(), &mut buf)?;
+    Serializer::serialize_byte_sequence("asure.".as_bytes(), &mut buf);
     assert_eq!(":YXN1cmUu:", &buf);
 
     buf.clear();
-    Serializer::serialize_byte_sequence("sure.".as_bytes(), &mut buf)?;
+    Serializer::serialize_byte_sequence("sure.".as_bytes(), &mut buf);
     assert_eq!(":c3VyZS4=:", &buf);
-
-    Ok(())
 }
 
 #[test]
-fn serialize_bool() -> Result<(), Box<dyn StdError>> {
+fn serialize_bool() {
     let mut buf = String::new();
-    Serializer::serialize_bool(true, &mut buf)?;
+    Serializer::serialize_bool(true, &mut buf);
     assert_eq!("?1", &buf);
 
     buf.clear();
-    Serializer::serialize_bool(false, &mut buf)?;
+    Serializer::serialize_bool(false, &mut buf);
     assert_eq!("?0", &buf);
-    Ok(())
 }
 
 #[test]
@@ -386,7 +383,7 @@ fn serialize_params_string() -> Result<(), Box<dyn StdError>> {
         BareItem::String("param_val".to_owned()),
     )]);
     Serializer::serialize_parameters(&input, &mut buf)?;
-    assert_eq!(";b=\"param_val\"", &buf);
+    assert_eq!(r#";b="param_val""#, &buf);
     Ok(())
 }
 
@@ -480,7 +477,7 @@ fn serialize_list_of_items_and_inner_list() -> Result<(), Box<dyn StdError>> {
     let input: List = vec![item1.into(), item2.into(), inner_list.into()];
 
     Serializer::serialize_list(&input, &mut buf)?;
-    assert_eq!("12, 14, (a b);param=\"param_value_1\"", &buf);
+    assert_eq!(r#"12, 14, (a b);param="param_value_1""#, &buf);
     Ok(())
 }
 
@@ -543,7 +540,7 @@ fn serialize_dictionary_with_params() -> Result<(), Box<dyn StdError>> {
     ]);
 
     Serializer::serialize_dict(&input, &mut buf)?;
-    assert_eq!("abc=123;a=1;b, def=456, ghi=789;q=?0;r=\"+w\"", &buf);
+    assert_eq!(r#"abc=123;a=1;b, def=456, ghi=789;q=?0;r="+w""#, &buf);
     Ok(())
 }
 

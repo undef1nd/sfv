@@ -55,8 +55,7 @@ impl Serializer {
         // https://httpwg.org/specs/rfc8941.html#ser-item
 
         Self::serialize_bare_item(&input_item.bare_item, output)?;
-        Self::serialize_parameters(&input_item.params, output)?;
-        Ok(())
+        Self::serialize_parameters(&input_item.params, output)
     }
 
     pub(crate) fn serialize_list(input_list: &List, output: &mut String) -> SFVResult<()> {
@@ -75,7 +74,7 @@ impl Serializer {
                 ListEntry::InnerList(inner_list) => {
                     Self::serialize_inner_list(inner_list, output)?;
                 }
-            };
+            }
 
             // If more items remain in input_list:
             //      Append “,” to output.
@@ -99,7 +98,7 @@ impl Serializer {
             Serializer::serialize_key(member_name, output)?;
 
             match member_value {
-                ListEntry::Item(ref item) => {
+                ListEntry::Item(item) => {
                     // If dict member is boolean true, no need to serialize it: only its params must be serialized
                     // Otherwise serialize entire item with its params
                     if item.bare_item == BareItem::Boolean(true) {
@@ -141,8 +140,7 @@ impl Serializer {
             }
         }
         output.push(')');
-        Self::serialize_parameters(inner_list_parameters, output)?;
-        Ok(())
+        Self::serialize_parameters(inner_list_parameters, output)
     }
 
     pub(crate) fn serialize_bare_item(
@@ -152,9 +150,9 @@ impl Serializer {
         // https://httpwg.org/specs/rfc8941.html#ser-bare-item
 
         match value.as_ref_bare_item() {
-            RefBareItem::Boolean(value) => Self::serialize_bool(value, output)?,
+            RefBareItem::Boolean(value) => Self::serialize_bool(value, output),
             RefBareItem::String(value) => Self::serialize_string(value, output)?,
-            RefBareItem::ByteSeq(value) => Self::serialize_byte_sequence(value, output)?,
+            RefBareItem::ByteSeq(value) => Self::serialize_byte_sequence(value, output),
             RefBareItem::Token(value) => Self::serialize_token(value, output)?,
             RefBareItem::Integer(value) => Self::serialize_integer(value, output)?,
             RefBareItem::Decimal(value) => Self::serialize_decimal(value, output)?,
@@ -168,7 +166,7 @@ impl Serializer {
     ) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc8941.html#ser-params
 
-        for (param_name, param_value) in input_params.iter() {
+        for (param_name, param_value) in input_params {
             Self::serialize_parameter(param_name, param_value, output)?;
         }
         Ok(())
@@ -261,14 +259,14 @@ impl Serializer {
             return Err(Error::new("serialize_string: not a visible character"));
         }
 
-        output.push('\"');
+        output.push('"');
         for char in value.chars() {
-            if char == '\\' || char == '\"' {
+            if char == '\\' || char == '"' {
                 output.push('\\');
             }
             output.push(char);
         }
-        output.push('\"');
+        output.push('"');
 
         Ok(())
     }
@@ -301,20 +299,17 @@ impl Serializer {
         Ok(())
     }
 
-    pub(crate) fn serialize_byte_sequence(value: &[u8], output: &mut String) -> SFVResult<()> {
+    pub(crate) fn serialize_byte_sequence(value: &[u8], output: &mut String) {
         // https://httpwg.org/specs/rfc8941.html#ser-binary
 
         output.push(':');
         base64::Engine::encode_string(&utils::BASE64, value, output);
         output.push(':');
-        Ok(())
     }
 
-    pub(crate) fn serialize_bool(value: bool, output: &mut String) -> SFVResult<()> {
+    pub(crate) fn serialize_bool(value: bool, output: &mut String) {
         // https://httpwg.org/specs/rfc8941.html#ser-boolean
 
-        let val = if value { "?1" } else { "?0" };
-        output.push_str(val);
-        Ok(())
+        output.push_str(if value { "?1" } else { "?0" });
     }
 }
