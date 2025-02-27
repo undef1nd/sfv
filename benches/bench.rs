@@ -103,9 +103,8 @@ fn serializing_ref_item(c: &mut Criterion) {
         &fixture,
         move |bench, &input| {
             bench.iter(|| {
-                let mut output = String::new();
-                let ser = RefItemSerializer::new(&mut output);
-                ser.bare_item(input.as_bytes()).unwrap();
+                let ser = RefItemSerializer::new();
+                ser.bare_item(input.as_bytes()).unwrap().finish()
             });
         },
     );
@@ -114,8 +113,7 @@ fn serializing_ref_item(c: &mut Criterion) {
 fn serializing_ref_list(c: &mut Criterion) {
     c.bench_function("serializing_ref_list", move |bench| {
         bench.iter(|| {
-            let mut output = String::new();
-            let ser = RefListSerializer::new(&mut output);
+            let ser = RefListSerializer::new();
             ser.bare_item(RefBareItem::Token("a"))
                 .unwrap()
                 .bare_item(RefBareItem::Token("abcdefghigklmnoprst"))
@@ -138,7 +136,8 @@ fn serializing_ref_list(c: &mut Criterion) {
                 .unwrap()
                 .inner_list_bare_item(145)
                 .unwrap()
-                .close_inner_list();
+                .close_inner_list()
+                .finish()
         });
     });
 }
@@ -146,8 +145,7 @@ fn serializing_ref_list(c: &mut Criterion) {
 fn serializing_ref_dict(c: &mut Criterion) {
     c.bench_function("serializing_ref_dict", move |bench| {
         bench.iter(|| {
-            let mut output = String::new();
-            RefDictSerializer::new(&mut output)
+            RefDictSerializer::new()
                 .bare_item_member("a", true)
                 .unwrap()
                 .bare_item_member("dict_key2", RefBareItem::Token("abcdefghigklmnoprst"))
@@ -162,7 +160,8 @@ fn serializing_ref_dict(c: &mut Criterion) {
                 .unwrap()
                 .close_inner_list()
                 .parameter("key", RefBareItem::Token("aW5uZXItbGlzdC1wYXJhbWV0ZXJz"))
-                .unwrap();
+                .unwrap()
+                .finish()
         });
     });
 }
