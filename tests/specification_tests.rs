@@ -34,7 +34,7 @@ enum FieldType {
     Dict(Dictionary),
 }
 impl FieldType {
-    fn serialize(&self) -> Result<String, &'static str> {
+    fn serialize(&self) -> Result<String, sfv::Error> {
         match self {
             FieldType::Item(value) => value.serialize_value(),
             FieldType::List(value) => value.serialize_value(),

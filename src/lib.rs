@@ -164,6 +164,7 @@ assert_eq!(
 ```
 */
 
+mod error;
 mod parser;
 mod ref_serializer;
 mod serializer;
@@ -180,6 +181,7 @@ pub use rust_decimal::{
     Decimal,
 };
 
+pub use error::Error;
 pub use parser::{ParseMore, Parser};
 pub use ref_serializer::{
     RefDictSerializer, RefInnerListSerializer, RefItemSerializer, RefListSerializer,
@@ -187,7 +189,7 @@ pub use ref_serializer::{
 };
 pub use serializer::SerializeValue;
 
-type SFVResult<T> = std::result::Result<T, &'static str>;
+type SFVResult<T> = std::result::Result<T, Error>;
 
 /// Represents `Item` type structured field value.
 /// Can be used as a member of `List` or `Dictionary`.
