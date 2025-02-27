@@ -212,3 +212,9 @@ impl<'a> arbitrary::Arbitrary<'a> for String {
         <&StringRef>::arbitrary(u).map(ToOwned::to_owned)
     }
 }
+
+impl Default for &StringRef {
+    fn default() -> Self {
+        StringRef::empty()
+    }
+}
