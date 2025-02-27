@@ -11,14 +11,15 @@ pub trait SerializeValue {
     /// # Examples
     /// ```
     /// # use sfv::{Parser, SerializeValue};
-    ///
-    /// let parsed_list_field = Parser::from_str("\"london\", \t\t\"berlin\"").parse_list();
-    /// assert!(parsed_list_field.is_ok());
+    /// # fn main() -> Result<(), &'static str> {
+    /// let parsed_list_field = Parser::from_str(r#" "london",   "berlin" "#).parse_list()?;
     ///
     /// assert_eq!(
-    ///     parsed_list_field.unwrap().serialize_value().unwrap(),
-    ///     "\"london\", \"berlin\""
+    ///     parsed_list_field.serialize_value()?,
+    ///     r#""london", "berlin""#
     /// );
+    /// # Ok(())
+    /// # }
     /// ```
     fn serialize_value(&self) -> SFVResult<String>;
 }
