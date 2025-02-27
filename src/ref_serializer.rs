@@ -5,14 +5,17 @@ use std::borrow::BorrowMut;
 
 /// Serializes `Item` field value components incrementally.
 /// ```
-/// use sfv::{key_ref, RefItemSerializer};
+/// use sfv::{KeyRef, RefItemSerializer};
 ///
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let serialized_item = RefItemSerializer::new()
 ///     .bare_item(11)
-///     .parameter(key_ref("foo"), true)
+///     .parameter(KeyRef::from_str("foo")?, true)
 ///     .finish();
 ///
 /// assert_eq!(serialized_item, "11;foo");
+/// # Ok(())
+/// # }
 /// ```
 #[derive(Debug)]
 pub struct RefItemSerializer<W> {
@@ -72,20 +75,19 @@ fn maybe_write_separator(buffer: &mut String, first: &mut bool) {
 
 /// Serializes `List` field value components incrementally.
 /// ```
-/// use sfv::{key_ref, string_ref, token_ref, RefListSerializer};
+/// use sfv::{KeyRef, StringRef, TokenRef, RefListSerializer};
 ///
-/// # fn main() -> Result<(), sfv::Error> {
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let serialized_list = RefListSerializer::new()
 ///     .bare_item(11)
-///     .parameter(key_ref("foo"), true)?
+///     .parameter(KeyRef::from_str("foo")?, true)?
 ///     .open_inner_list()
-///     .inner_list_bare_item(token_ref("abc"))
-///     .inner_list_parameter(key_ref("abc_param"), false)?
-///     .inner_list_bare_item(token_ref("def"))
+///     .inner_list_bare_item(TokenRef::from_str("abc")?)
+///     .inner_list_parameter(KeyRef::from_str("abc_param")?, false)?
+///     .inner_list_bare_item(TokenRef::from_str("def")?)
 ///     .close_inner_list()
-///     .parameter(key_ref("bar"), string_ref("val"))?
+///     .parameter(KeyRef::from_str("bar")?, StringRef::from_str("val")?)?
 ///     .finish()?;
-///
 /// assert_eq!(
 ///     serialized_list,
 ///     r#"11;foo, (abc;abc_param=?0 def);bar="val""#
@@ -154,22 +156,21 @@ impl<W: BorrowMut<String>> RefListSerializer<W> {
 
 /// Serializes `Dictionary` field value components incrementally.
 /// ```
-/// use sfv::{key_ref, string_ref, token_ref, Decimal, RefDictSerializer};
+/// use sfv::{KeyRef, StringRef, TokenRef, RefDictSerializer, Decimal};
 /// use std::convert::TryFrom;
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let serialized_dict = RefDictSerializer::new()
-///    .bare_item_member(key_ref("member1"), 11)
-///    .parameter(key_ref("foo"), true)?
-///    .open_inner_list(key_ref("member2"))
-///    .inner_list_bare_item(token_ref("abc"))
-///    .inner_list_parameter(key_ref("abc_param"), false)?
-///    .inner_list_bare_item(token_ref("def"))
+///    .bare_item_member(KeyRef::from_str("member1")?, 11)
+///    .parameter(KeyRef::from_str("foo")?, true)?
+///    .open_inner_list(KeyRef::from_str("member2")?)
+///    .inner_list_bare_item(TokenRef::from_str("abc")?)
+///    .inner_list_parameter(KeyRef::from_str("abc_param")?, false)?
+///    .inner_list_bare_item(TokenRef::from_str("def")?)
 ///    .close_inner_list()
-///    .parameter(key_ref("bar"), string_ref("val"))?
-///    .bare_item_member(key_ref("member3"), Decimal::try_from(12.34566)?)
+///    .parameter(KeyRef::from_str("bar")?, StringRef::from_str("val")?)?
+///    .bare_item_member(KeyRef::from_str("member3")?, Decimal::try_from(12.34566)?)
 ///    .finish()?;
-///
 /// assert_eq!(
 ///    serialized_dict,
 ///    r#"member1=11;foo, member2=(abc;abc_param=?0 def);bar="val", member3=12.346"#

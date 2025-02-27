@@ -98,70 +98,80 @@ match dict.get("u") {
 ### Structured Field Value Construction and Serialization
 Creates `Item` with empty parameters:
 ```
-use sfv::{string_ref, Item, SerializeValue};
+use sfv::{StringRef, Item, SerializeValue};
 
-let str_item = Item::new(string_ref("foo"));
-assert_eq!(str_item.serialize_value().unwrap(), r#""foo""#);
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let str_item = Item::new(StringRef::from_str("foo")?);
+assert_eq!(str_item.serialize_value()?, r#""foo""#);
+# Ok(())
+# }
 ```
 
 
 Creates `Item` field value with parameters:
 ```
 use std::convert::TryFrom;
-use sfv::{key_ref, Item, BareItem, SerializeValue, Parameters, Decimal};
+use sfv::{KeyRef, Item, BareItem, SerializeValue, Parameters, Decimal};
 
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
 let mut params = Parameters::new();
-let decimal = Decimal::try_from(13.45655).unwrap();
-params.insert(key_ref("key").to_owned(), BareItem::Decimal(decimal));
+let decimal = Decimal::try_from(13.45655)?;
+params.insert(KeyRef::from_str("key")?.to_owned(), BareItem::Decimal(decimal));
 let int_item = Item::with_params(99, params);
-assert_eq!(int_item.serialize_value().unwrap(), "99;key=13.457");
+assert_eq!(int_item.serialize_value()?, "99;key=13.457");
+# Ok(())
+# }
 ```
 
 Creates `List` field value with `Item` and parametrized `InnerList` as members:
 ```
-use sfv::{key_ref, string_ref, token_ref, Item, BareItem, InnerList, List, SerializeValue, Parameters};
+use sfv::{KeyRef, StringRef, TokenRef, Item, BareItem, InnerList, List, SerializeValue, Parameters};
 
-let tok_item = BareItem::Token(token_ref("tok").to_owned());
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let tok_item = BareItem::Token(TokenRef::from_str("tok")?.to_owned());
 
 // Creates Item.
-let str_item = Item::new(string_ref("foo"));
+let str_item = Item::new(StringRef::from_str("foo")?);
 
 // Creates InnerList members.
 let mut int_item_params = Parameters::new();
-int_item_params.insert(key_ref("key").to_owned(), BareItem::Boolean(false));
+int_item_params.insert(KeyRef::from_str("key")?.to_owned(), BareItem::Boolean(false));
 let int_item = Item::with_params(99, int_item_params);
 
 // Creates InnerList.
 let mut inner_list_params = Parameters::new();
-inner_list_params.insert(key_ref("bar").to_owned(), BareItem::Boolean(true));
+inner_list_params.insert(KeyRef::from_str("bar")?.to_owned(), BareItem::Boolean(true));
 let inner_list = InnerList::with_params(vec![int_item, str_item], inner_list_params);
-
 
 let list: List = vec![Item::new(tok_item).into(), inner_list.into()];
 assert_eq!(
-    list.serialize_value().unwrap(),
+    list.serialize_value()?,
     r#"tok, (99;key=?0 "foo");bar"#
 );
+# Ok(())
+# }
 ```
 
 Creates `Dictionary` field value:
 ```
-use sfv::{key_ref, string_ref, Parser, Item, SerializeValue, Dictionary};
+use sfv::{KeyRef, StringRef, Parser, Item, SerializeValue, Dictionary};
 
-let member_value1 = Item::new(string_ref("apple"));
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let member_value1 = Item::new(StringRef::from_str("apple")?.to_owned());
 let member_value2 = Item::new(true);
 let member_value3 = Item::new(false);
 
 let mut dict = Dictionary::new();
-dict.insert(key_ref("key1").to_owned(), member_value1.into());
-dict.insert(key_ref("key2").to_owned(), member_value2.into());
-dict.insert(key_ref("key3").to_owned(), member_value3.into());
+dict.insert(KeyRef::from_str("key1")?.to_owned(), member_value1.into());
+dict.insert(KeyRef::from_str("key2")?.to_owned(), member_value2.into());
+dict.insert(KeyRef::from_str("key3")?.to_owned(), member_value3.into());
 
 assert_eq!(
-    dict.serialize_value().unwrap(),
+    dict.serialize_value()?,
     r#"key1="apple", key2, key3=?0"#
 );
-
+# Ok(())
+# }
 ```
 */
 
