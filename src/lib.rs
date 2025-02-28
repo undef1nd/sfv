@@ -320,10 +320,10 @@ impl InnerList {
     }
 }
 
-/// `BareItem` type is used to construct `Items` or `Parameters` values.
-#[derive(Debug, PartialEq, Clone)]
+/// An abstraction over multiple kinds of ownership of a bare item.
+#[derive(Debug, PartialEq, Clone, Copy)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub enum BareItem {
+pub enum GenericBareItem<S, B, T> {
     /// Decimal number
     // sf-decimal  = ["-"] 1*12DIGIT "." 1*3DIGIT
     Decimal(Decimal),
@@ -334,18 +334,18 @@ pub enum BareItem {
     // chr       = unescaped / escaped
     // unescaped = %x20-21 / %x23-5B / %x5D-7E
     // escaped   = "\" ( DQUOTE / "\" )
-    String(String),
+    String(S),
     // ":" *(base64) ":"
     // base64    = ALPHA / DIGIT / "+" / "/" / "="
-    ByteSeq(Vec<u8>),
+    ByteSeq(B),
     // sf-boolean = "?" boolean
     // boolean    = "0" / "1"
     Boolean(bool),
     // sf-token = ( ALPHA / "*" ) *( tchar / ":" / "/" )
-    Token(Token),
+    Token(T),
 }
 
-impl BareItem {
+impl<S, B, T> GenericBareItem<S, B, T> {
     /// If `BareItem` is a decimal, returns `Decimal`, otherwise returns `None`.
     /// ```
     /// # use std::convert::TryFrom;
@@ -356,7 +356,7 @@ impl BareItem {
     /// ```
     pub fn as_decimal(&self) -> Option<Decimal> {
         match *self {
-            BareItem::Decimal(val) => Some(val),
+            Self::Decimal(val) => Some(val),
             _ => None,
         }
     }
@@ -368,7 +368,7 @@ impl BareItem {
     /// ```
     pub fn as_int(&self) -> Option<Integer> {
         match *self {
-            BareItem::Integer(val) => Some(val),
+            Self::Integer(val) => Some(val),
             _ => None,
         }
     }
@@ -378,9 +378,9 @@ impl BareItem {
     /// let bare_item = BareItem::String(string_ref("foo").to_owned());
     /// assert_eq!(bare_item.as_str().unwrap().as_str(), "foo");
     /// ```
-    pub fn as_str(&self) -> Option<&String> {
+    pub fn as_str(&self) -> Option<&S> {
         match *self {
-            BareItem::String(ref val) => Some(val),
+            Self::String(ref val) => Some(val),
             _ => None,
         }
     }
@@ -390,9 +390,9 @@ impl BareItem {
     /// let bare_item = BareItem::ByteSeq(b"foo".to_vec());
     /// assert_eq!(bare_item.as_byte_seq().unwrap().as_slice(), "foo".as_bytes());
     /// ```
-    pub fn as_byte_seq(&self) -> Option<&Vec<u8>> {
+    pub fn as_byte_seq(&self) -> Option<&B> {
         match *self {
-            BareItem::ByteSeq(ref val) => Some(val),
+            Self::ByteSeq(ref val) => Some(val),
             _ => None,
         }
     }
@@ -404,7 +404,7 @@ impl BareItem {
     /// ```
     pub fn as_bool(&self) -> Option<bool> {
         match *self {
-            BareItem::Boolean(val) => Some(val),
+            Self::Boolean(val) => Some(val),
             _ => None,
         }
     }
@@ -415,27 +415,27 @@ impl BareItem {
     /// let bare_item = BareItem::Token(token_ref("*bar").to_owned());
     /// assert_eq!(bare_item.as_token().unwrap().as_str(), "*bar");
     /// ```
-    pub fn as_token(&self) -> Option<&Token> {
+    pub fn as_token(&self) -> Option<&T> {
         match *self {
-            BareItem::Token(ref val) => Some(val),
+            Self::Token(ref val) => Some(val),
             _ => None,
         }
     }
 }
 
-impl From<Integer> for BareItem {
-    fn from(val: Integer) -> BareItem {
-        BareItem::Integer(val)
+impl<S, B, T> From<Integer> for GenericBareItem<S, B, T> {
+    fn from(val: Integer) -> Self {
+        Self::Integer(val)
     }
 }
 
-impl From<bool> for BareItem {
-    fn from(val: bool) -> BareItem {
-        BareItem::Boolean(val)
+impl<S, B, T> From<bool> for GenericBareItem<S, B, T> {
+    fn from(val: bool) -> Self {
+        Self::Boolean(val)
     }
 }
 
-impl From<Decimal> for BareItem {
+impl<S, B, T> From<Decimal> for GenericBareItem<S, B, T> {
     /// Converts `Decimal` into `BareItem::Decimal`.
     /// ```
     /// # use std::convert::TryFrom;
@@ -445,7 +445,7 @@ impl From<Decimal> for BareItem {
     /// assert_eq!(bare_item.as_decimal().unwrap(), decimal_number);
     /// ```
     fn from(item: Decimal) -> Self {
-        BareItem::Decimal(item)
+        Self::Decimal(item)
     }
 }
 
@@ -491,17 +491,11 @@ pub(crate) enum Num {
     Integer(Integer),
 }
 
+/// `BareItem` type is used to construct `Items` or `Parameters` values.
+pub type BareItem = GenericBareItem<String, Vec<u8>, Token>;
+
 /// Similar to `BareItem`, but used to serialize values via `RefItemSerializer`, `RefListSerializer`, `RefDictSerializer`.
-#[derive(Debug, PartialEq, Clone, Copy)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub enum RefBareItem<'a> {
-    Integer(Integer),
-    Decimal(Decimal),
-    String(&'a StringRef),
-    ByteSeq(&'a [u8]),
-    Boolean(bool),
-    Token(&'a TokenRef),
-}
+pub type RefBareItem<'a> = GenericBareItem<&'a StringRef, &'a [u8], &'a TokenRef>;
 
 impl<'a> From<&'a BareItem> for RefBareItem<'a> {
     fn from(val: &'a BareItem) -> RefBareItem<'a> {
@@ -513,24 +507,6 @@ impl<'a> From<&'a BareItem> for RefBareItem<'a> {
             BareItem::Boolean(val) => RefBareItem::Boolean(*val),
             BareItem::Token(val) => RefBareItem::Token(val),
         }
-    }
-}
-
-impl<'a> From<Integer> for RefBareItem<'a> {
-    fn from(val: Integer) -> RefBareItem<'a> {
-        RefBareItem::Integer(val)
-    }
-}
-
-impl<'a> From<bool> for RefBareItem<'a> {
-    fn from(val: bool) -> RefBareItem<'a> {
-        RefBareItem::Boolean(val)
-    }
-}
-
-impl<'a> From<Decimal> for RefBareItem<'a> {
-    fn from(val: Decimal) -> RefBareItem<'a> {
-        RefBareItem::Decimal(val)
     }
 }
 
