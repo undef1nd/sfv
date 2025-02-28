@@ -1,7 +1,7 @@
 use crate::utils;
 use crate::{
-    BareItem, Decimal, Dictionary, Error, InnerList, Integer, Item, Key, List, ListEntry, Num,
-    Parameters, SFVResult, String, Token,
+    BareItem, Decimal, Dictionary, Error, InnerList, Integer, Item, KeyRef, List, ListEntry, Num,
+    Parameters, SFVResult, String, TokenRef,
 };
 
 use std::convert::TryFrom;
@@ -96,7 +96,7 @@ impl ParseValue for Dictionary {
             if let Some(b'=') = parser.peek() {
                 parser.next();
                 let member = parser.parse_list_entry()?;
-                dict.insert(this_key, member);
+                dict.insert(this_key.to_owned(), member);
             } else {
                 let value = true;
                 let params = parser.parse_parameters()?;
@@ -104,7 +104,7 @@ impl ParseValue for Dictionary {
                     bare_item: BareItem::Boolean(value),
                     params,
                 };
-                dict.insert(this_key, member.into());
+                dict.insert(this_key.to_owned(), member.into());
             }
 
             parser.consume_ows_chars();
@@ -270,7 +270,7 @@ impl<'a> Parser<'a> {
             Some(b'"') => Ok(BareItem::String(self.parse_string()?)),
             Some(b':') => Ok(BareItem::ByteSeq(self.parse_byte_sequence()?)),
             Some(c) if utils::is_allowed_start_token_char(c) => {
-                Ok(BareItem::Token(self.parse_token()?))
+                Ok(BareItem::Token(self.parse_token()?.to_owned()))
             }
             Some(c) if c == b'-' || c.is_ascii_digit() => match self.parse_number()? {
                 Num::Decimal(val) => Ok(BareItem::Decimal(val)),
@@ -341,15 +341,14 @@ impl<'a> Parser<'a> {
         self.error("unterminated string")
     }
 
-    pub(crate) fn parse_token(&mut self) -> SFVResult<Token> {
+    pub(crate) fn parse_token(&mut self) -> SFVResult<&'a TokenRef> {
         // https://httpwg.org/specs/rfc8941.html#parse-token
 
-        let mut output_string = StdString::new();
+        let start = self.index;
 
         match self.peek() {
             Some(c) if utils::is_allowed_start_token_char(c) => {
                 self.next();
-                output_string.push(c as char);
             }
             _ => return self.error("expected start of token"),
         }
@@ -358,9 +357,14 @@ impl<'a> Parser<'a> {
             match self.peek() {
                 Some(c) if utils::is_allowed_inner_token_char(c) => {
                     self.next();
-                    output_string.push(c as char);
                 }
-                _ => return Ok(Token::from_string(output_string).unwrap()),
+                // TODO: The UTF-8 validation is redundant with the preceding character checks, but
+                // its removal is only possible with unsafe code.
+                _ => {
+                    return Ok(TokenRef::from_validated_str(
+                        std::str::from_utf8(&self.input[start..self.index]).unwrap(),
+                    ));
+                }
             }
         }
     }
@@ -490,7 +494,7 @@ impl<'a> Parser<'a> {
                 }
                 _ => BareItem::Boolean(true),
             };
-            params.insert(param_name, param_value);
+            params.insert(param_name.to_owned(), param_value);
         }
 
         // If parameters already contains a name param_name (comparing character-for-character), overwrite its value.
@@ -498,13 +502,12 @@ impl<'a> Parser<'a> {
         Ok(params)
     }
 
-    pub(crate) fn parse_key(&mut self) -> SFVResult<Key> {
-        let mut output = StdString::new();
+    pub(crate) fn parse_key(&mut self) -> SFVResult<&'a KeyRef> {
+        let start = self.index;
 
         match self.peek() {
             Some(c) if utils::is_allowed_start_key_char(c) => {
                 self.next();
-                output.push(c as char);
             }
             _ => return self.error("expected start of key ('a'-'z' or '*')"),
         }
@@ -513,9 +516,14 @@ impl<'a> Parser<'a> {
             match self.peek() {
                 Some(c) if utils::is_allowed_inner_key_char(c) => {
                     self.next();
-                    output.push(c as char);
                 }
-                _ => return Ok(Key::from_string(output).unwrap()),
+                // TODO: The UTF-8 validation is redundant with the preceding character checks, but
+                // its removal is only possible with unsafe code.
+                _ => {
+                    return Ok(KeyRef::from_validated_str(
+                        std::str::from_utf8(&self.input[start..self.index]).unwrap(),
+                    ));
+                }
             }
         }
     }

@@ -85,6 +85,13 @@ impl KeyRef {
         Ok(Self::cast(v))
     }
 
+    // Like `from_str`, but assumes that the contents of the string have already
+    // been validated as a key.
+    pub(crate) fn from_validated_str(v: &str) -> &Self {
+        debug_assert!(validate(v.as_bytes()).is_ok());
+        Self::cast(v)
+    }
+
     /// Creates a `&KeyRef`, panicking if the value is invalid.
     ///
     /// This method is intended to be called from `const` contexts in which the
