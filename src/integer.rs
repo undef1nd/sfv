@@ -1,4 +1,4 @@
-use crate::{BareItem, RefBareItem};
+use crate::GenericBareItem;
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 
@@ -78,14 +78,9 @@ macro_rules! impl_conversion {
                 Integer(v.into())
             }
         }
-        impl From<$t> for BareItem {
-            fn from(v: $t) -> BareItem {
-                BareItem::Integer(v.into())
-            }
-        }
-        impl<'a> From<$t> for RefBareItem<'a> {
-            fn from(v: $t) -> RefBareItem<'a> {
-                RefBareItem::Integer(v.into())
+        impl<S, B, T> From<$t> for GenericBareItem<S, B, T> {
+            fn from(v: $t) -> Self {
+                Self::Integer(v.into())
             }
         }
     };
@@ -100,18 +95,11 @@ macro_rules! impl_conversion {
                 }
             }
         }
-        impl TryFrom<$t> for BareItem {
+        impl<S, B, T> TryFrom<$t> for GenericBareItem<S, B, T> {
             type Error = OutOfRangeError;
 
-            fn try_from(v: $t) -> Result<BareItem, OutOfRangeError> {
-                Integer::try_from(v).map(BareItem::Integer)
-            }
-        }
-        impl<'a> TryFrom<$t> for RefBareItem<'a> {
-            type Error = OutOfRangeError;
-
-            fn try_from(v: $t) -> Result<RefBareItem<'a>, OutOfRangeError> {
-                Integer::try_from(v).map(RefBareItem::Integer)
+            fn try_from(v: $t) -> Result<Self, OutOfRangeError> {
+                Integer::try_from(v).map(Self::Integer)
             }
         }
     };

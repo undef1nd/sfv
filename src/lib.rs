@@ -202,6 +202,8 @@ mod test_string;
 mod test_token;
 
 use indexmap::IndexMap;
+use std::borrow::Borrow;
+use std::convert::TryFrom;
 
 pub use decimal::{Decimal, DecimalError};
 pub use error::Error;
@@ -451,6 +453,22 @@ impl<S, B, T> From<Decimal> for GenericBareItem<S, B, T> {
     }
 }
 
+impl<S, B, T> TryFrom<f32> for GenericBareItem<S, B, T> {
+    type Error = DecimalError;
+
+    fn try_from(val: f32) -> Result<Self, DecimalError> {
+        Decimal::try_from(val).map(Self::Decimal)
+    }
+}
+
+impl<S, B, T> TryFrom<f64> for GenericBareItem<S, B, T> {
+    type Error = DecimalError;
+
+    fn try_from(val: f64) -> Result<Self, DecimalError> {
+        Decimal::try_from(val).map(Self::Decimal)
+    }
+}
+
 impl From<Vec<u8>> for BareItem {
     fn from(val: Vec<u8>) -> BareItem {
         BareItem::ByteSeq(val)
@@ -499,15 +517,20 @@ pub type BareItem = GenericBareItem<String, Vec<u8>, Token>;
 /// Similar to `BareItem`, but used to serialize values via `RefItemSerializer`, `RefListSerializer`, `RefDictSerializer`.
 pub type RefBareItem<'a> = GenericBareItem<&'a StringRef, &'a [u8], &'a TokenRef>;
 
-impl<'a> From<&'a BareItem> for RefBareItem<'a> {
-    fn from(val: &'a BareItem) -> RefBareItem<'a> {
+impl<'a, S, B, T> From<&'a GenericBareItem<S, B, T>> for RefBareItem<'a>
+where
+    S: Borrow<StringRef>,
+    B: Borrow<[u8]>,
+    T: Borrow<TokenRef>,
+{
+    fn from(val: &'a GenericBareItem<S, B, T>) -> RefBareItem<'a> {
         match val {
-            BareItem::Integer(val) => RefBareItem::Integer(*val),
-            BareItem::Decimal(val) => RefBareItem::Decimal(*val),
-            BareItem::String(val) => RefBareItem::String(val),
-            BareItem::ByteSeq(val) => RefBareItem::ByteSeq(val),
-            BareItem::Boolean(val) => RefBareItem::Boolean(*val),
-            BareItem::Token(val) => RefBareItem::Token(val),
+            GenericBareItem::Integer(val) => RefBareItem::Integer(*val),
+            GenericBareItem::Decimal(val) => RefBareItem::Decimal(*val),
+            GenericBareItem::String(val) => RefBareItem::String(val.borrow()),
+            GenericBareItem::ByteSeq(val) => RefBareItem::ByteSeq(val.borrow()),
+            GenericBareItem::Boolean(val) => RefBareItem::Boolean(*val),
+            GenericBareItem::Token(val) => RefBareItem::Token(val.borrow()),
         }
     }
 }
