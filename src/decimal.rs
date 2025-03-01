@@ -121,6 +121,20 @@ impl TryFrom<i128> for Decimal {
     }
 }
 
+impl TryFrom<isize> for Decimal {
+    type Error = DecimalError;
+
+    fn try_from(v: isize) -> Result<Decimal, DecimalError> {
+        match v.checked_mul(1000) {
+            None => Err(DecimalError::OutOfRange),
+            Some(v) => match Integer::try_from(v) {
+                Ok(v) => Ok(Decimal(v)),
+                Err(_) => Err(DecimalError::OutOfRange),
+            },
+        }
+    }
+}
+
 impl From<u8> for Decimal {
     fn from(v: u8) -> Decimal {
         Self(Integer::from(v as u16 * 1000))
@@ -157,6 +171,20 @@ impl TryFrom<u128> for Decimal {
     type Error = DecimalError;
 
     fn try_from(v: u128) -> Result<Decimal, DecimalError> {
+        match v.checked_mul(1000) {
+            None => Err(DecimalError::OutOfRange),
+            Some(v) => match Integer::try_from(v) {
+                Ok(v) => Ok(Decimal(v)),
+                Err(_) => Err(DecimalError::OutOfRange),
+            },
+        }
+    }
+}
+
+impl TryFrom<usize> for Decimal {
+    type Error = DecimalError;
+
+    fn try_from(v: usize) -> Result<Decimal, DecimalError> {
         match v.checked_mul(1000) {
             None => Err(DecimalError::OutOfRange),
             Some(v) => match Integer::try_from(v) {
@@ -213,5 +241,13 @@ impl TryFrom<f64> for Decimal {
             Ok(v) => Ok(Decimal(v)),
             Err(_) => Err(DecimalError::OutOfRange),
         }
+    }
+}
+
+impl TryFrom<Integer> for Decimal {
+    type Error = DecimalError;
+
+    fn try_from(v: Integer) -> Result<Decimal, DecimalError> {
+        i64::from(v).try_into()
     }
 }
