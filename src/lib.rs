@@ -321,13 +321,15 @@ impl InnerList {
 }
 
 /// An abstraction over multiple kinds of ownership of a bare item.
+///
+/// In general most users will be interested in:
+/// - [`BareItem`], for completely owned data
+/// - [`RefBareItem`], for completely borrowed data
 #[derive(Debug, PartialEq, Clone, Copy)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum GenericBareItem<S, B, T> {
-    /// Decimal number
     // sf-decimal  = ["-"] 1*12DIGIT "." 1*3DIGIT
     Decimal(Decimal),
-    /// Integer number
     // sf-integer = ["-"] 1*15DIGIT
     Integer(Integer),
     // sf-string = DQUOTE *chr DQUOTE
