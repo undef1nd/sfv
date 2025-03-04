@@ -564,3 +564,15 @@ impl<'a> From<&'a StringRef> for RefBareItem<'a> {
         RefBareItem::String(val)
     }
 }
+
+impl PartialEq<BareItem> for RefBareItem<'_> {
+    fn eq(&self, other: &BareItem) -> bool {
+        *self == RefBareItem::from(other)
+    }
+}
+
+impl<'a> PartialEq<RefBareItem<'a>> for BareItem {
+    fn eq(&self, other: &RefBareItem<'a>) -> bool {
+        RefBareItem::from(self) == *other
+    }
+}

@@ -1,6 +1,6 @@
 use crate::{
     integer, key_ref, string_ref, token_ref, BareItem, Decimal, Dictionary, Error, InnerList, Item,
-    List, Num, Parameters, ParseMore, Parser,
+    List, Num, Parameters, ParseMore, Parser, RefBareItem,
 };
 use std::convert::TryFrom;
 use std::error::Error as StdError;
@@ -354,23 +354,23 @@ fn parse_dict_multiple_spaces() -> Result<(), Box<dyn StdError>> {
 #[test]
 fn parse_bare_item() -> Result<(), Box<dyn StdError>> {
     assert_eq!(
-        BareItem::Boolean(false),
+        RefBareItem::Boolean(false),
         Parser::from_str("?0").parse_bare_item()?
     );
     assert_eq!(
-        BareItem::String(string_ref("test string").to_owned()),
+        RefBareItem::String(string_ref("test string")),
         Parser::from_str(r#""test string""#).parse_bare_item()?
     );
     assert_eq!(
-        BareItem::Token(token_ref("*token").to_owned()),
+        RefBareItem::Token(token_ref("*token")),
         Parser::from_str("*token").parse_bare_item()?
     );
     assert_eq!(
-        BareItem::ByteSeq(b"base_64 encoding test".to_vec()),
+        RefBareItem::ByteSeq(b"base_64 encoding test"),
         Parser::from_str(":YmFzZV82NCBlbmNvZGluZyB0ZXN0:").parse_bare_item()?
     );
     assert_eq!(
-        BareItem::Decimal(Decimal::try_from(-3.55)?),
+        RefBareItem::Decimal(Decimal::try_from(-3.55)?),
         Parser::from_str("-3.55").parse_bare_item()?
     );
     Ok(())
