@@ -264,7 +264,7 @@ impl From<InnerList> for ListEntry {
 /// Array of `Items` with associated `Parameters`.
 // inner-list    = "(" *SP [ sf-item *( 1*SP sf-item ) *SP ] ")"
 //                 parameters
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Default, PartialEq, Clone)]
 pub struct InnerList {
     /// `Items` that `InnerList` contains. Can be empty.
     pub items: Vec<Item>,
