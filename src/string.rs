@@ -95,6 +95,10 @@ impl ToOwned for StringRef {
     fn to_owned(&self) -> String {
         String(self.0.to_owned())
     }
+
+    fn clone_into(&self, target: &mut String) {
+        self.0.clone_into(&mut target.0);
+    }
 }
 
 impl Borrow<StringRef> for String {

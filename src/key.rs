@@ -122,6 +122,10 @@ impl ToOwned for KeyRef {
     fn to_owned(&self) -> Key {
         Key(self.0.to_owned())
     }
+
+    fn clone_into(&self, target: &mut Key) {
+        self.0.clone_into(&mut target.0);
+    }
 }
 
 impl Borrow<KeyRef> for Key {

@@ -126,6 +126,10 @@ impl ToOwned for TokenRef {
     fn to_owned(&self) -> Token {
         Token(self.0.to_owned())
     }
+
+    fn clone_into(&self, target: &mut Token) {
+        self.0.clone_into(&mut target.0);
+    }
 }
 
 impl Borrow<TokenRef> for Token {
