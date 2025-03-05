@@ -12,6 +12,7 @@ libfuzzer-sys = "0.4"
 
 [dependencies.sfv]
 path = ".."
+features = ["arbitrary"]
 
 [[bin]]
 name = "parse_dictionary"
@@ -30,6 +31,27 @@ bench = false
 [[bin]]
 name = "parse_item"
 path = "fuzz_targets/parse_item.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "roundtrip_item"
+path = "fuzz_targets/roundtrip_item.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "roundtrip_list"
+path = "fuzz_targets/roundtrip_list.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "roundtrip_dictionary"
+path = "fuzz_targets/roundtrip_dictionary.rs"
 test = false
 doc = false
 bench = false
