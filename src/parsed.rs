@@ -1,5 +1,7 @@
-use crate::{BareItem, Key};
+use crate::visitor::*;
+use crate::{BareItem, BareItemFromInput, Key, KeyRef};
 use indexmap::IndexMap;
+use std::convert::Infallible;
 
 /// Represents `Item` type structured field value.
 /// Can be used as a member of `List` or `Dictionary`.
@@ -100,5 +102,123 @@ impl InnerList {
     /// Returns new `InnerList` with specified `Parameters`.
     pub fn with_params(items: Vec<Item>, params: Parameters) -> InnerList {
         InnerList { items, params }
+    }
+}
+
+impl<'a> ParameterVisitor<'a> for &mut Parameters {
+    type Error = Infallible;
+
+    fn parameter(
+        &mut self,
+        key: &'a KeyRef,
+        value: BareItemFromInput<'a>,
+    ) -> Result<(), Self::Error> {
+        self.insert(key.to_owned(), value.into());
+        Ok(())
+    }
+}
+
+impl<'a> ItemVisitor<'a> for &mut Item {
+    type Error = Infallible;
+
+    fn bare_item(
+        self,
+        bare_item: BareItemFromInput<'a>,
+    ) -> Result<impl ParameterVisitor<'a>, Self::Error> {
+        self.bare_item = bare_item.into();
+        Ok(&mut self.params)
+    }
+}
+
+impl<'a> ItemVisitor<'a> for &mut InnerList {
+    type Error = Infallible;
+
+    fn bare_item(
+        self,
+        bare_item: BareItemFromInput<'a>,
+    ) -> Result<impl ParameterVisitor<'a>, Self::Error> {
+        self.items.push(Item::new(bare_item));
+        match self.items.last_mut() {
+            Some(item) => Ok(&mut item.params),
+            None => unreachable!(),
+        }
+    }
+}
+
+impl<'a> InnerListVisitor<'a> for &mut InnerList {
+    type Error = Infallible;
+
+    fn item(&mut self) -> Result<impl ItemVisitor<'a>, Self::Error> {
+        Ok(&mut **self)
+    }
+
+    fn finish(self) -> Result<impl ParameterVisitor<'a>, Self::Error> {
+        Ok(&mut self.params)
+    }
+}
+
+impl<'a> DictionaryVisitor<'a> for Dictionary {
+    type Error = Infallible;
+
+    fn entry(&mut self, key: &'a KeyRef) -> Result<impl EntryVisitor<'a>, Self::Error> {
+        Ok(self.entry(key.to_owned()))
+    }
+}
+
+type Entry<'a> = indexmap::map::Entry<'a, Key, ListEntry>;
+
+impl<'a> ItemVisitor<'a> for Entry<'_> {
+    type Error = Infallible;
+
+    fn bare_item(
+        self,
+        bare_item: BareItemFromInput<'a>,
+    ) -> Result<impl ParameterVisitor<'a>, Self::Error> {
+        match self.insert_entry(Item::new(bare_item).into()).into_mut() {
+            ListEntry::Item(item) => Ok(&mut item.params),
+            ListEntry::InnerList(_) => unreachable!(),
+        }
+    }
+}
+
+impl<'a> EntryVisitor<'a> for Entry<'_> {
+    fn inner_list(self) -> Result<impl InnerListVisitor<'a>, Self::Error> {
+        match self.insert_entry(InnerList::default().into()).into_mut() {
+            ListEntry::InnerList(inner_list) => Ok(inner_list),
+            ListEntry::Item(_) => unreachable!(),
+        }
+    }
+}
+
+impl<'a> ItemVisitor<'a> for &mut List {
+    type Error = Infallible;
+
+    fn bare_item(
+        self,
+        bare_item: BareItemFromInput<'a>,
+    ) -> Result<impl ParameterVisitor<'a>, Self::Error> {
+        self.push(Item::new(bare_item).into());
+        match self.last_mut() {
+            Some(ListEntry::Item(item)) => Ok(&mut item.params),
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl<'a> EntryVisitor<'a> for &mut List {
+    fn inner_list(self) -> Result<impl InnerListVisitor<'a>, Self::Error> {
+        self.push(InnerList::default().into());
+        match self.last_mut() {
+            Some(ListEntry::InnerList(inner_list)) => Ok(inner_list),
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl<'a> ListVisitor<'a> for List {
+    type Error = Infallible;
+
+    fn entry(&mut self) -> Result<impl EntryVisitor<'a>, Self::Error> {
+        Ok(self)
     }
 }
