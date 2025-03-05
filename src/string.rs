@@ -1,4 +1,4 @@
-use std::borrow::Borrow;
+use std::borrow::{Borrow, Cow};
 use std::convert::TryFrom;
 use std::fmt;
 use std::string::String as StdString;
@@ -182,6 +182,8 @@ macro_rules! impl_eq {
 
 impl_eq!(String, StringRef);
 impl_eq!(String, &StringRef);
+impl_eq!(Cow<'_, StringRef>, StringRef);
+impl_eq!(Cow<'_, StringRef>, &StringRef);
 
 impl<'a> TryFrom<&'a str> for &'a StringRef {
     type Error = StringError;

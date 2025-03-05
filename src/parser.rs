@@ -1,9 +1,10 @@
 use crate::utils;
 use crate::{
-    BareItem, Decimal, Dictionary, Error, InnerList, Integer, Item, KeyRef, List, ListEntry, Num,
-    Parameters, SFVResult, String, TokenRef,
+    BareItem, BareItemFromInput, Decimal, Dictionary, Error, InnerList, Integer, Item, KeyRef,
+    List, ListEntry, Num, Parameters, SFVResult, String, StringRef, TokenRef,
 };
 
+use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::string::String as StdString;
 
@@ -44,7 +45,10 @@ impl ParseValue for Item {
         let bare_item = parser.parse_bare_item()?;
         let params = parser.parse_parameters()?;
 
-        Ok(Item { bare_item, params })
+        Ok(Item {
+            bare_item: bare_item.into(),
+            params,
+        })
     }
 }
 
@@ -262,19 +266,19 @@ impl<'a> Parser<'a> {
         self.error("unterminated inner list")
     }
 
-    pub(crate) fn parse_bare_item(&mut self) -> SFVResult<BareItem> {
+    pub(crate) fn parse_bare_item(&mut self) -> SFVResult<BareItemFromInput<'a>> {
         // https://httpwg.org/specs/rfc8941.html#parse-bare-item
 
         match self.peek() {
-            Some(b'?') => Ok(BareItem::Boolean(self.parse_bool()?)),
-            Some(b'"') => Ok(BareItem::String(self.parse_string()?)),
-            Some(b':') => Ok(BareItem::ByteSeq(self.parse_byte_sequence()?)),
+            Some(b'?') => Ok(BareItemFromInput::Boolean(self.parse_bool()?)),
+            Some(b'"') => Ok(BareItemFromInput::String(self.parse_string()?)),
+            Some(b':') => Ok(BareItemFromInput::ByteSeq(self.parse_byte_sequence()?)),
             Some(c) if utils::is_allowed_start_token_char(c) => {
-                Ok(BareItem::Token(self.parse_token()?.to_owned()))
+                Ok(BareItemFromInput::Token(self.parse_token()?))
             }
             Some(c) if c == b'-' || c.is_ascii_digit() => match self.parse_number()? {
-                Num::Decimal(val) => Ok(BareItem::Decimal(val)),
-                Num::Integer(val) => Ok(BareItem::Integer(val)),
+                Num::Decimal(val) => Ok(BareItemFromInput::Decimal(val)),
+                Num::Integer(val) => Ok(BareItemFromInput::Integer(val)),
             },
             _ => self.error("expected start of bare item"),
         }
@@ -302,7 +306,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub(crate) fn parse_string(&mut self) -> SFVResult<String> {
+    pub(crate) fn parse_string(&mut self) -> SFVResult<Cow<'a, StringRef>> {
         // https://httpwg.org/specs/rfc8941.html#parse-string
 
         if self.peek() != Some(b'"') {
@@ -311,12 +315,25 @@ impl<'a> Parser<'a> {
 
         self.next();
 
-        let mut output_string = StdString::new();
+        let start = self.index;
+        let mut output = Cow::Borrowed(&[] as &[u8]);
+
         while let Some(curr_char) = self.peek() {
             match curr_char {
                 b'"' => {
                     self.next();
-                    return Ok(String::from_string(output_string).unwrap());
+                    // TODO: The UTF-8 validation is redundant with the preceding character checks, but
+                    // its removal is only possible with unsafe code.
+                    return Ok(match output {
+                        Cow::Borrowed(output) => {
+                            let output = std::str::from_utf8(output).unwrap();
+                            Cow::Borrowed(StringRef::from_str(output).unwrap())
+                        }
+                        Cow::Owned(output) => {
+                            let output = StdString::from_utf8(output).unwrap();
+                            Cow::Owned(String::from_string(output).unwrap())
+                        }
+                    });
                 }
                 0x00..=0x1f | 0x7f..=0xff => {
                     return self.error("invalid string character");
@@ -326,7 +343,7 @@ impl<'a> Parser<'a> {
                     match self.peek() {
                         Some(c @ b'\\' | c @ b'"') => {
                             self.next();
-                            output_string.push(c as char);
+                            output.to_mut().push(c);
                         }
                         None => return self.error("unterminated escape sequence"),
                         Some(_) => return self.error("invalid escape sequence"),
@@ -334,7 +351,10 @@ impl<'a> Parser<'a> {
                 }
                 _ => {
                     self.next();
-                    output_string.push(curr_char as char);
+                    match output {
+                        Cow::Borrowed(ref mut output) => *output = &self.input[start..self.index],
+                        Cow::Owned(ref mut output) => output.push(curr_char),
+                    }
                 }
             }
         }
@@ -492,9 +512,9 @@ impl<'a> Parser<'a> {
                     self.next();
                     self.parse_bare_item()?
                 }
-                _ => BareItem::Boolean(true),
+                _ => BareItemFromInput::Boolean(true),
             };
-            params.insert(param_name.to_owned(), param_value);
+            params.insert(param_name.to_owned(), param_value.into());
         }
 
         // If parameters already contains a name param_name (comparing character-for-character), overwrite its value.
