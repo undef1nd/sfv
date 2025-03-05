@@ -1,18 +1,13 @@
 use crate::utils;
+use crate::visitor::*;
 use crate::{
-    BareItem, BareItemFromInput, Decimal, Dictionary, Error, InnerList, Integer, Item, KeyRef,
-    List, ListEntry, Num, Parameters, SFVResult, String, StringRef, TokenRef,
+    BareItemFromInput, Decimal, Dictionary, Error, Integer, Item, KeyRef, List, Num, SFVResult,
+    String, StringRef, TokenRef,
 };
 
 use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::string::String as StdString;
-
-trait ParseValue {
-    fn parse(parser: &mut Parser) -> SFVResult<Self>
-    where
-        Self: Sized;
-}
 
 /// If structured field value of List or Dictionary type is split into multiple lines,
 /// allows to parse more lines and merge them into already existing structure field value.
@@ -39,103 +34,92 @@ pub trait ParseMore {
         Self: Sized;
 }
 
-impl ParseValue for Item {
-    fn parse(parser: &mut Parser) -> SFVResult<Item> {
-        // https://httpwg.org/specs/rfc8941.html#parse-item
-        let bare_item = parser.parse_bare_item()?;
-        let params = parser.parse_parameters()?;
-
-        Ok(Item {
-            bare_item: bare_item.into(),
-            params,
-        })
-    }
+fn parse_item<'a>(parser: &mut Parser<'a>, visitor: impl ItemVisitor<'a>) -> SFVResult<()> {
+    // https://httpwg.org/specs/rfc8941.html#parse-item
+    let param_visitor = visitor
+        .bare_item(parser.parse_bare_item()?)
+        .map_err(Error::custom)?;
+    parser.parse_parameters(param_visitor)
 }
 
-impl ParseValue for List {
-    fn parse(parser: &mut Parser) -> SFVResult<List> {
-        // https://httpwg.org/specs/rfc8941.html#parse-list
-        // List represents an array of (item_or_inner_list, parameters)
+fn parse_list<'a>(
+    parser: &mut Parser<'a>,
+    visitor: &mut (impl ?Sized + ListVisitor<'a>),
+) -> SFVResult<()> {
+    // https://httpwg.org/specs/rfc8941.html#parse-list
+    // List represents an array of (item_or_inner_list, parameters)
 
-        let mut members = vec![];
+    while parser.peek().is_some() {
+        parser.parse_list_entry(visitor.entry().map_err(Error::custom)?)?;
 
-        while parser.peek().is_some() {
-            members.push(parser.parse_list_entry()?);
+        parser.consume_ows_chars();
 
-            parser.consume_ows_chars();
-
-            if parser.peek().is_none() {
-                return Ok(members);
-            }
-
-            let comma_index = parser.index;
-
-            if let Some(c) = parser.peek() {
-                if c != b',' {
-                    return parser.error("trailing characters after list member");
-                }
-                parser.next();
-            }
-
-            parser.consume_ows_chars();
-
-            if parser.peek().is_none() {
-                // Report the error at the position of the comma itself, rather
-                // than at the end of input.
-                return Err(Error::with_index("trailing comma", comma_index));
-            }
+        if parser.peek().is_none() {
+            return Ok(());
         }
 
-        Ok(members)
+        let comma_index = parser.index;
+
+        if let Some(c) = parser.peek() {
+            if c != b',' {
+                return parser.error("trailing characters after list member");
+            }
+            parser.next();
+        }
+
+        parser.consume_ows_chars();
+
+        if parser.peek().is_none() {
+            // Report the error at the position of the comma itself, rather
+            // than at the end of input.
+            return Err(Error::with_index("trailing comma", comma_index));
+        }
     }
+
+    Ok(())
 }
 
-impl ParseValue for Dictionary {
-    fn parse(parser: &mut Parser) -> SFVResult<Dictionary> {
-        let mut dict = Dictionary::new();
+fn parse_dictionary<'a>(
+    parser: &mut Parser<'a>,
+    visitor: &mut (impl ?Sized + DictionaryVisitor<'a>),
+) -> SFVResult<()> {
+    while parser.peek().is_some() {
+        let entry_visitor = visitor.entry(parser.parse_key()?).map_err(Error::custom)?;
 
-        while parser.peek().is_some() {
-            let this_key = parser.parse_key()?;
-
-            if let Some(b'=') = parser.peek() {
-                parser.next();
-                let member = parser.parse_list_entry()?;
-                dict.insert(this_key.to_owned(), member);
-            } else {
-                let value = true;
-                let params = parser.parse_parameters()?;
-                let member = Item {
-                    bare_item: BareItem::Boolean(value),
-                    params,
-                };
-                dict.insert(this_key.to_owned(), member.into());
-            }
-
-            parser.consume_ows_chars();
-
-            if parser.peek().is_none() {
-                return Ok(dict);
-            }
-
-            let comma_index = parser.index;
-
-            if let Some(c) = parser.peek() {
-                if c != b',' {
-                    return parser.error("trailing characters after dictionary member");
-                }
-                parser.next();
-            }
-
-            parser.consume_ows_chars();
-
-            if parser.peek().is_none() {
-                // Report the error at the position of the comma itself, rather
-                // than at the end of input.
-                return Err(Error::with_index("trailing comma", comma_index));
-            }
+        if let Some(b'=') = parser.peek() {
+            parser.next();
+            parser.parse_list_entry(entry_visitor)?;
+        } else {
+            let param_visitor = entry_visitor
+                .bare_item(BareItemFromInput::from(true))
+                .map_err(Error::custom)?;
+            parser.parse_parameters(param_visitor)?;
         }
-        Ok(dict)
+
+        parser.consume_ows_chars();
+
+        if parser.peek().is_none() {
+            return Ok(());
+        }
+
+        let comma_index = parser.index;
+
+        if let Some(c) = parser.peek() {
+            if c != b',' {
+                return parser.error("trailing characters after dictionary member");
+            }
+            parser.next();
+        }
+
+        parser.consume_ows_chars();
+
+        if parser.peek().is_none() {
+            // Report the error at the position of the comma itself, rather
+            // than at the end of input.
+            return Err(Error::with_index("trailing comma", comma_index));
+        }
     }
+    Ok(())
 }
 
 impl ParseMore for List {
@@ -172,17 +156,44 @@ impl<'a> Parser<'a> {
 
     /// Parses input into structured field value of Dictionary type
     pub fn parse_dictionary(self) -> SFVResult<Dictionary> {
-        self.parse()
+        let mut dict = Dictionary::new();
+        self.parse_dictionary_with_visitor(&mut dict)?;
+        Ok(dict)
+    }
+
+    /// Like `parse_dictionary`, but uses the given visitor instead of producing a [`Dictionary`].
+    pub fn parse_dictionary_with_visitor(
+        self,
+        visitor: &mut (impl ?Sized + DictionaryVisitor<'a>),
+    ) -> SFVResult<()> {
+        self.parse(|parser| parse_dictionary(parser, visitor))
     }
 
     /// Parses input into structured field value of List type
     pub fn parse_list(self) -> SFVResult<List> {
-        self.parse()
+        let mut list = List::new();
+        self.parse_list_with_visitor(&mut list)?;
+        Ok(list)
+    }
+
+    /// Like `parse_list`, but uses the given visitor instead of producing a [`List`].
+    pub fn parse_list_with_visitor(
+        self,
+        visitor: &mut (impl ?Sized + ListVisitor<'a>),
+    ) -> SFVResult<()> {
+        self.parse(|parser| parse_list(parser, visitor))
     }
 
     /// Parses input into structured field value of Item type
     pub fn parse_item(self) -> SFVResult<Item> {
-        self.parse()
+        let mut item = Item::new(false);
+        self.parse_item_with_visitor(&mut item)?;
+        Ok(item)
+    }
+
+    /// Like `parse_item`, but uses the given visitor instead of producing an [`Item`].
+    pub fn parse_item_with_visitor(self, visitor: impl ItemVisitor<'a>) -> SFVResult<()> {
+        self.parse(|parser| parse_item(parser, visitor))
     }
 
     fn peek(&self) -> Option<u8> {
@@ -199,39 +210,36 @@ impl<'a> Parser<'a> {
 
     // Generic parse method for checking input before parsing
     // and handling trailing text error
-    fn parse<T: ParseValue>(mut self) -> SFVResult<T> {
+    fn parse(mut self, f: impl FnOnce(&mut Self) -> SFVResult<()>) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc8941.html#text-parse
 
         self.consume_sp_chars();
 
-        let output = T::parse(&mut self)?;
+        f(&mut self)?;
 
         self.consume_sp_chars();
 
         if self.peek().is_some() {
             self.error("trailing characters after parsed value")
         } else {
-            Ok(output)
+            Ok(())
         }
     }
 
-    fn parse_list_entry(&mut self) -> SFVResult<ListEntry> {
+    fn parse_list_entry(&mut self, visitor: impl EntryVisitor<'a>) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc8941.html#parse-item-or-list
         // ListEntry represents a tuple (item_or_inner_list, parameters)
 
         match self.peek() {
-            Some(b'(') => {
-                let parsed = self.parse_inner_list()?;
-                Ok(ListEntry::InnerList(parsed))
-            }
-            _ => {
-                let parsed = Item::parse(self)?;
-                Ok(ListEntry::Item(parsed))
-            }
+            Some(b'(') => self.parse_inner_list(visitor.inner_list().map_err(Error::custom)?),
+            _ => parse_item(self, visitor),
         }
     }
 
-    pub(crate) fn parse_inner_list(&mut self) -> SFVResult<InnerList> {
+    pub(crate) fn parse_inner_list(
+        &mut self,
+        mut visitor: impl InnerListVisitor<'a>,
+    ) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc8941.html#parse-innerlist
 
         if Some(b'(') != self.peek() {
@@ -240,21 +248,16 @@ impl<'a> Parser<'a> {
 
         self.next();
 
-        let mut inner_list = Vec::new();
         while self.peek().is_some() {
             self.consume_sp_chars();
 
             if Some(b')') == self.peek() {
                 self.next();
-                let params = self.parse_parameters()?;
-                return Ok(InnerList {
-                    items: inner_list,
-                    params,
-                });
+                let param_visitor = visitor.finish().map_err(Error::custom)?;
+                return self.parse_parameters(param_visitor);
             }
 
-            let parsed_item = Item::parse(self)?;
-            inner_list.push(parsed_item);
+            parse_item(self, visitor.item().map_err(Error::custom)?)?;
 
             if let Some(c) = self.peek() {
                 if c != b' ' && c != b')' {
@@ -497,10 +500,11 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub(crate) fn parse_parameters(&mut self) -> SFVResult<Parameters> {
+    pub(crate) fn parse_parameters(
+        &mut self,
+        mut visitor: impl ParameterVisitor<'a>,
+    ) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc8941.html#parse-param
-
-        let mut params = Parameters::new();
 
         while let Some(b';') = self.peek() {
             self.next();
@@ -514,12 +518,14 @@ impl<'a> Parser<'a> {
                 }
                 _ => BareItemFromInput::Boolean(true),
             };
-            params.insert(param_name.to_owned(), param_value.into());
+            visitor
+                .parameter(param_name, param_value)
+                .map_err(Error::custom)?;
         }
 
         // If parameters already contains a name param_name (comparing character-for-character), overwrite its value.
         // Note that when duplicate Parameter keys are encountered, this has the effect of ignoring all but the last instance.
-        Ok(params)
+        visitor.finish().map_err(Error::custom)
     }
 
     pub(crate) fn parse_key(&mut self) -> SFVResult<&'a KeyRef> {

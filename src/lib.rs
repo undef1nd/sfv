@@ -186,6 +186,7 @@ mod serializer;
 mod string;
 mod token;
 mod utils;
+pub mod visitor;
 
 #[cfg(test)]
 mod test_decimal;
@@ -450,7 +451,6 @@ impl<'a> From<BareItemFromInput<'a>> for BareItem {
         }
     }
 }
-
 
 impl<'a> From<&'a [u8]> for RefBareItem<'a> {
     fn from(val: &'a [u8]) -> RefBareItem<'a> {
