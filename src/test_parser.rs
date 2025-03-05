@@ -1,7 +1,7 @@
 use crate::visitor::Ignored;
 use crate::{
     integer, key_ref, string_ref, token_ref, BareItem, Decimal, Dictionary, Error, InnerList, Item,
-    List, Num, Parameters, ParseMore, Parser, RefBareItem,
+    List, Num, Parameters, Parser, RefBareItem,
 };
 use std::convert::TryFrom;
 use std::error::Error as StdError;
@@ -829,7 +829,7 @@ fn parse_more_list() -> Result<(), Box<dyn StdError>> {
     let expected_list: List = vec![inner_list_1.into(), item3.into()];
 
     let mut parsed_header = Parser::from_str("(1 2)").parse_list()?;
-    let _ = parsed_header.parse_more("42".as_bytes())?;
+    Parser::from_str("42").parse_list_with_visitor(&mut parsed_header)?;
     assert_eq!(expected_list, parsed_header);
     Ok(())
 }
@@ -850,21 +850,21 @@ fn parse_more_dict() -> Result<(), Box<dyn StdError>> {
     ]);
 
     let mut parsed_header = Parser::from_str("a=1, b;foo=*\t\t").parse_dictionary()?;
-    let _ = parsed_header.parse_more(" c=3".as_bytes())?;
+    Parser::from_str(" c=3").parse_dictionary_with_visitor(&mut parsed_header)?;
     assert_eq!(expected_dict, parsed_header);
     Ok(())
 }
 
 #[test]
 fn parse_more_errors() -> Result<(), Box<dyn StdError>> {
-    let parsed_dict_header = Parser::from_str("a=1, b;foo=*")
-        .parse_dictionary()?
-        .parse_more(",a".as_bytes());
-    assert!(parsed_dict_header.is_err());
+    let mut parsed_dict_header = Parser::from_str("a=1, b;foo=*").parse_dictionary()?;
+    assert!(Parser::from_str(",a")
+        .parse_dictionary_with_visitor(&mut parsed_dict_header)
+        .is_err());
 
-    let parsed_list_header = Parser::from_str("a, b;foo=*")
-        .parse_list()?
-        .parse_more("(a, 2)".as_bytes());
-    assert!(parsed_list_header.is_err());
+    let mut parsed_list_header = Parser::from_str("a, b;foo=*").parse_list()?;
+    assert!(Parser::from_str("(a, 2)")
+        .parse_list_with_visitor(&mut parsed_list_header)
+        .is_err());
     Ok(())
 }

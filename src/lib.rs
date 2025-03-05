@@ -210,7 +210,7 @@ pub use decimal::{Decimal, DecimalError};
 pub use error::Error;
 pub use integer::{integer, Integer, OutOfRangeError};
 pub use key::{key_ref, Key, KeyError, KeyRef};
-pub use parser::{ParseMore, Parser};
+pub use parser::Parser;
 pub use ref_serializer::{
     RefDictSerializer, RefInnerListSerializer, RefItemSerializer, RefListSerializer,
     RefParameterSerializer,
