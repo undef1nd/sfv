@@ -211,8 +211,7 @@ pub use integer::{integer, Integer, OutOfRangeError};
 pub use key::{key_ref, Key, KeyError, KeyRef};
 pub use parser::{ParseMore, Parser};
 pub use ref_serializer::{
-    RefDictSerializer, RefInnerListSerializer, RefItemSerializer, RefListSerializer,
-    RefParameterSerializer,
+    DictSerializer, InnerListSerializer, ItemSerializer, ListSerializer, ParameterSerializer,
 };
 pub use serializer::SerializeValue;
 pub use string::{string_ref, String, StringError, StringRef};
@@ -514,7 +513,7 @@ pub(crate) enum Num {
 /// `BareItem` type is used to construct `Items` or `Parameters` values.
 pub type BareItem = GenericBareItem<String, Vec<u8>, Token>;
 
-/// Similar to `BareItem`, but used to serialize values via `RefItemSerializer`, `RefListSerializer`, `RefDictSerializer`.
+/// Similar to `BareItem`, but used to serialize values via `ItemSerializer`, `ListSerializer`, `DictSerializer`.
 pub type RefBareItem<'a> = GenericBareItem<&'a StringRef, &'a [u8], &'a TokenRef>;
 
 impl<'a, S, B, T> From<&'a GenericBareItem<S, B, T>> for RefBareItem<'a>
