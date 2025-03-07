@@ -1,6 +1,7 @@
+use crate::visitor::Ignored;
 use crate::{
     integer, key_ref, string_ref, token_ref, BareItem, Decimal, Dictionary, Error, InnerList, Item,
-    List, Num, Parameters, ParseMore, Parser, RefBareItem,
+    List, Num, Parameters, Parser, RefBareItem,
 };
 use std::convert::TryFrom;
 use std::error::Error as StdError;
@@ -196,13 +197,13 @@ fn parse_inner_list_errors() -> Result<(), Box<dyn StdError>> {
     let input = "c b); a=1";
     assert_eq!(
         Err(Error::with_index("expected start of inner list", 0)),
-        Parser::from_str(input).parse_inner_list()
+        Parser::from_str(input).parse_inner_list(Ignored)
     );
 
     let input = "(";
     assert_eq!(
         Err(Error::with_index("unterminated inner list", 1)),
-        Parser::from_str(input).parse_inner_list()
+        Parser::from_str(input).parse_inner_list(Ignored)
     );
     Ok(())
 }
@@ -215,7 +216,9 @@ fn parse_inner_list_with_param_and_spaces() -> Result<(), Box<dyn StdError>> {
     let item1 = Item::new(token_ref("c"));
     let item2 = Item::new(token_ref("b"));
     let expected = InnerList::with_params(vec![item1, item2], inner_list_param);
-    assert_eq!(expected, Parser::from_str(input).parse_inner_list()?);
+    let mut inner_list = InnerList::default();
+    Parser::from_str(input).parse_inner_list(&mut inner_list)?;
+    assert_eq!(expected, inner_list);
     Ok(())
 }
 
@@ -734,7 +737,9 @@ fn parse_params_string() -> Result<(), Box<dyn StdError>> {
         key_ref("b").to_owned(),
         BareItem::String(string_ref("param_val").to_owned()),
     )]);
-    assert_eq!(expected, Parser::from_str(input).parse_parameters()?);
+    let mut params = Parameters::new();
+    Parser::from_str(input).parse_parameters(&mut params)?;
+    assert_eq!(expected, params);
     Ok(())
 }
 
@@ -745,7 +750,9 @@ fn parse_params_bool() -> Result<(), Box<dyn StdError>> {
         (key_ref("b").to_owned(), BareItem::Boolean(true)),
         (key_ref("a").to_owned(), BareItem::Boolean(true)),
     ]);
-    assert_eq!(expected, Parser::from_str(input).parse_parameters()?);
+    let mut params = Parameters::new();
+    Parser::from_str(input).parse_parameters(&mut params)?;
+    assert_eq!(expected, params);
     Ok(())
 }
 
@@ -759,7 +766,9 @@ fn parse_params_mixed_types() -> Result<(), Box<dyn StdError>> {
             Decimal::try_from(746.15)?.into(),
         ),
     ]);
-    assert_eq!(expected, Parser::from_str(input).parse_parameters()?);
+    let mut params = Parameters::new();
+    Parser::from_str(input).parse_parameters(&mut params)?;
+    assert_eq!(expected, params);
     Ok(())
 }
 
@@ -770,22 +779,23 @@ fn parse_params_with_spaces() -> Result<(), Box<dyn StdError>> {
         (key_ref("key1").to_owned(), BareItem::Boolean(false)),
         (key_ref("key2").to_owned(), 11111.into()),
     ]);
-    assert_eq!(expected, Parser::from_str(input).parse_parameters()?);
+    let mut params = Parameters::new();
+    Parser::from_str(input).parse_parameters(&mut params)?;
+    assert_eq!(expected, params);
     Ok(())
 }
 
 #[test]
 fn parse_params_empty() -> Result<(), Box<dyn StdError>> {
-    assert_eq!(
-        Parameters::new(),
-        Parser::from_str(" key1=?0; key2=11111").parse_parameters()?
-    );
-    assert_eq!(Parameters::new(), Parser::from_str("").parse_parameters()?);
-    assert_eq!(
-        Parameters::new(),
-        Parser::from_str("[;a=1").parse_parameters()?
-    );
-    assert_eq!(Parameters::new(), Parser::from_str("").parse_parameters()?);
+    let mut params = Parameters::new();
+    Parser::from_str(" key1=?0; key2=11111").parse_parameters(&mut params)?;
+    assert_eq!(Parameters::new(), params);
+    Parser::from_str("").parse_parameters(&mut params)?;
+    assert_eq!(Parameters::new(), params);
+    Parser::from_str("[;a=1").parse_parameters(&mut params)?;
+    assert_eq!(Parameters::new(), params);
+    Parser::from_str("").parse_parameters(&mut params)?;
+    assert_eq!(Parameters::new(), params);
     Ok(())
 }
 
@@ -819,7 +829,7 @@ fn parse_more_list() -> Result<(), Box<dyn StdError>> {
     let expected_list: List = vec![inner_list_1.into(), item3.into()];
 
     let mut parsed_header = Parser::from_str("(1 2)").parse_list()?;
-    let _ = parsed_header.parse_more("42".as_bytes())?;
+    Parser::from_str("42").parse_list_with_visitor(&mut parsed_header)?;
     assert_eq!(expected_list, parsed_header);
     Ok(())
 }
@@ -840,21 +850,21 @@ fn parse_more_dict() -> Result<(), Box<dyn StdError>> {
     ]);
 
     let mut parsed_header = Parser::from_str("a=1, b;foo=*\t\t").parse_dictionary()?;
-    let _ = parsed_header.parse_more(" c=3".as_bytes())?;
+    Parser::from_str(" c=3").parse_dictionary_with_visitor(&mut parsed_header)?;
     assert_eq!(expected_dict, parsed_header);
     Ok(())
 }
 
 #[test]
 fn parse_more_errors() -> Result<(), Box<dyn StdError>> {
-    let parsed_dict_header = Parser::from_str("a=1, b;foo=*")
-        .parse_dictionary()?
-        .parse_more(",a".as_bytes());
-    assert!(parsed_dict_header.is_err());
+    let mut parsed_dict_header = Parser::from_str("a=1, b;foo=*").parse_dictionary()?;
+    assert!(Parser::from_str(",a")
+        .parse_dictionary_with_visitor(&mut parsed_dict_header)
+        .is_err());
 
-    let parsed_list_header = Parser::from_str("a, b;foo=*")
-        .parse_list()?
-        .parse_more("(a, 2)".as_bytes());
-    assert!(parsed_list_header.is_err());
+    let mut parsed_list_header = Parser::from_str("a, b;foo=*").parse_list()?;
+    assert!(Parser::from_str("(a, 2)")
+        .parse_list_with_visitor(&mut parsed_list_header)
+        .is_err());
     Ok(())
 }

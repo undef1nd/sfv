@@ -179,12 +179,14 @@ mod decimal;
 mod error;
 mod integer;
 mod key;
+mod parsed;
 mod parser;
 mod ref_serializer;
 mod serializer;
 mod string;
 mod token;
 mod utils;
+pub mod visitor;
 
 #[cfg(test)]
 mod test_decimal;
@@ -201,15 +203,14 @@ mod test_string;
 #[cfg(test)]
 mod test_token;
 
-use indexmap::IndexMap;
-use std::borrow::Borrow;
+use std::borrow::{Borrow, Cow};
 use std::convert::TryFrom;
 
 pub use decimal::{Decimal, DecimalError};
 pub use error::Error;
 pub use integer::{integer, Integer, OutOfRangeError};
 pub use key::{key_ref, Key, KeyError, KeyRef};
-pub use parser::{ParseMore, Parser};
+pub use parser::Parser;
 pub use ref_serializer::{
     RefDictSerializer, RefInnerListSerializer, RefItemSerializer, RefListSerializer,
     RefParameterSerializer,
@@ -218,116 +219,16 @@ pub use serializer::SerializeValue;
 pub use string::{string_ref, String, StringError, StringRef};
 pub use token::{token_ref, Token, TokenError, TokenRef};
 
+pub use parsed::{Dictionary, InnerList, Item, List, ListEntry, Parameters};
+
 type SFVResult<T> = std::result::Result<T, Error>;
-
-/// Represents `Item` type structured field value.
-/// Can be used as a member of `List` or `Dictionary`.
-// sf-item   = bare-item parameters
-// bare-item = sf-integer / sf-decimal / sf-string / sf-token
-//             / sf-binary / sf-boolean
-#[derive(Debug, PartialEq, Clone)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct Item {
-    /// Value of `Item`.
-    pub bare_item: BareItem,
-    /// `Item`'s associated parameters. Can be empty.
-    pub params: Parameters,
-}
-
-impl Item {
-    /// Returns new `Item` with empty `Parameters`.
-    pub fn new(bare_item: impl Into<BareItem>) -> Item {
-        Item {
-            bare_item: bare_item.into(),
-            params: Parameters::new(),
-        }
-    }
-    /// Returns new `Item` with specified `Parameters`.
-    pub fn with_params(bare_item: impl Into<BareItem>, params: Parameters) -> Item {
-        Item {
-            bare_item: bare_item.into(),
-            params,
-        }
-    }
-}
-
-/// Represents `Dictionary` type structured field value.
-// sf-dictionary  = dict-member *( OWS "," OWS dict-member )
-// dict-member    = member-name [ "=" member-value ]
-// member-name    = key
-// member-value   = sf-item / inner-list
-pub type Dictionary = IndexMap<Key, ListEntry>;
-
-/// Represents `List` type structured field value.
-// sf-list       = list-member *( OWS "," OWS list-member )
-// list-member   = sf-item / inner-list
-pub type List = Vec<ListEntry>;
-
-/// Parameters of `Item` or `InnerList`.
-// parameters    = *( ";" *SP parameter )
-// parameter     = param-name [ "=" param-value ]
-// param-name    = key
-// key           = ( lcalpha / "*" )
-//                 *( lcalpha / DIGIT / "_" / "-" / "." / "*" )
-// lcalpha       = %x61-7A ; a-z
-// param-value   = bare-item
-pub type Parameters = IndexMap<Key, BareItem>;
-
-/// Represents a member of `List` or `Dictionary` structured field value.
-#[derive(Debug, PartialEq, Clone)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub enum ListEntry {
-    /// Member of `Item` type.
-    Item(Item),
-    /// Member of `InnerList` (array of `Items`) type.
-    InnerList(InnerList),
-}
-
-impl From<Item> for ListEntry {
-    fn from(item: Item) -> Self {
-        ListEntry::Item(item)
-    }
-}
-
-impl From<InnerList> for ListEntry {
-    fn from(item: InnerList) -> Self {
-        ListEntry::InnerList(item)
-    }
-}
-
-/// Array of `Items` with associated `Parameters`.
-// inner-list    = "(" *SP [ sf-item *( 1*SP sf-item ) *SP ] ")"
-//                 parameters
-#[derive(Debug, Default, PartialEq, Clone)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct InnerList {
-    /// `Items` that `InnerList` contains. Can be empty.
-    pub items: Vec<Item>,
-    /// `InnerList`'s associated parameters. Can be empty.
-    pub params: Parameters,
-}
-
-impl InnerList {
-    /// Returns new `InnerList` with empty `Parameters`.
-    pub fn new(items: Vec<Item>) -> InnerList {
-        InnerList {
-            items,
-            params: Parameters::new(),
-        }
-    }
-
-    /// Returns new `InnerList` with specified `Parameters`.
-    pub fn with_params(items: Vec<Item>, params: Parameters) -> InnerList {
-        InnerList { items, params }
-    }
-}
 
 /// An abstraction over multiple kinds of ownership of a bare item.
 ///
 /// In general most users will be interested in:
 /// - [`BareItem`], for completely owned data
 /// - [`RefBareItem`], for completely borrowed data
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum GenericBareItem<S, B, T> {
     // sf-decimal  = ["-"] 1*12DIGIT "." 1*3DIGIT
@@ -469,9 +370,9 @@ impl<S, B, T> TryFrom<f64> for GenericBareItem<S, B, T> {
     }
 }
 
-impl From<Vec<u8>> for BareItem {
-    fn from(val: Vec<u8>) -> BareItem {
-        BareItem::ByteSeq(val)
+impl<S, T> From<Vec<u8>> for GenericBareItem<S, Vec<u8>, T> {
+    fn from(val: Vec<u8>) -> Self {
+        Self::ByteSeq(val)
     }
 }
 
@@ -517,6 +418,9 @@ pub type BareItem = GenericBareItem<String, Vec<u8>, Token>;
 /// Similar to `BareItem`, but used to serialize values via `RefItemSerializer`, `RefListSerializer`, `RefDictSerializer`.
 pub type RefBareItem<'a> = GenericBareItem<&'a StringRef, &'a [u8], &'a TokenRef>;
 
+/// Similar to `BareItem`, but borrows data from input when possible.
+pub type BareItemFromInput<'a> = GenericBareItem<Cow<'a, StringRef>, Vec<u8>, &'a TokenRef>;
+
 impl<'a, S, B, T> From<&'a GenericBareItem<S, B, T>> for RefBareItem<'a>
 where
     S: Borrow<StringRef>,
@@ -535,21 +439,34 @@ where
     }
 }
 
+impl<'a> From<BareItemFromInput<'a>> for BareItem {
+    fn from(val: BareItemFromInput<'a>) -> BareItem {
+        match val {
+            BareItemFromInput::Integer(val) => BareItem::Integer(val),
+            BareItemFromInput::Decimal(val) => BareItem::Decimal(val),
+            BareItemFromInput::String(val) => BareItem::String(val.into_owned()),
+            BareItemFromInput::ByteSeq(val) => BareItem::ByteSeq(val),
+            BareItemFromInput::Boolean(val) => BareItem::Boolean(val),
+            BareItemFromInput::Token(val) => BareItem::Token(val.to_owned()),
+        }
+    }
+}
+
 impl<'a> From<&'a [u8]> for RefBareItem<'a> {
     fn from(val: &'a [u8]) -> RefBareItem<'a> {
         RefBareItem::ByteSeq(val)
     }
 }
 
-impl<'a> From<&'a Token> for RefBareItem<'a> {
-    fn from(val: &'a Token) -> RefBareItem<'a> {
-        RefBareItem::Token(val)
+impl<'a, S, B> From<&'a Token> for GenericBareItem<S, B, &'a TokenRef> {
+    fn from(val: &'a Token) -> Self {
+        Self::Token(val)
     }
 }
 
-impl<'a> From<&'a TokenRef> for RefBareItem<'a> {
-    fn from(val: &'a TokenRef) -> RefBareItem<'a> {
-        RefBareItem::Token(val)
+impl<'a, S, B> From<&'a TokenRef> for GenericBareItem<S, B, &'a TokenRef> {
+    fn from(val: &'a TokenRef) -> Self {
+        Self::Token(val)
     }
 }
 
@@ -565,14 +482,20 @@ impl<'a> From<&'a StringRef> for RefBareItem<'a> {
     }
 }
 
-impl PartialEq<BareItem> for RefBareItem<'_> {
-    fn eq(&self, other: &BareItem) -> bool {
-        *self == RefBareItem::from(other)
-    }
-}
-
-impl<'a> PartialEq<RefBareItem<'a>> for BareItem {
-    fn eq(&self, other: &RefBareItem<'a>) -> bool {
-        RefBareItem::from(self) == *other
+impl<S1, B1, T1, S2, B2, T2> PartialEq<GenericBareItem<S2, B2, T2>> for GenericBareItem<S1, B1, T1>
+where
+    for<'a> RefBareItem<'a>: From<&'a Self>,
+    for<'a> RefBareItem<'a>: From<&'a GenericBareItem<S2, B2, T2>>,
+{
+    fn eq(&self, other: &GenericBareItem<S2, B2, T2>) -> bool {
+        match (RefBareItem::from(self), RefBareItem::from(other)) {
+            (RefBareItem::Integer(a), RefBareItem::Integer(b)) => a == b,
+            (RefBareItem::Decimal(a), RefBareItem::Decimal(b)) => a == b,
+            (RefBareItem::String(a), RefBareItem::String(b)) => a == b,
+            (RefBareItem::ByteSeq(a), RefBareItem::ByteSeq(b)) => a == b,
+            (RefBareItem::Boolean(a), RefBareItem::Boolean(b)) => a == b,
+            (RefBareItem::Token(a), RefBareItem::Token(b)) => a == b,
+            _ => false,
+        }
     }
 }
