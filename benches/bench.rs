@@ -115,24 +115,23 @@ fn serializing_ref_item(c: &mut Criterion) {
 fn serializing_ref_list(c: &mut Criterion) {
     c.bench_function("serializing_ref_list", move |bench| {
         bench.iter(|| {
-            let ser = RefListSerializer::new();
-            ser.bare_item(token_ref("a"))
-                .bare_item(token_ref("abcdefghigklmnoprst"))
-                .bare_item(integer(123456785686457))
-                .bare_item(Decimal::try_from(99999999999.999).unwrap())
-                .open_inner_list()
-                .close_inner_list()
-                .open_inner_list()
-                .inner_list_bare_item(string_ref("somelongstringvalue"))
-                .inner_list_bare_item(string_ref("anotherlongstringvalue"))
-                .inner_list_parameter(
-                    key_ref("key"),
-                    "somever longstringvaluerepresentedasbytes".as_bytes(),
-                )
-                .unwrap()
-                .inner_list_bare_item(145)
-                .close_inner_list()
-                .finish()
+            let mut ser = RefListSerializer::new();
+            ser.bare_item(token_ref("a"));
+            ser.bare_item(token_ref("abcdefghigklmnoprst"));
+            ser.bare_item(integer(123456785686457));
+            ser.bare_item(Decimal::try_from(99999999999.999).unwrap());
+            ser.inner_list();
+            {
+                let mut ser = ser.inner_list();
+                ser.bare_item(string_ref("somelongstringvalue"));
+                ser.bare_item(string_ref("anotherlongstringvalue"))
+                    .parameter(
+                        key_ref("key"),
+                        "somever longstringvaluerepresentedasbytes".as_bytes(),
+                    );
+                ser.bare_item(145);
+            }
+            ser.finish()
         });
     });
 }
@@ -140,17 +139,18 @@ fn serializing_ref_list(c: &mut Criterion) {
 fn serializing_ref_dict(c: &mut Criterion) {
     c.bench_function("serializing_ref_dict", move |bench| {
         bench.iter(|| {
-            RefDictSerializer::new()
-                .bare_item_member(key_ref("a"), true)
-                .bare_item_member(key_ref("dict_key2"), token_ref("abcdefghigklmnoprst"))
-                .bare_item_member(key_ref("dict_key3"), integer(123456785686457))
-                .open_inner_list(key_ref("dict_key4"))
-                .inner_list_bare_item(string_ref("inner-list-member"))
-                .inner_list_bare_item("inner-list-member".as_bytes())
-                .close_inner_list()
-                .parameter(key_ref("key"), token_ref("aW5uZXItbGlzdC1wYXJhbWV0ZXJz"))
-                .unwrap()
-                .finish()
+            let mut ser = RefDictSerializer::new();
+            ser.bare_item(key_ref("a"), true);
+            ser.bare_item(key_ref("dict_key2"), token_ref("abcdefghigklmnoprst"));
+            ser.bare_item(key_ref("dict_key3"), integer(123456785686457));
+            {
+                let mut ser = ser.inner_list(key_ref("dict_key4"));
+                ser.bare_item(string_ref("inner-list-member"));
+                ser.bare_item("inner-list-member".as_bytes());
+                ser.finish()
+                    .parameter(key_ref("key"), token_ref("aW5uZXItbGlzdC1wYXJhbWV0ZXJz"));
+            }
+            ser.finish()
         });
     });
 }
