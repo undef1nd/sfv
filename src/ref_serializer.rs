@@ -1,5 +1,5 @@
 use crate::serializer::Serializer;
-use crate::{Error, KeyRef, RefBareItem, SFVResult};
+use crate::{Error, Item, KeyRef, ListEntry, RefBareItem, SFVResult};
 
 use std::borrow::BorrowMut;
 
@@ -17,6 +17,7 @@ use std::borrow::BorrowMut;
 /// # Ok(())
 /// # }
 /// ```
+// https://httpwg.org/specs/rfc8941.html#ser-item
 #[derive(Debug)]
 pub struct RefItemSerializer<W> {
     buffer: W,
@@ -66,6 +67,16 @@ impl<W: BorrowMut<String>> RefParameterSerializer<W> {
         self
     }
 
+    pub fn parameters<'b>(
+        mut self,
+        params: impl IntoIterator<Item = (impl AsRef<KeyRef>, impl Into<RefBareItem<'b>>)>,
+    ) -> Self {
+        for (name, value) in params {
+            Serializer::serialize_parameter(name.as_ref(), value, self.buffer.borrow_mut());
+        }
+        self
+    }
+
     pub fn finish(self) -> W {
         self.buffer
     }
@@ -108,6 +119,7 @@ fn maybe_write_separator(buffer: &mut String, first: &mut bool) {
 /// # Ok(())
 /// # }
 /// ```
+// https://httpwg.org/specs/rfc8941.html#ser-list
 #[derive(Debug)]
 pub struct RefListSerializer<W> {
     buffer: W,
@@ -158,6 +170,21 @@ impl<W: BorrowMut<String>> RefListSerializer<W> {
         }
     }
 
+    pub fn members<'b>(&mut self, members: impl IntoIterator<Item = &'b ListEntry>) {
+        for value in members {
+            match value {
+                ListEntry::Item(value) => {
+                    self.bare_item(&value.bare_item).parameters(&value.params);
+                }
+                ListEntry::InnerList(value) => {
+                    let mut ser = self.inner_list();
+                    ser.items(&value.items);
+                    ser.finish().parameters(&value.params);
+                }
+            }
+        }
+    }
+
     pub fn finish(self) -> SFVResult<W> {
         if self.first {
             return Err(Error::new("serializing empty list is not allowed"));
@@ -198,6 +225,7 @@ impl<W: BorrowMut<String>> RefListSerializer<W> {
 /// # Ok(())
 /// # }
 /// ```
+// https://httpwg.org/specs/rfc8941.html#ser-dictionary
 #[derive(Debug)]
 pub struct RefDictSerializer<W> {
     buffer: W,
@@ -255,6 +283,25 @@ impl<W: BorrowMut<String>> RefDictSerializer<W> {
         }
     }
 
+    pub fn members<'b>(
+        &mut self,
+        members: impl IntoIterator<Item = (impl AsRef<KeyRef>, &'b ListEntry)>,
+    ) {
+        for (name, value) in members {
+            match value {
+                ListEntry::Item(value) => {
+                    self.bare_item(name.as_ref(), &value.bare_item)
+                        .parameters(&value.params);
+                }
+                ListEntry::InnerList(value) => {
+                    let mut ser = self.inner_list(name.as_ref());
+                    ser.items(&value.items);
+                    ser.finish().parameters(&value.params);
+                }
+            }
+        }
+    }
+
     pub fn finish(self) -> SFVResult<W> {
         if self.first {
             return Err(Error::new("serializing empty dictionary is not allowed"));
@@ -264,6 +311,7 @@ impl<W: BorrowMut<String>> RefDictSerializer<W> {
 }
 
 /// Used by `RefItemSerializer`, `RefListSerializer`, `RefDictSerializer` to serialize `InnerList`.
+// https://httpwg.org/specs/rfc8941.html#ser-innerlist
 #[derive(Debug)]
 pub struct RefInnerListSerializer<'a> {
     buffer: Option<&'a mut String>,
@@ -288,6 +336,12 @@ impl<'a> RefInnerListSerializer<'a> {
         }
         Serializer::serialize_bare_item(bare_item, buffer);
         RefParameterSerializer { buffer }
+    }
+
+    pub fn items<'b>(&mut self, items: impl IntoIterator<Item = &'b Item>) {
+        for item in items {
+            self.bare_item(&item.bare_item).parameters(&item.params);
+        }
     }
 
     pub fn finish(mut self) -> RefParameterSerializer<&'a mut String> {

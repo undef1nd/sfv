@@ -230,6 +230,18 @@ impl Borrow<str> for KeyRef {
     }
 }
 
+impl AsRef<KeyRef> for Key {
+    fn as_ref(&self) -> &KeyRef {
+        self
+    }
+}
+
+impl AsRef<KeyRef> for KeyRef {
+    fn as_ref(&self) -> &KeyRef {
+        self
+    }
+}
+
 #[cfg(feature = "arbitrary")]
 impl<'a> arbitrary::Arbitrary<'a> for &'a KeyRef {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
