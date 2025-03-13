@@ -17,6 +17,14 @@ pub trait ParameterVisitor<'a> {
     /// Called after a parameter has been parsed.
     ///
     /// Parsing will be terminated early if an error is returned.
+    ///
+    /// Note: Per [RFC 8941], when duplicate parameter keys are encountered in
+    /// the same scope, all but the last instance are ignored. Implementations
+    /// of this trait must respect that requirement in order to comply with the
+    /// specification. For example, if parameters are stored in a map, earlier
+    /// values for a given parameter key must be overwritten by later ones.
+    ///
+    /// [RFC 8941]: <https://httpwg.org/specs/rfc8941.html#parse-param>
     fn parameter(
         &mut self,
         key: &'a KeyRef,
@@ -103,6 +111,15 @@ pub trait DictionaryVisitor<'a> {
     /// The returned visitor is used to handle the associated value.
     ///
     /// Parsing will be terminated early if an error is returned.
+    ///
+    /// Note: Per [RFC 8941], when duplicate dictionary keys are encountered in
+    /// the same scope, all but the last instance are ignored. Implementations
+    /// of this trait must respect that requirement in order to comply with the
+    /// specification. For example, if dictionary entries are stored in a map,
+    /// earlier values for a given dictionary key must be overwritten by later
+    /// ones.
+    ///
+    /// [RFC 8941]: <https://httpwg.org/specs/rfc8941.html#parse-dictionary>
     fn entry(&mut self, key: &'a KeyRef) -> Result<impl EntryVisitor<'a>, Self::Error>;
 }
 
@@ -124,6 +141,9 @@ pub trait ListVisitor<'a> {
 }
 
 /// A visitor that can be used to silently discard structured-field parts.
+///
+/// Note that the discarded parts are still validated during parsing: syntactic
+/// errors in the input still cause parsing to fail even when this type is used.
 pub struct Ignored;
 
 impl<'a> ParameterVisitor<'a> for Ignored {
