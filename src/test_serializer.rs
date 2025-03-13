@@ -1,34 +1,39 @@
 use crate::serializer::Serializer;
-use crate::SerializeValue;
-use crate::{
-    integer, key_ref, string_ref, token_ref, BareItem, Decimal, Dictionary, Error, InnerList, Item,
-    List, Parameters,
-};
+use crate::{integer, key_ref, string_ref, token_ref, Decimal};
 use std::convert::TryFrom;
 use std::error::Error as StdError;
+
+#[cfg(feature = "parsed-types")]
+use crate::SerializeValue;
+
+#[cfg(feature = "parsed-types")]
+use crate::{BareItem, Dictionary, Error, InnerList, Item, List, Parameters};
+
+#[cfg(feature = "parsed-types")]
 use std::iter::FromIterator;
 
 #[test]
-fn serialize_value_empty_dict() -> Result<(), Box<dyn StdError>> {
+#[cfg(feature = "parsed-types")]
+fn serialize_value_empty_dict() {
     let dict_field_value = Dictionary::new();
     assert_eq!(
         Err(Error::new("serializing empty dictionary is not allowed")),
         dict_field_value.serialize_value()
     );
-    Ok(())
 }
 
 #[test]
-fn serialize_value_empty_list() -> Result<(), Box<dyn StdError>> {
+#[cfg(feature = "parsed-types")]
+fn serialize_value_empty_list() {
     let list_field_value = List::new();
     assert_eq!(
         Err(Error::new("serializing empty list is not allowed")),
         list_field_value.serialize_value()
     );
-    Ok(())
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn serialize_value_list_mixed_members_with_params() -> Result<(), Box<dyn StdError>> {
     let item1 = Item::new(Decimal::try_from(42.4568)?);
     let item2_param = Parameters::from_iter(vec![(
@@ -61,6 +66,7 @@ fn serialize_value_list_mixed_members_with_params() -> Result<(), Box<dyn StdErr
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn serialize_item_byteseq_with_param() -> Result<(), Box<dyn StdError>> {
     let item_param = (
         key_ref("a").to_owned(),
@@ -73,6 +79,7 @@ fn serialize_item_byteseq_with_param() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn serialize_item_without_params() -> Result<(), Box<dyn StdError>> {
     let item = Item::new(1);
     assert_eq!("1", item.serialize_value()?);
@@ -80,6 +87,7 @@ fn serialize_item_without_params() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn serialize_item_with_bool_true_param() -> Result<(), Box<dyn StdError>> {
     let param = Parameters::from_iter(vec![(key_ref("a").to_owned(), BareItem::Boolean(true))]);
     let item = Item::with_params(Decimal::try_from(12.35)?, param);
@@ -88,6 +96,7 @@ fn serialize_item_with_bool_true_param() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn serialize_item_with_token_param() -> Result<(), Box<dyn StdError>> {
     let param = Parameters::from_iter(vec![(
         key_ref("a1").to_owned(),
@@ -250,6 +259,7 @@ fn serialize_bool() {
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn serialize_params_bool() {
     let mut buf = String::new();
     Serializer::serialize_parameter(key_ref("*b"), true, &mut buf);
@@ -261,6 +271,7 @@ fn serialize_params_bool() {
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn serialize_params_string() {
     let mut buf = String::new();
 
@@ -269,6 +280,7 @@ fn serialize_params_string() {
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn serialize_params_numbers() -> Result<(), Box<dyn StdError>> {
     let mut buf = String::new();
 
@@ -301,6 +313,7 @@ fn serialize_key() {
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn serialize_list_of_items_and_inner_list() -> Result<(), Box<dyn StdError>> {
     let item1 = Item::new(12);
     let item2 = Item::new(14);
@@ -321,6 +334,7 @@ fn serialize_list_of_items_and_inner_list() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn serialize_list_of_lists() -> Result<(), Box<dyn StdError>> {
     let item1 = Item::new(1);
     let item2 = Item::new(2);
@@ -335,6 +349,7 @@ fn serialize_list_of_lists() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn serialize_list_with_bool_item_and_bool_params() -> Result<(), Box<dyn StdError>> {
     let item1_params = Parameters::from_iter(vec![
         (key_ref("a").to_owned(), BareItem::Boolean(true)),
@@ -349,6 +364,7 @@ fn serialize_list_with_bool_item_and_bool_params() -> Result<(), Box<dyn StdErro
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn serialize_dictionary_with_params() -> Result<(), Box<dyn StdError>> {
     let item1_params = Parameters::from_iter(vec![
         (key_ref("a").to_owned(), 1.into()),
@@ -381,6 +397,7 @@ fn serialize_dictionary_with_params() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn serialize_dict_empty_member_value() -> Result<(), Box<dyn StdError>> {
     let inner_list = InnerList::new(vec![]);
     let input = Dictionary::from_iter(vec![(key_ref("a").to_owned(), inner_list.into())]);

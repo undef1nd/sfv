@@ -1,5 +1,8 @@
 use crate::serializer::Serializer;
-use crate::{Error, Item, KeyRef, ListEntry, RefBareItem, SFVResult};
+use crate::{Error, KeyRef, RefBareItem, SFVResult};
+
+#[cfg(feature = "parsed-types")]
+use crate::{Item, ListEntry};
 
 use std::borrow::BorrowMut;
 
@@ -170,6 +173,7 @@ impl<W: BorrowMut<String>> RefListSerializer<W> {
         }
     }
 
+    #[cfg(feature = "parsed-types")]
     pub fn members<'b>(&mut self, members: impl IntoIterator<Item = &'b ListEntry>) {
         for value in members {
             match value {
@@ -283,6 +287,7 @@ impl<W: BorrowMut<String>> RefDictSerializer<W> {
         }
     }
 
+    #[cfg(feature = "parsed-types")]
     pub fn members<'b>(
         &mut self,
         members: impl IntoIterator<Item = (impl AsRef<KeyRef>, &'b ListEntry)>,
@@ -338,6 +343,7 @@ impl<'a> RefInnerListSerializer<'a> {
         RefParameterSerializer { buffer }
     }
 
+    #[cfg(feature = "parsed-types")]
     pub fn items<'b>(&mut self, items: impl IntoIterator<Item = &'b Item>) {
         for item in items {
             self.bare_item(&item.bare_item).parameters(&item.params);

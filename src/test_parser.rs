@@ -1,13 +1,16 @@
 use crate::visitor::Ignored;
-use crate::{
-    integer, key_ref, string_ref, token_ref, BareItem, Decimal, Dictionary, Error, InnerList, Item,
-    List, Num, Parameters, Parser, RefBareItem,
-};
+use crate::{integer, key_ref, string_ref, token_ref, Decimal, Error, Num, Parser, RefBareItem};
 use std::convert::TryFrom;
 use std::error::Error as StdError;
+
+#[cfg(feature = "parsed-types")]
+use crate::{BareItem, Dictionary, InnerList, Item, List, Parameters};
+
+#[cfg(feature = "parsed-types")]
 use std::iter::FromIterator;
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn parse() -> Result<(), Box<dyn StdError>> {
     let input = r#""some_value""#;
     let parsed_item = Item::new(string_ref("some_value"));
@@ -23,11 +26,11 @@ fn parse() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn parse_errors() -> Result<(), Box<dyn StdError>> {
+fn parse_errors() {
     let input = r#""some_value¢""#;
     assert_eq!(
         Err(Error::with_index("invalid string character", 11)),
-        Parser::from_str(input).parse_item()
+        Parser::from_str(input).parse_item_with_visitor(Ignored)
     );
     let input = r#""some_value" trailing_text""#;
     assert_eq!(
@@ -35,16 +38,16 @@ fn parse_errors() -> Result<(), Box<dyn StdError>> {
             "trailing characters after parsed value",
             13
         )),
-        Parser::from_str(input).parse_item()
+        Parser::from_str(input).parse_item_with_visitor(Ignored)
     );
     assert_eq!(
         Err(Error::with_index("expected start of bare item", 0)),
-        Parser::from_str("").parse_item()
+        Parser::from_str("").parse_item_with_visitor(Ignored)
     );
-    Ok(())
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn parse_list_of_numbers() -> Result<(), Box<dyn StdError>> {
     let input = "1,42";
     let item1 = Item::new(1);
@@ -55,6 +58,7 @@ fn parse_list_of_numbers() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn parse_list_with_multiple_spaces() -> Result<(), Box<dyn StdError>> {
     let input = "1  ,  42";
     let item1 = Item::new(1);
@@ -65,6 +69,7 @@ fn parse_list_with_multiple_spaces() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn parse_list_of_lists() -> Result<(), Box<dyn StdError>> {
     let input = "(1 2), (42 43)";
     let item1 = Item::new(1);
@@ -79,6 +84,7 @@ fn parse_list_of_lists() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn parse_list_empty_inner_list() -> Result<(), Box<dyn StdError>> {
     let input = "()";
     let inner_list = InnerList::new(vec![]);
@@ -88,6 +94,7 @@ fn parse_list_empty_inner_list() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn parse_list_empty() -> Result<(), Box<dyn StdError>> {
     let input = "";
     let expected_list: List = vec![];
@@ -96,6 +103,7 @@ fn parse_list_empty() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn parse_list_of_lists_with_param_and_spaces() -> Result<(), Box<dyn StdError>> {
     let input = "(  1  42  ); k=*";
     let item1 = Item::new(1);
@@ -111,6 +119,7 @@ fn parse_list_of_lists_with_param_and_spaces() -> Result<(), Box<dyn StdError>> 
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn parse_list_of_items_and_lists_with_param() -> Result<(), Box<dyn StdError>> {
     let input = r#"12, 14, (a  b); param="param_value_1", ()"#;
     let item1 = Item::new(12);
@@ -134,11 +143,11 @@ fn parse_list_of_items_and_lists_with_param() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn parse_list_errors() -> Result<(), Box<dyn StdError>> {
+fn parse_list_errors() {
     let input = ",";
     assert_eq!(
         Err(Error::with_index("expected start of bare item", 0)),
-        Parser::from_str(input).parse_list()
+        Parser::from_str(input).parse_list_with_visitor(&mut Ignored)
     );
 
     let input = "a, b c";
@@ -147,37 +156,37 @@ fn parse_list_errors() -> Result<(), Box<dyn StdError>> {
             "trailing characters after list member",
             5
         )),
-        Parser::from_str(input).parse_list()
+        Parser::from_str(input).parse_list_with_visitor(&mut Ignored)
     );
 
     let input = "a,";
     assert_eq!(
         Err(Error::with_index("trailing comma", 1)),
-        Parser::from_str(input).parse_list()
+        Parser::from_str(input).parse_list_with_visitor(&mut Ignored)
     );
 
     let input = "a     ,    ";
     assert_eq!(
         Err(Error::with_index("trailing comma", 6)),
-        Parser::from_str(input).parse_list()
+        Parser::from_str(input).parse_list_with_visitor(&mut Ignored)
     );
 
     let input = "a\t \t ,\t ";
     assert_eq!(
         Err(Error::with_index("trailing comma", 5)),
-        Parser::from_str(input).parse_list()
+        Parser::from_str(input).parse_list_with_visitor(&mut Ignored)
     );
 
     let input = "a\t\t,\t\t\t";
     assert_eq!(
         Err(Error::with_index("trailing comma", 3)),
-        Parser::from_str(input).parse_list()
+        Parser::from_str(input).parse_list_with_visitor(&mut Ignored)
     );
 
     let input = "(a b),";
     assert_eq!(
         Err(Error::with_index("trailing comma", 5)),
-        Parser::from_str(input).parse_list()
+        Parser::from_str(input).parse_list_with_visitor(&mut Ignored)
     );
 
     let input = "(1, 2, (a b)";
@@ -186,14 +195,12 @@ fn parse_list_errors() -> Result<(), Box<dyn StdError>> {
             "expected inner list delimiter (' ' or ')')",
             2
         )),
-        Parser::from_str(input).parse_list()
+        Parser::from_str(input).parse_list_with_visitor(&mut Ignored)
     );
-
-    Ok(())
 }
 
 #[test]
-fn parse_inner_list_errors() -> Result<(), Box<dyn StdError>> {
+fn parse_inner_list_errors() {
     let input = "c b); a=1";
     assert_eq!(
         Err(Error::with_index("expected start of inner list", 0)),
@@ -205,10 +212,10 @@ fn parse_inner_list_errors() -> Result<(), Box<dyn StdError>> {
         Err(Error::with_index("unterminated inner list", 1)),
         Parser::from_str(input).parse_inner_list(Ignored)
     );
-    Ok(())
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn parse_inner_list_with_param_and_spaces() -> Result<(), Box<dyn StdError>> {
     let input = "(c b); a=1";
     let inner_list_param = Parameters::from_iter(vec![(key_ref("a").to_owned(), 1.into())]);
@@ -223,6 +230,7 @@ fn parse_inner_list_with_param_and_spaces() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn parse_item_int_with_space() -> Result<(), Box<dyn StdError>> {
     let input = "12 ";
     assert_eq!(Item::new(12), Parser::from_str(input).parse_item()?);
@@ -230,6 +238,7 @@ fn parse_item_int_with_space() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn parse_item_decimal_with_bool_param_and_space() -> Result<(), Box<dyn StdError>> {
     let input = "12.35;a ";
     let param = Parameters::from_iter(vec![(key_ref("a").to_owned(), BareItem::Boolean(true))]);
@@ -241,6 +250,7 @@ fn parse_item_decimal_with_bool_param_and_space() -> Result<(), Box<dyn StdError
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn parse_item_number_with_param() -> Result<(), Box<dyn StdError>> {
     let param = Parameters::from_iter(vec![(
         key_ref("a1").to_owned(),
@@ -254,30 +264,31 @@ fn parse_item_number_with_param() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn parse_dict_empty() -> Result<(), Box<dyn StdError>> {
     assert_eq!(Dictionary::new(), Parser::from_str("").parse_dictionary()?);
     Ok(())
 }
 
 #[test]
-fn parse_dict_errors() -> Result<(), Box<dyn StdError>> {
+fn parse_dict_errors() {
     let input = "abc=123;a=1;b=2 def";
     assert_eq!(
         Err(Error::with_index(
             "trailing characters after dictionary member",
             16
         )),
-        Parser::from_str(input).parse_dictionary()
+        Parser::from_str(input).parse_dictionary_with_visitor(&mut Ignored)
     );
     let input = "abc=123;a=1,";
     assert_eq!(
         Err(Error::with_index("trailing comma", 11)),
-        Parser::from_str(input).parse_dictionary()
+        Parser::from_str(input).parse_dictionary_with_visitor(&mut Ignored)
     );
-    Ok(())
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn parse_dict_with_spaces_and_params() -> Result<(), Box<dyn StdError>> {
     let input = r#"abc=123;a=1;b=2, def=456, ghi=789;q=9;r="+w""#;
     let item1_params = Parameters::from_iter(vec![
@@ -307,6 +318,7 @@ fn parse_dict_with_spaces_and_params() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn parse_dict_empty_value() -> Result<(), Box<dyn StdError>> {
     let input = "a=()";
     let inner_list = InnerList::new(vec![]);
@@ -316,6 +328,7 @@ fn parse_dict_empty_value() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn parse_dict_with_token_param() -> Result<(), Box<dyn StdError>> {
     let input = "a=1, b;foo=*, c=3";
     let item2_params = Parameters::from_iter(vec![(
@@ -335,6 +348,7 @@ fn parse_dict_with_token_param() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn parse_dict_multiple_spaces() -> Result<(), Box<dyn StdError>> {
     // input1, input2, input3 must be parsed into the same structure
     let item1 = Item::new(1);
@@ -380,7 +394,7 @@ fn parse_bare_item() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn parse_bare_item_errors() -> Result<(), Box<dyn StdError>> {
+fn parse_bare_item_errors() {
     assert_eq!(
         Err(Error::with_index("expected start of bare item", 0)),
         Parser::from_str("!?0").parse_bare_item()
@@ -393,7 +407,6 @@ fn parse_bare_item_errors() -> Result<(), Box<dyn StdError>> {
         Err(Error::with_index("expected start of bare item", 0)),
         Parser::from_str("   ").parse_bare_item()
     );
-    Ok(())
 }
 
 #[test]
@@ -408,7 +421,7 @@ fn parse_bool() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn parse_bool_errors() -> Result<(), Box<dyn StdError>> {
+fn parse_bool_errors() {
     assert_eq!(
         Err(Error::with_index("expected start of boolean ('?')", 0)),
         Parser::from_str("").parse_bool()
@@ -417,7 +430,6 @@ fn parse_bool_errors() -> Result<(), Box<dyn StdError>> {
         Err(Error::with_index("expected boolean ('0' or '1')", 1)),
         Parser::from_str("?").parse_bool()
     );
-    Ok(())
 }
 
 #[test]
@@ -443,7 +455,7 @@ fn parse_string() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn parse_string_errors() -> Result<(), Box<dyn StdError>> {
+fn parse_string_errors() {
     assert_eq!(
         Err(Error::with_index(r#"expected start of string ('"')"#, 0)),
         Parser::from_str("test").parse_string()
@@ -464,7 +476,6 @@ fn parse_string_errors() -> Result<(), Box<dyn StdError>> {
         Err(Error::with_index("unterminated string", 5)),
         Parser::from_str(r#""smth"#).parse_string()
     );
-    Ok(())
 }
 
 #[test]
@@ -500,7 +511,7 @@ fn parse_token() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn parse_token_errors() -> Result<(), Box<dyn StdError>> {
+fn parse_token_errors() {
     let mut parser = Parser::from_str("765token");
     assert_eq!(
         Err(Error::with_index("expected start of token", 0)),
@@ -516,7 +527,6 @@ fn parse_token_errors() -> Result<(), Box<dyn StdError>> {
         Err(Error::with_index("expected start of token", 0)),
         Parser::from_str("").parse_token()
     );
-    Ok(())
 }
 
 #[test]
@@ -542,7 +552,7 @@ fn parse_byte_sequence() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn parse_byte_sequence_errors() -> Result<(), Box<dyn StdError>> {
+fn parse_byte_sequence_errors() {
     assert_eq!(
         Err(Error::with_index(
             "expected start of byte sequence (':')",
@@ -558,7 +568,6 @@ fn parse_byte_sequence_errors() -> Result<(), Box<dyn StdError>> {
         Err(Error::with_index("unterminated byte sequence", 9)),
         Parser::from_str(":aGVsbG8=").parse_byte_sequence()
     );
-    Ok(())
 }
 
 #[test]
@@ -657,7 +666,7 @@ fn parse_number_decimal() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn parse_number_errors() -> Result<(), Box<dyn StdError>> {
+fn parse_number_errors() {
     let mut parser = Parser::from_str(":aGVsbG8:rest");
     assert_eq!(
         Err(Error::with_index("expected digit", 0)),
@@ -726,11 +735,10 @@ fn parse_number_errors() -> Result<(), Box<dyn StdError>> {
         )),
         Parser::from_str("-7333333333323.12").parse_number()
     );
-
-    Ok(())
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn parse_params_string() -> Result<(), Box<dyn StdError>> {
     let input = r#";b="param_val""#;
     let expected = Parameters::from_iter(vec![(
@@ -744,6 +752,7 @@ fn parse_params_string() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn parse_params_bool() -> Result<(), Box<dyn StdError>> {
     let input = ";b;a";
     let expected = Parameters::from_iter(vec![
@@ -757,6 +766,7 @@ fn parse_params_bool() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn parse_params_mixed_types() -> Result<(), Box<dyn StdError>> {
     let input = ";key1=?0;key2=746.15";
     let expected = Parameters::from_iter(vec![
@@ -773,6 +783,7 @@ fn parse_params_mixed_types() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn parse_params_with_spaces() -> Result<(), Box<dyn StdError>> {
     let input = "; key1=?0; key2=11111";
     let expected = Parameters::from_iter(vec![
@@ -786,6 +797,7 @@ fn parse_params_with_spaces() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn parse_params_empty() -> Result<(), Box<dyn StdError>> {
     let mut params = Parameters::new();
     Parser::from_str(" key1=?0; key2=11111").parse_parameters(&mut params)?;
@@ -809,7 +821,7 @@ fn parse_key() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn parse_key_errors() -> Result<(), Box<dyn StdError>> {
+fn parse_key_errors() {
     assert_eq!(
         Err(Error::with_index(
             "expected start of key ('a'-'z' or '*')",
@@ -817,10 +829,10 @@ fn parse_key_errors() -> Result<(), Box<dyn StdError>> {
         )),
         Parser::from_str("[*f=10").parse_key()
     );
-    Ok(())
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn parse_more_list() -> Result<(), Box<dyn StdError>> {
     let item1 = Item::new(1);
     let item2 = Item::new(2);
@@ -835,6 +847,7 @@ fn parse_more_list() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn parse_more_dict() -> Result<(), Box<dyn StdError>> {
     let item2_params = Parameters::from_iter(vec![(
         key_ref("foo").to_owned(),
@@ -856,6 +869,7 @@ fn parse_more_dict() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
+#[cfg(feature = "parsed-types")]
 fn parse_more_errors() -> Result<(), Box<dyn StdError>> {
     let mut parsed_dict_header = Parser::from_str("a=1, b;foo=*").parse_dictionary()?;
     assert!(Parser::from_str(",a")

@@ -15,7 +15,7 @@ exclude = ["tests/**", ".github/*"]
 [dependencies]
 arbitrary = { version = "1.4.1", optional = true, features = ["derive"] }
 base64 = "0.22.1"
-indexmap = "2"
+indexmap = { version = "2", optional = true }
 ref-cast = "1.0.23"
 
 [dev-dependencies]
@@ -27,6 +27,17 @@ base32 = "0.5.1"
 [[bench]]
 name = "bench"
 harness = false
+required-features = ["parsed-types"]
 
 [features]
+default = ["parsed-types"]
 arbitrary = ["dep:arbitrary", "indexmap/arbitrary"]
+parsed-types = ["dep:indexmap"]
+
+[[test]]
+name = "integration_tests"
+required-features = ["parsed-types"]
+
+[[test]]
+name = "specification_tests"
+required-features = ["parsed-types"]
