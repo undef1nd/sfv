@@ -144,6 +144,7 @@ pub trait ListVisitor<'a> {
 ///
 /// Note that the discarded parts are still validated during parsing: syntactic
 /// errors in the input still cause parsing to fail even when this type is used.
+#[derive(Default)]
 pub struct Ignored;
 
 impl<'a> ParameterVisitor<'a> for Ignored {
