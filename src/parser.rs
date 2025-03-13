@@ -59,6 +59,7 @@ fn parse_dictionary<'a>(
     visitor: &mut (impl ?Sized + DictionaryVisitor<'a>),
 ) -> SFVResult<()> {
     while parser.peek().is_some() {
+        // Note: It is up to the visitor to properly handle duplicate keys.
         let entry_visitor = visitor.entry(parser.parse_key()?).map_err(Error::custom)?;
 
         if let Some(b'=') = parser.peek() {
@@ -512,13 +513,12 @@ impl<'a> Parser<'a> {
                 }
                 _ => BareItemFromInput::Boolean(true),
             };
+            // Note: It is up to the visitor to properly handle duplicate keys.
             visitor
                 .parameter(param_name, param_value)
                 .map_err(Error::custom)?;
         }
 
-        // If parameters already contains a name param_name (comparing character-for-character), overwrite its value.
-        // Note that when duplicate Parameter keys are encountered, this has the effect of ignoring all but the last instance.
         visitor.finish().map_err(Error::custom)
     }
 
