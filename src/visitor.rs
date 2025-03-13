@@ -2,6 +2,53 @@
 Contains traits for parsing structured-field values incrementally.
 
 These can be used to borrow data from the input without copies in some cases.
+
+The various visitor methods are invoked *during* parsing, i.e. before validation
+of the entire input is complete. Therefore, users of these traits should
+carefully consider whether they want to induce side effects or perform expensive
+operations *before* knowing whether the entire input is valid.
+
+For example, it may make sense to defer storage of these values in a database
+until after validation is complete, in order to avoid the need for rollbacks in
+the event that a later error occurs. In this case, the visitor could retain the
+relevant state in its fields, before using that state to perform the operation
+*after* parsing is complete:
+
+```
+# use sfv::visitor::{Ignored, ItemVisitor, ParameterVisitor};
+# use sfv::{BareItemFromInput, TokenRef};
+# fn main() -> Result<(), sfv::Error> {
+struct Visitor<'a> {
+    token: Option<&'a TokenRef>,
+}
+
+impl<'a> ItemVisitor<'a> for &mut Visitor<'a> {
+  type Error = std::convert::Infallible;
+
+  fn bare_item(self, bare_item: BareItemFromInput<'a>) -> Result<impl ParameterVisitor<'a>, Self::Error> {
+      self.token =
+          if let BareItemFromInput::Token(token) = bare_item {
+              Some(token)
+          } else {
+              None
+          };
+
+      Ok(Ignored)
+  }
+}
+
+let input = "abc";
+
+let mut visitor = Visitor { token: None };
+
+sfv::Parser::from_str(input).parse_item_with_visitor(&mut visitor)?;
+
+// Use `visitor.token` to do something expensive or with side effects now that
+// we know the entire input is valid.
+
+# Ok(())
+# }
+```
 */
 
 use crate::{BareItemFromInput, KeyRef};
