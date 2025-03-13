@@ -1,153 +1,101 @@
 use crate::utils;
+use crate::visitor::*;
 use crate::{
-    BareItem, Decimal, Dictionary, Error, InnerList, Integer, Item, KeyRef, List, ListEntry, Num,
-    Parameters, SFVResult, String, TokenRef,
+    BareItemFromInput, Decimal, Dictionary, Error, Integer, Item, KeyRef, List, Num, SFVResult,
+    String, StringRef, TokenRef,
 };
 
+use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::string::String as StdString;
 
-trait ParseValue {
-    fn parse(parser: &mut Parser) -> SFVResult<Self>
-    where
-        Self: Sized;
+fn parse_item<'a>(parser: &mut Parser<'a>, visitor: impl ItemVisitor<'a>) -> SFVResult<()> {
+    // https://httpwg.org/specs/rfc8941.html#parse-item
+    let param_visitor = visitor
+        .bare_item(parser.parse_bare_item()?)
+        .map_err(Error::custom)?;
+    parser.parse_parameters(param_visitor)
 }
 
-/// If structured field value of List or Dictionary type is split into multiple lines,
-/// allows to parse more lines and merge them into already existing structure field value.
-pub trait ParseMore {
-    /// If structured field value is split across lines,
-    /// parses and merges next line into a single structured field value.
-    /// # Examples
-    /// ```
-    /// # use sfv::{ParseMore, Parser, SerializeValue};
-    /// # fn main() -> Result<(), sfv::Error> {
-    /// let mut list_field = Parser::from_str("11, (12 13)").parse_list()?;
-    ///
-    /// list_field.parse_more(r#""foo",        "bar""#.as_bytes())?;
-    ///
-    /// assert_eq!(
-    ///     list_field.serialize_value()?,
-    ///     r#"11, (12 13), "foo", "bar""#,
-    /// );
-    /// # Ok(())
-    /// # }
-    /// ```
-    fn parse_more(&mut self, input_bytes: &[u8]) -> SFVResult<()>
-    where
-        Self: Sized;
-}
+fn parse_list<'a>(
+    parser: &mut Parser<'a>,
+    visitor: &mut (impl ?Sized + ListVisitor<'a>),
+) -> SFVResult<()> {
+    // https://httpwg.org/specs/rfc8941.html#parse-list
+    // List represents an array of (item_or_inner_list, parameters)
 
-impl ParseValue for Item {
-    fn parse(parser: &mut Parser) -> SFVResult<Item> {
-        // https://httpwg.org/specs/rfc8941.html#parse-item
-        let bare_item = parser.parse_bare_item()?;
-        let params = parser.parse_parameters()?;
+    while parser.peek().is_some() {
+        parser.parse_list_entry(visitor.entry().map_err(Error::custom)?)?;
 
-        Ok(Item { bare_item, params })
-    }
-}
+        parser.consume_ows_chars();
 
-impl ParseValue for List {
-    fn parse(parser: &mut Parser) -> SFVResult<List> {
-        // https://httpwg.org/specs/rfc8941.html#parse-list
-        // List represents an array of (item_or_inner_list, parameters)
-
-        let mut members = vec![];
-
-        while parser.peek().is_some() {
-            members.push(parser.parse_list_entry()?);
-
-            parser.consume_ows_chars();
-
-            if parser.peek().is_none() {
-                return Ok(members);
-            }
-
-            let comma_index = parser.index;
-
-            if let Some(c) = parser.peek() {
-                if c != b',' {
-                    return parser.error("trailing characters after list member");
-                }
-                parser.next();
-            }
-
-            parser.consume_ows_chars();
-
-            if parser.peek().is_none() {
-                // Report the error at the position of the comma itself, rather
-                // than at the end of input.
-                return Err(Error::with_index("trailing comma", comma_index));
-            }
+        if parser.peek().is_none() {
+            return Ok(());
         }
 
-        Ok(members)
-    }
-}
+        let comma_index = parser.index;
 
-impl ParseValue for Dictionary {
-    fn parse(parser: &mut Parser) -> SFVResult<Dictionary> {
-        let mut dict = Dictionary::new();
-
-        while parser.peek().is_some() {
-            let this_key = parser.parse_key()?;
-
-            if let Some(b'=') = parser.peek() {
-                parser.next();
-                let member = parser.parse_list_entry()?;
-                dict.insert(this_key.to_owned(), member);
-            } else {
-                let value = true;
-                let params = parser.parse_parameters()?;
-                let member = Item {
-                    bare_item: BareItem::Boolean(value),
-                    params,
-                };
-                dict.insert(this_key.to_owned(), member.into());
+        if let Some(c) = parser.peek() {
+            if c != b',' {
+                return parser.error("trailing characters after list member");
             }
-
-            parser.consume_ows_chars();
-
-            if parser.peek().is_none() {
-                return Ok(dict);
-            }
-
-            let comma_index = parser.index;
-
-            if let Some(c) = parser.peek() {
-                if c != b',' {
-                    return parser.error("trailing characters after dictionary member");
-                }
-                parser.next();
-            }
-
-            parser.consume_ows_chars();
-
-            if parser.peek().is_none() {
-                // Report the error at the position of the comma itself, rather
-                // than at the end of input.
-                return Err(Error::with_index("trailing comma", comma_index));
-            }
+            parser.next();
         }
-        Ok(dict)
+
+        parser.consume_ows_chars();
+
+        if parser.peek().is_none() {
+            // Report the error at the position of the comma itself, rather
+            // than at the end of input.
+            return Err(Error::with_index("trailing comma", comma_index));
+        }
     }
+
+    Ok(())
 }
 
-impl ParseMore for List {
-    fn parse_more(&mut self, input_bytes: &[u8]) -> SFVResult<()> {
-        let parsed_list = Parser::from_bytes(input_bytes).parse_list()?;
-        self.extend(parsed_list);
-        Ok(())
-    }
-}
+fn parse_dictionary<'a>(
+    parser: &mut Parser<'a>,
+    visitor: &mut (impl ?Sized + DictionaryVisitor<'a>),
+) -> SFVResult<()> {
+    while parser.peek().is_some() {
+        // Note: It is up to the visitor to properly handle duplicate keys.
+        let entry_visitor = visitor.entry(parser.parse_key()?).map_err(Error::custom)?;
 
-impl ParseMore for Dictionary {
-    fn parse_more(&mut self, input_bytes: &[u8]) -> SFVResult<()> {
-        let parsed_dict = Parser::from_bytes(input_bytes).parse_dictionary()?;
-        self.extend(parsed_dict);
-        Ok(())
+        if let Some(b'=') = parser.peek() {
+            parser.next();
+            parser.parse_list_entry(entry_visitor)?;
+        } else {
+            let param_visitor = entry_visitor
+                .bare_item(BareItemFromInput::from(true))
+                .map_err(Error::custom)?;
+            parser.parse_parameters(param_visitor)?;
+        }
+
+        parser.consume_ows_chars();
+
+        if parser.peek().is_none() {
+            return Ok(());
+        }
+
+        let comma_index = parser.index;
+
+        if let Some(c) = parser.peek() {
+            if c != b',' {
+                return parser.error("trailing characters after dictionary member");
+            }
+            parser.next();
+        }
+
+        parser.consume_ows_chars();
+
+        if parser.peek().is_none() {
+            // Report the error at the position of the comma itself, rather
+            // than at the end of input.
+            return Err(Error::with_index("trailing comma", comma_index));
+        }
     }
+    Ok(())
 }
 
 /// Exposes methods for parsing input into structured field value.
@@ -168,17 +116,79 @@ impl<'a> Parser<'a> {
 
     /// Parses input into structured field value of Dictionary type
     pub fn parse_dictionary(self) -> SFVResult<Dictionary> {
-        self.parse()
+        let mut dict = Dictionary::new();
+        self.parse_dictionary_with_visitor(&mut dict)?;
+        Ok(dict)
+    }
+
+    /// Like `parse_dictionary`, but uses the given visitor instead of producing a [`Dictionary`].
+    ///
+    /// This can also be used to parse a dictionary that is split into multiple lines by merging
+    /// them into an existing structure:
+    ///
+    /// ```
+    /// # use sfv::{Parser, SerializeValue};
+    /// # fn main() -> Result<(), sfv::Error> {
+    /// let mut dict = Parser::from_str("a=1").parse_dictionary()?;
+    ///
+    /// Parser::from_str("b=2").parse_dictionary_with_visitor(&mut dict)?;
+    ///
+    /// assert_eq!(
+    ///     dict.serialize_value()?,
+    ///     "a=1, b=2",
+    /// );
+    /// # Ok(())
+    /// # }
+    pub fn parse_dictionary_with_visitor(
+        self,
+        visitor: &mut (impl ?Sized + DictionaryVisitor<'a>),
+    ) -> SFVResult<()> {
+        self.parse(|parser| parse_dictionary(parser, visitor))
     }
 
     /// Parses input into structured field value of List type
     pub fn parse_list(self) -> SFVResult<List> {
-        self.parse()
+        let mut list = List::new();
+        self.parse_list_with_visitor(&mut list)?;
+        Ok(list)
+    }
+
+    /// Like `parse_list`, but uses the given visitor instead of producing a [`List`].
+    ///
+    /// This can also be used to parse a list that is split into multiple lines by merging them
+    /// into an existing structure:
+    ///
+    /// ```
+    /// # use sfv::{Parser, SerializeValue};
+    /// # fn main() -> Result<(), sfv::Error> {
+    /// let mut list = Parser::from_str("11, (12 13)").parse_list()?;
+    ///
+    /// Parser::from_str(r#""foo",        "bar""#).parse_list_with_visitor(&mut list)?;
+    ///
+    /// assert_eq!(
+    ///     list.serialize_value()?,
+    ///     r#"11, (12 13), "foo", "bar""#,
+    /// );
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn parse_list_with_visitor(
+        self,
+        visitor: &mut (impl ?Sized + ListVisitor<'a>),
+    ) -> SFVResult<()> {
+        self.parse(|parser| parse_list(parser, visitor))
     }
 
     /// Parses input into structured field value of Item type
     pub fn parse_item(self) -> SFVResult<Item> {
-        self.parse()
+        let mut item = Item::new(false);
+        self.parse_item_with_visitor(&mut item)?;
+        Ok(item)
+    }
+
+    /// Like `parse_item`, but uses the given visitor instead of producing an [`Item`].
+    pub fn parse_item_with_visitor(self, visitor: impl ItemVisitor<'a>) -> SFVResult<()> {
+        self.parse(|parser| parse_item(parser, visitor))
     }
 
     fn peek(&self) -> Option<u8> {
@@ -195,39 +205,36 @@ impl<'a> Parser<'a> {
 
     // Generic parse method for checking input before parsing
     // and handling trailing text error
-    fn parse<T: ParseValue>(mut self) -> SFVResult<T> {
+    fn parse(mut self, f: impl FnOnce(&mut Self) -> SFVResult<()>) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc8941.html#text-parse
 
         self.consume_sp_chars();
 
-        let output = T::parse(&mut self)?;
+        f(&mut self)?;
 
         self.consume_sp_chars();
 
         if self.peek().is_some() {
             self.error("trailing characters after parsed value")
         } else {
-            Ok(output)
+            Ok(())
         }
     }
 
-    fn parse_list_entry(&mut self) -> SFVResult<ListEntry> {
+    fn parse_list_entry(&mut self, visitor: impl EntryVisitor<'a>) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc8941.html#parse-item-or-list
         // ListEntry represents a tuple (item_or_inner_list, parameters)
 
         match self.peek() {
-            Some(b'(') => {
-                let parsed = self.parse_inner_list()?;
-                Ok(ListEntry::InnerList(parsed))
-            }
-            _ => {
-                let parsed = Item::parse(self)?;
-                Ok(ListEntry::Item(parsed))
-            }
+            Some(b'(') => self.parse_inner_list(visitor.inner_list().map_err(Error::custom)?),
+            _ => parse_item(self, visitor),
         }
     }
 
-    pub(crate) fn parse_inner_list(&mut self) -> SFVResult<InnerList> {
+    pub(crate) fn parse_inner_list(
+        &mut self,
+        mut visitor: impl InnerListVisitor<'a>,
+    ) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc8941.html#parse-innerlist
 
         if Some(b'(') != self.peek() {
@@ -236,21 +243,16 @@ impl<'a> Parser<'a> {
 
         self.next();
 
-        let mut inner_list = Vec::new();
         while self.peek().is_some() {
             self.consume_sp_chars();
 
             if Some(b')') == self.peek() {
                 self.next();
-                let params = self.parse_parameters()?;
-                return Ok(InnerList {
-                    items: inner_list,
-                    params,
-                });
+                let param_visitor = visitor.finish().map_err(Error::custom)?;
+                return self.parse_parameters(param_visitor);
             }
 
-            let parsed_item = Item::parse(self)?;
-            inner_list.push(parsed_item);
+            parse_item(self, visitor.item().map_err(Error::custom)?)?;
 
             if let Some(c) = self.peek() {
                 if c != b' ' && c != b')' {
@@ -262,19 +264,19 @@ impl<'a> Parser<'a> {
         self.error("unterminated inner list")
     }
 
-    pub(crate) fn parse_bare_item(&mut self) -> SFVResult<BareItem> {
+    pub(crate) fn parse_bare_item(&mut self) -> SFVResult<BareItemFromInput<'a>> {
         // https://httpwg.org/specs/rfc8941.html#parse-bare-item
 
         match self.peek() {
-            Some(b'?') => Ok(BareItem::Boolean(self.parse_bool()?)),
-            Some(b'"') => Ok(BareItem::String(self.parse_string()?)),
-            Some(b':') => Ok(BareItem::ByteSeq(self.parse_byte_sequence()?)),
+            Some(b'?') => Ok(BareItemFromInput::Boolean(self.parse_bool()?)),
+            Some(b'"') => Ok(BareItemFromInput::String(self.parse_string()?)),
+            Some(b':') => Ok(BareItemFromInput::ByteSeq(self.parse_byte_sequence()?)),
             Some(c) if utils::is_allowed_start_token_char(c) => {
-                Ok(BareItem::Token(self.parse_token()?.to_owned()))
+                Ok(BareItemFromInput::Token(self.parse_token()?))
             }
             Some(c) if c == b'-' || c.is_ascii_digit() => match self.parse_number()? {
-                Num::Decimal(val) => Ok(BareItem::Decimal(val)),
-                Num::Integer(val) => Ok(BareItem::Integer(val)),
+                Num::Decimal(val) => Ok(BareItemFromInput::Decimal(val)),
+                Num::Integer(val) => Ok(BareItemFromInput::Integer(val)),
             },
             _ => self.error("expected start of bare item"),
         }
@@ -302,7 +304,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub(crate) fn parse_string(&mut self) -> SFVResult<String> {
+    pub(crate) fn parse_string(&mut self) -> SFVResult<Cow<'a, StringRef>> {
         // https://httpwg.org/specs/rfc8941.html#parse-string
 
         if self.peek() != Some(b'"') {
@@ -311,12 +313,25 @@ impl<'a> Parser<'a> {
 
         self.next();
 
-        let mut output_string = StdString::new();
+        let start = self.index;
+        let mut output = Cow::Borrowed(&[] as &[u8]);
+
         while let Some(curr_char) = self.peek() {
             match curr_char {
                 b'"' => {
                     self.next();
-                    return Ok(String::from_string(output_string).unwrap());
+                    // TODO: The UTF-8 validation is redundant with the preceding character checks, but
+                    // its removal is only possible with unsafe code.
+                    return Ok(match output {
+                        Cow::Borrowed(output) => {
+                            let output = std::str::from_utf8(output).unwrap();
+                            Cow::Borrowed(StringRef::from_str(output).unwrap())
+                        }
+                        Cow::Owned(output) => {
+                            let output = StdString::from_utf8(output).unwrap();
+                            Cow::Owned(String::from_string(output).unwrap())
+                        }
+                    });
                 }
                 0x00..=0x1f | 0x7f..=0xff => {
                     return self.error("invalid string character");
@@ -326,7 +341,7 @@ impl<'a> Parser<'a> {
                     match self.peek() {
                         Some(c @ b'\\' | c @ b'"') => {
                             self.next();
-                            output_string.push(c as char);
+                            output.to_mut().push(c);
                         }
                         None => return self.error("unterminated escape sequence"),
                         Some(_) => return self.error("invalid escape sequence"),
@@ -334,7 +349,10 @@ impl<'a> Parser<'a> {
                 }
                 _ => {
                     self.next();
-                    output_string.push(curr_char as char);
+                    match output {
+                        Cow::Borrowed(ref mut output) => *output = &self.input[start..self.index],
+                        Cow::Owned(ref mut output) => output.push(curr_char),
+                    }
                 }
             }
         }
@@ -477,10 +495,11 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub(crate) fn parse_parameters(&mut self) -> SFVResult<Parameters> {
+    pub(crate) fn parse_parameters(
+        &mut self,
+        mut visitor: impl ParameterVisitor<'a>,
+    ) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc8941.html#parse-param
-
-        let mut params = Parameters::new();
 
         while let Some(b';') = self.peek() {
             self.next();
@@ -492,14 +511,15 @@ impl<'a> Parser<'a> {
                     self.next();
                     self.parse_bare_item()?
                 }
-                _ => BareItem::Boolean(true),
+                _ => BareItemFromInput::Boolean(true),
             };
-            params.insert(param_name.to_owned(), param_value);
+            // Note: It is up to the visitor to properly handle duplicate keys.
+            visitor
+                .parameter(param_name, param_value)
+                .map_err(Error::custom)?;
         }
 
-        // If parameters already contains a name param_name (comparing character-for-character), overwrite its value.
-        // Note that when duplicate Parameter keys are encountered, this has the effect of ignoring all but the last instance.
-        Ok(params)
+        visitor.finish().map_err(Error::custom)
     }
 
     pub(crate) fn parse_key(&mut self) -> SFVResult<&'a KeyRef> {
