@@ -1,3 +1,5 @@
+use crate::Error;
+
 use std::borrow::{Borrow, Cow};
 use std::convert::TryFrom;
 use std::fmt;
@@ -24,23 +26,15 @@ pub struct String(StdString);
 #[repr(transparent)]
 pub struct StringRef(str);
 
-/// An error produced during conversion to a string.
-#[derive(Debug)]
-pub struct StringError {
+struct StringError {
     byte_index: usize,
 }
 
-impl fmt::Display for StringError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "invalid character for string at byte index {}",
-            self.byte_index
-        )
+impl From<StringError> for Error {
+    fn from(err: StringError) -> Error {
+        Error::with_index("invalid character", err.byte_index)
     }
 }
-
-impl std::error::Error for StringError {}
 
 const fn validate(v: &[u8]) -> Result<(), StringError> {
     let mut index = 0;
@@ -66,7 +60,7 @@ impl StringRef {
 
     /// Creates a `&StringRef` from a `&str`.
     #[allow(clippy::should_implement_trait)]
-    pub fn from_str(v: &str) -> Result<&Self, StringError> {
+    pub fn from_str(v: &str) -> Result<&Self, Error> {
         validate(v.as_bytes())?;
         Ok(Self::cast(v))
     }
@@ -122,9 +116,9 @@ impl From<String> for StdString {
 }
 
 impl TryFrom<StdString> for String {
-    type Error = StringError;
+    type Error = Error;
 
-    fn try_from(v: StdString) -> Result<String, StringError> {
+    fn try_from(v: StdString) -> Result<String, Error> {
         validate(v.as_bytes())?;
         Ok(String(v))
     }
@@ -134,10 +128,10 @@ impl String {
     /// Creates a `String` from a `std::string::String`.
     ///
     /// Returns the original value if the conversion failed.
-    pub fn from_string(v: StdString) -> Result<Self, (StringError, StdString)> {
+    pub fn from_string(v: StdString) -> Result<Self, (Error, StdString)> {
         match validate(v.as_bytes()) {
             Ok(_) => Ok(Self(v)),
-            Err(err) => Err((err, v)),
+            Err(err) => Err((err.into(), v)),
         }
     }
 }
@@ -186,9 +180,9 @@ impl_eq!(Cow<'_, StringRef>, StringRef);
 impl_eq!(Cow<'_, StringRef>, &StringRef);
 
 impl<'a> TryFrom<&'a str> for &'a StringRef {
-    type Error = StringError;
+    type Error = Error;
 
-    fn try_from(v: &'a str) -> Result<&'a StringRef, StringError> {
+    fn try_from(v: &'a str) -> Result<&'a StringRef, Error> {
         StringRef::from_str(v)
     }
 }

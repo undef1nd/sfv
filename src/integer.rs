@@ -1,4 +1,5 @@
-use crate::GenericBareItem;
+use crate::{Error, GenericBareItem};
+
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 
@@ -49,19 +50,6 @@ impl fmt::Display for Integer {
     }
 }
 
-/// An error that occurs when a value is out of range.
-#[derive(Debug, PartialEq)]
-#[non_exhaustive]
-pub struct OutOfRangeError;
-
-impl fmt::Display for OutOfRangeError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str("out of range")
-    }
-}
-
-impl std::error::Error for OutOfRangeError {}
-
 macro_rules! impl_conversions {
     ($($t: ty: $from:ident => $into:ident,)+) => {
         $(
@@ -86,19 +74,19 @@ macro_rules! impl_conversion {
     };
     (TryFrom<$t: ty>) => {
         impl TryFrom<$t> for Integer {
-            type Error = OutOfRangeError;
+            type Error = Error;
 
-            fn try_from(v: $t) -> Result<Integer, OutOfRangeError> {
+            fn try_from(v: $t) -> Result<Integer, Error> {
                 match i64::try_from(v) {
                     Ok(v) if RANGE_I64.contains(&v) => Ok(Integer(v)),
-                    _ => Err(OutOfRangeError),
+                    _ => Err(Error::out_of_range()),
                 }
             }
         }
         impl<S, B, T> TryFrom<$t> for GenericBareItem<S, B, T> {
-            type Error = OutOfRangeError;
+            type Error = Error;
 
-            fn try_from(v: $t) -> Result<Self, OutOfRangeError> {
+            fn try_from(v: $t) -> Result<Self, Error> {
                 Integer::try_from(v).map(Self::Integer)
             }
         }
@@ -112,10 +100,10 @@ macro_rules! impl_conversion {
     };
     (TryInto<$t: ty>) => {
         impl TryFrom<Integer> for $t {
-            type Error = OutOfRangeError;
+            type Error = Error;
 
-            fn try_from(v: Integer) -> Result<$t, OutOfRangeError> {
-                v.0.try_into().map_err(|_| OutOfRangeError)
+            fn try_from(v: Integer) -> Result<$t, Error> {
+                v.0.try_into().map_err(|_| Error::out_of_range())
             }
         }
     };

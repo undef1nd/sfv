@@ -1,4 +1,5 @@
-use crate::Integer;
+use crate::{Error, Integer};
+
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 
@@ -94,42 +95,42 @@ impl From<i32> for Decimal {
 }
 
 impl TryFrom<i64> for Decimal {
-    type Error = DecimalError;
+    type Error = Error;
 
-    fn try_from(v: i64) -> Result<Decimal, DecimalError> {
+    fn try_from(v: i64) -> Result<Decimal, Error> {
         match v.checked_mul(1000) {
-            None => Err(DecimalError::OutOfRange),
+            None => Err(Error::out_of_range()),
             Some(v) => match Integer::try_from(v) {
                 Ok(v) => Ok(Decimal(v)),
-                Err(_) => Err(DecimalError::OutOfRange),
+                Err(_) => Err(Error::out_of_range()),
             },
         }
     }
 }
 
 impl TryFrom<i128> for Decimal {
-    type Error = DecimalError;
+    type Error = Error;
 
-    fn try_from(v: i128) -> Result<Decimal, DecimalError> {
+    fn try_from(v: i128) -> Result<Decimal, Error> {
         match v.checked_mul(1000) {
-            None => Err(DecimalError::OutOfRange),
+            None => Err(Error::out_of_range()),
             Some(v) => match Integer::try_from(v) {
                 Ok(v) => Ok(Decimal(v)),
-                Err(_) => Err(DecimalError::OutOfRange),
+                Err(_) => Err(Error::out_of_range()),
             },
         }
     }
 }
 
 impl TryFrom<isize> for Decimal {
-    type Error = DecimalError;
+    type Error = Error;
 
-    fn try_from(v: isize) -> Result<Decimal, DecimalError> {
+    fn try_from(v: isize) -> Result<Decimal, Error> {
         match v.checked_mul(1000) {
-            None => Err(DecimalError::OutOfRange),
+            None => Err(Error::out_of_range()),
             Some(v) => match Integer::try_from(v) {
                 Ok(v) => Ok(Decimal(v)),
-                Err(_) => Err(DecimalError::OutOfRange),
+                Err(_) => Err(Error::out_of_range()),
             },
         }
     }
@@ -154,42 +155,42 @@ impl From<u32> for Decimal {
 }
 
 impl TryFrom<u64> for Decimal {
-    type Error = DecimalError;
+    type Error = Error;
 
-    fn try_from(v: u64) -> Result<Decimal, DecimalError> {
+    fn try_from(v: u64) -> Result<Decimal, Error> {
         match v.checked_mul(1000) {
-            None => Err(DecimalError::OutOfRange),
+            None => Err(Error::out_of_range()),
             Some(v) => match Integer::try_from(v) {
                 Ok(v) => Ok(Decimal(v)),
-                Err(_) => Err(DecimalError::OutOfRange),
+                Err(_) => Err(Error::out_of_range()),
             },
         }
     }
 }
 
 impl TryFrom<u128> for Decimal {
-    type Error = DecimalError;
+    type Error = Error;
 
-    fn try_from(v: u128) -> Result<Decimal, DecimalError> {
+    fn try_from(v: u128) -> Result<Decimal, Error> {
         match v.checked_mul(1000) {
-            None => Err(DecimalError::OutOfRange),
+            None => Err(Error::out_of_range()),
             Some(v) => match Integer::try_from(v) {
                 Ok(v) => Ok(Decimal(v)),
-                Err(_) => Err(DecimalError::OutOfRange),
+                Err(_) => Err(Error::out_of_range()),
             },
         }
     }
 }
 
 impl TryFrom<usize> for Decimal {
-    type Error = DecimalError;
+    type Error = Error;
 
-    fn try_from(v: usize) -> Result<Decimal, DecimalError> {
+    fn try_from(v: usize) -> Result<Decimal, Error> {
         match v.checked_mul(1000) {
-            None => Err(DecimalError::OutOfRange),
+            None => Err(Error::out_of_range()),
             Some(v) => match Integer::try_from(v) {
                 Ok(v) => Ok(Decimal(v)),
-                Err(_) => Err(DecimalError::OutOfRange),
+                Err(_) => Err(Error::out_of_range()),
             },
         }
     }
@@ -202,52 +203,33 @@ impl From<Decimal> for f64 {
     }
 }
 
-/// An error that occurs when a value cannot be converted to a `Decimal`.
-#[derive(Debug, PartialEq)]
-#[non_exhaustive]
-pub enum DecimalError {
-    NaN,
-    OutOfRange,
-}
-
-impl fmt::Display for DecimalError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(match self {
-            Self::NaN => "NaN",
-            Self::OutOfRange => "out of range",
-        })
-    }
-}
-
-impl std::error::Error for DecimalError {}
-
 impl TryFrom<f32> for Decimal {
-    type Error = DecimalError;
+    type Error = Error;
 
-    fn try_from(v: f32) -> Result<Decimal, DecimalError> {
+    fn try_from(v: f32) -> Result<Decimal, Error> {
         (v as f64).try_into()
     }
 }
 
 impl TryFrom<f64> for Decimal {
-    type Error = DecimalError;
+    type Error = Error;
 
-    fn try_from(v: f64) -> Result<Decimal, DecimalError> {
+    fn try_from(v: f64) -> Result<Decimal, Error> {
         if v.is_nan() {
-            return Err(DecimalError::NaN);
+            return Err(Error::new("NaN"));
         }
 
         match Integer::try_from((v * 1000.0).round_ties_even() as i64) {
             Ok(v) => Ok(Decimal(v)),
-            Err(_) => Err(DecimalError::OutOfRange),
+            Err(_) => Err(Error::out_of_range()),
         }
     }
 }
 
 impl TryFrom<Integer> for Decimal {
-    type Error = DecimalError;
+    type Error = Error;
 
-    fn try_from(v: Integer) -> Result<Decimal, DecimalError> {
+    fn try_from(v: Integer) -> Result<Decimal, Error> {
         i64::from(v).try_into()
     }
 }

@@ -1,4 +1,4 @@
-use crate::{Decimal, DecimalError, Integer};
+use crate::{Decimal, Error, Integer};
 
 use std::convert::TryFrom;
 
@@ -60,17 +60,17 @@ fn test_into_f64() {
 #[test]
 fn test_try_from_f64() {
     for (expected, input) in [
-        (Err(DecimalError::NaN), f64::NAN),
-        (Err(DecimalError::OutOfRange), f64::INFINITY),
-        (Err(DecimalError::OutOfRange), f64::NEG_INFINITY),
-        (Err(DecimalError::OutOfRange), -1_000_000_000_000.0),
-        (Err(DecimalError::OutOfRange), 1_000_000_000_000.0),
+        (Err(Error::new("NaN")), f64::NAN),
+        (Err(Error::out_of_range()), f64::INFINITY),
+        (Err(Error::out_of_range()), f64::NEG_INFINITY),
+        (Err(Error::out_of_range()), -1_000_000_000_000.0),
+        (Err(Error::out_of_range()), 1_000_000_000_000.0),
         (Ok(Decimal::MIN), -999_999_999_999.999),
         (Ok(Decimal::MIN), -999_999_999_999.9991),
-        (Err(DecimalError::OutOfRange), -999_999_999_999.9995),
+        (Err(Error::out_of_range()), -999_999_999_999.9995),
         (Ok(Decimal::MAX), 999_999_999_999.999),
         (Ok(Decimal::MAX), 999_999_999_999.9991),
-        (Err(DecimalError::OutOfRange), 999_999_999_999.9995),
+        (Err(Error::out_of_range()), 999_999_999_999.9995),
         (Ok(Decimal::ZERO), 0.0),
         (Ok(Decimal::ZERO), -0.0),
         (

@@ -1,4 +1,4 @@
-use crate::Integer;
+use crate::{Error, Integer};
 
 use std::convert::TryFrom;
 
@@ -15,7 +15,7 @@ fn test_constant_too_large() {
 }
 
 #[test]
-fn test_conversions() -> Result<(), Box<dyn std::error::Error>> {
+fn test_conversions() -> Result<(), Error> {
     assert_eq!(Integer::MIN, Integer::constant(-999_999_999_999_999));
     assert_eq!(Integer::MAX, Integer::constant(999_999_999_999_999));
 

@@ -24,6 +24,10 @@ impl Error {
         }
     }
 
+    pub(crate) fn out_of_range() -> Self {
+        Self::new("out of range")
+    }
+
     pub(crate) fn custom(msg: impl fmt::Display) -> Self {
         Self {
             msg: Cow::Owned(msg.to_string()),
@@ -42,3 +46,35 @@ impl fmt::Display for Error {
 }
 
 impl std::error::Error for Error {}
+
+pub(crate) struct NonEmptyStringError {
+    byte_index: Option<usize>,
+}
+
+impl NonEmptyStringError {
+    pub(crate) const fn empty() -> Self {
+        Self { byte_index: None }
+    }
+
+    pub(crate) const fn invalid_character(byte_index: usize) -> Self {
+        Self {
+            byte_index: Some(byte_index),
+        }
+    }
+
+    pub const fn msg(&self) -> &'static str {
+        match self.byte_index {
+            None => "cannot be empty",
+            Some(_) => "invalid character",
+        }
+    }
+}
+
+impl From<NonEmptyStringError> for Error {
+    fn from(err: NonEmptyStringError) -> Error {
+        Error {
+            msg: Cow::Borrowed(err.msg()),
+            index: err.byte_index,
+        }
+    }
+}

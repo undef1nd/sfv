@@ -1,3 +1,4 @@
+use crate::error::{Error, NonEmptyStringError};
 use crate::utils;
 
 use std::borrow::Borrow;
@@ -31,42 +32,20 @@ pub struct Key(String);
 #[repr(transparent)]
 pub struct KeyRef(str);
 
-/// An error produced during conversion to a key.
-#[derive(Debug)]
-pub struct KeyError {
-    byte_index: Option<usize>,
-}
-
-impl fmt::Display for KeyError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if let Some(byte_index) = self.byte_index {
-            write!(f, "invalid character for key at byte index {}", byte_index)
-        } else {
-            f.write_str("key cannot be empty")
-        }
-    }
-}
-
-impl std::error::Error for KeyError {}
-
-const fn validate(v: &[u8]) -> Result<(), KeyError> {
+const fn validate(v: &[u8]) -> Result<(), NonEmptyStringError> {
     if v.is_empty() {
-        return Err(KeyError { byte_index: None });
+        return Err(NonEmptyStringError::empty());
     }
 
     if !utils::is_allowed_start_key_char(v[0]) {
-        return Err(KeyError {
-            byte_index: Some(0),
-        });
+        return Err(NonEmptyStringError::invalid_character(0));
     }
 
     let mut index = 1;
 
     while index < v.len() {
         if !utils::is_allowed_inner_key_char(v[index]) {
-            return Err(KeyError {
-                byte_index: Some(index),
-            });
+            return Err(NonEmptyStringError::invalid_character(index));
         }
         index += 1;
     }
@@ -80,7 +59,7 @@ impl KeyRef {
 
     /// Creates a `&KeyRef` from a `&str`.
     #[allow(clippy::should_implement_trait)]
-    pub fn from_str(v: &str) -> Result<&Self, KeyError> {
+    pub fn from_str(v: &str) -> Result<&Self, Error> {
         validate(v.as_bytes())?;
         Ok(Self::cast(v))
     }
@@ -100,13 +79,7 @@ impl KeyRef {
     pub const fn constant(v: &str) -> &Self {
         match validate(v.as_bytes()) {
             Ok(_) => Self::cast(v),
-            Err(err) => {
-                if err.byte_index.is_none() {
-                    panic!("key cannot be empty")
-                } else {
-                    panic!("invalid character for key")
-                }
-            }
+            Err(err) => panic!("{}", err.msg()),
         }
     }
 
@@ -149,9 +122,9 @@ impl From<Key> for String {
 }
 
 impl TryFrom<String> for Key {
-    type Error = KeyError;
+    type Error = Error;
 
-    fn try_from(v: String) -> Result<Key, KeyError> {
+    fn try_from(v: String) -> Result<Key, Error> {
         validate(v.as_bytes())?;
         Ok(Key(v))
     }
@@ -161,10 +134,10 @@ impl Key {
     /// Creates a `Key` from a `String`.
     ///
     /// Returns the original value if the conversion failed.
-    pub fn from_string(v: String) -> Result<Self, (KeyError, String)> {
+    pub fn from_string(v: String) -> Result<Self, (Error, String)> {
         match validate(v.as_bytes()) {
             Ok(_) => Ok(Self(v)),
-            Err(err) => Err((err, v)),
+            Err(err) => Err((err.into(), v)),
         }
     }
 }
@@ -211,9 +184,9 @@ impl_eq!(Key, KeyRef);
 impl_eq!(Key, &KeyRef);
 
 impl<'a> TryFrom<&'a str> for &'a KeyRef {
-    type Error = KeyError;
+    type Error = Error;
 
-    fn try_from(v: &'a str) -> Result<&'a KeyRef, KeyError> {
+    fn try_from(v: &'a str) -> Result<&'a KeyRef, Error> {
         KeyRef::from_str(v)
     }
 }
