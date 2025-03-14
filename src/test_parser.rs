@@ -1,7 +1,6 @@
 use crate::visitor::Ignored;
 use crate::{integer, key_ref, string_ref, token_ref, Decimal, Error, Num, Parser, RefBareItem};
 use std::convert::TryFrom;
-use std::error::Error as StdError;
 
 #[cfg(feature = "parsed-types")]
 use crate::{BareItem, Dictionary, InnerList, Item, List, Parameters};
@@ -11,7 +10,7 @@ use std::iter::FromIterator;
 
 #[test]
 #[cfg(feature = "parsed-types")]
-fn parse() -> Result<(), Box<dyn StdError>> {
+fn parse() -> Result<(), Error> {
     let input = r#""some_value""#;
     let parsed_item = Item::new(string_ref("some_value"));
     let expected = parsed_item;
@@ -48,7 +47,7 @@ fn parse_errors() {
 
 #[test]
 #[cfg(feature = "parsed-types")]
-fn parse_list_of_numbers() -> Result<(), Box<dyn StdError>> {
+fn parse_list_of_numbers() -> Result<(), Error> {
     let input = "1,42";
     let item1 = Item::new(1);
     let item2 = Item::new(42);
@@ -59,7 +58,7 @@ fn parse_list_of_numbers() -> Result<(), Box<dyn StdError>> {
 
 #[test]
 #[cfg(feature = "parsed-types")]
-fn parse_list_with_multiple_spaces() -> Result<(), Box<dyn StdError>> {
+fn parse_list_with_multiple_spaces() -> Result<(), Error> {
     let input = "1  ,  42";
     let item1 = Item::new(1);
     let item2 = Item::new(42);
@@ -70,7 +69,7 @@ fn parse_list_with_multiple_spaces() -> Result<(), Box<dyn StdError>> {
 
 #[test]
 #[cfg(feature = "parsed-types")]
-fn parse_list_of_lists() -> Result<(), Box<dyn StdError>> {
+fn parse_list_of_lists() -> Result<(), Error> {
     let input = "(1 2), (42 43)";
     let item1 = Item::new(1);
     let item2 = Item::new(2);
@@ -85,7 +84,7 @@ fn parse_list_of_lists() -> Result<(), Box<dyn StdError>> {
 
 #[test]
 #[cfg(feature = "parsed-types")]
-fn parse_list_empty_inner_list() -> Result<(), Box<dyn StdError>> {
+fn parse_list_empty_inner_list() -> Result<(), Error> {
     let input = "()";
     let inner_list = InnerList::new(vec![]);
     let expected_list: List = vec![inner_list.into()];
@@ -95,7 +94,7 @@ fn parse_list_empty_inner_list() -> Result<(), Box<dyn StdError>> {
 
 #[test]
 #[cfg(feature = "parsed-types")]
-fn parse_list_empty() -> Result<(), Box<dyn StdError>> {
+fn parse_list_empty() -> Result<(), Error> {
     let input = "";
     let expected_list: List = vec![];
     assert_eq!(expected_list, Parser::from_str(input).parse_list()?);
@@ -104,7 +103,7 @@ fn parse_list_empty() -> Result<(), Box<dyn StdError>> {
 
 #[test]
 #[cfg(feature = "parsed-types")]
-fn parse_list_of_lists_with_param_and_spaces() -> Result<(), Box<dyn StdError>> {
+fn parse_list_of_lists_with_param_and_spaces() -> Result<(), Error> {
     let input = "(  1  42  ); k=*";
     let item1 = Item::new(1);
     let item2 = Item::new(42);
@@ -120,7 +119,7 @@ fn parse_list_of_lists_with_param_and_spaces() -> Result<(), Box<dyn StdError>> 
 
 #[test]
 #[cfg(feature = "parsed-types")]
-fn parse_list_of_items_and_lists_with_param() -> Result<(), Box<dyn StdError>> {
+fn parse_list_of_items_and_lists_with_param() -> Result<(), Error> {
     let input = r#"12, 14, (a  b); param="param_value_1", ()"#;
     let item1 = Item::new(12);
     let item2 = Item::new(14);
@@ -216,7 +215,7 @@ fn parse_inner_list_errors() {
 
 #[test]
 #[cfg(feature = "parsed-types")]
-fn parse_inner_list_with_param_and_spaces() -> Result<(), Box<dyn StdError>> {
+fn parse_inner_list_with_param_and_spaces() -> Result<(), Error> {
     let input = "(c b); a=1";
     let inner_list_param = Parameters::from_iter(vec![(key_ref("a").to_owned(), 1.into())]);
 
@@ -231,7 +230,7 @@ fn parse_inner_list_with_param_and_spaces() -> Result<(), Box<dyn StdError>> {
 
 #[test]
 #[cfg(feature = "parsed-types")]
-fn parse_item_int_with_space() -> Result<(), Box<dyn StdError>> {
+fn parse_item_int_with_space() -> Result<(), Error> {
     let input = "12 ";
     assert_eq!(Item::new(12), Parser::from_str(input).parse_item()?);
     Ok(())
@@ -239,7 +238,7 @@ fn parse_item_int_with_space() -> Result<(), Box<dyn StdError>> {
 
 #[test]
 #[cfg(feature = "parsed-types")]
-fn parse_item_decimal_with_bool_param_and_space() -> Result<(), Box<dyn StdError>> {
+fn parse_item_decimal_with_bool_param_and_space() -> Result<(), Error> {
     let input = "12.35;a ";
     let param = Parameters::from_iter(vec![(key_ref("a").to_owned(), BareItem::Boolean(true))]);
     assert_eq!(
@@ -251,7 +250,7 @@ fn parse_item_decimal_with_bool_param_and_space() -> Result<(), Box<dyn StdError
 
 #[test]
 #[cfg(feature = "parsed-types")]
-fn parse_item_number_with_param() -> Result<(), Box<dyn StdError>> {
+fn parse_item_number_with_param() -> Result<(), Error> {
     let param = Parameters::from_iter(vec![(
         key_ref("a1").to_owned(),
         BareItem::Token(token_ref("*").to_owned()),
@@ -265,7 +264,7 @@ fn parse_item_number_with_param() -> Result<(), Box<dyn StdError>> {
 
 #[test]
 #[cfg(feature = "parsed-types")]
-fn parse_dict_empty() -> Result<(), Box<dyn StdError>> {
+fn parse_dict_empty() -> Result<(), Error> {
     assert_eq!(Dictionary::new(), Parser::from_str("").parse_dictionary()?);
     Ok(())
 }
@@ -289,7 +288,7 @@ fn parse_dict_errors() {
 
 #[test]
 #[cfg(feature = "parsed-types")]
-fn parse_dict_with_spaces_and_params() -> Result<(), Box<dyn StdError>> {
+fn parse_dict_with_spaces_and_params() -> Result<(), Error> {
     let input = r#"abc=123;a=1;b=2, def=456, ghi=789;q=9;r="+w""#;
     let item1_params = Parameters::from_iter(vec![
         (key_ref("a").to_owned(), 1.into()),
@@ -319,7 +318,7 @@ fn parse_dict_with_spaces_and_params() -> Result<(), Box<dyn StdError>> {
 
 #[test]
 #[cfg(feature = "parsed-types")]
-fn parse_dict_empty_value() -> Result<(), Box<dyn StdError>> {
+fn parse_dict_empty_value() -> Result<(), Error> {
     let input = "a=()";
     let inner_list = InnerList::new(vec![]);
     let expected_dict = Dictionary::from_iter(vec![(key_ref("a").to_owned(), inner_list.into())]);
@@ -329,7 +328,7 @@ fn parse_dict_empty_value() -> Result<(), Box<dyn StdError>> {
 
 #[test]
 #[cfg(feature = "parsed-types")]
-fn parse_dict_with_token_param() -> Result<(), Box<dyn StdError>> {
+fn parse_dict_with_token_param() -> Result<(), Error> {
     let input = "a=1, b;foo=*, c=3";
     let item2_params = Parameters::from_iter(vec![(
         key_ref("foo").to_owned(),
@@ -349,7 +348,7 @@ fn parse_dict_with_token_param() -> Result<(), Box<dyn StdError>> {
 
 #[test]
 #[cfg(feature = "parsed-types")]
-fn parse_dict_multiple_spaces() -> Result<(), Box<dyn StdError>> {
+fn parse_dict_multiple_spaces() -> Result<(), Error> {
     // input1, input2, input3 must be parsed into the same structure
     let item1 = Item::new(1);
     let item2 = Item::new(2);
@@ -369,7 +368,7 @@ fn parse_dict_multiple_spaces() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn parse_bare_item() -> Result<(), Box<dyn StdError>> {
+fn parse_bare_item() -> Result<(), Error> {
     assert_eq!(
         RefBareItem::Boolean(false),
         Parser::from_str("?0").parse_bare_item()?
@@ -410,7 +409,7 @@ fn parse_bare_item_errors() {
 }
 
 #[test]
-fn parse_bool() -> Result<(), Box<dyn StdError>> {
+fn parse_bool() -> Result<(), Error> {
     let mut parser = Parser::from_str("?0gk");
     assert_eq!(false, parser.parse_bool()?);
     assert_eq!(parser.remaining(), b"gk");
@@ -433,7 +432,7 @@ fn parse_bool_errors() {
 }
 
 #[test]
-fn parse_string() -> Result<(), Box<dyn StdError>> {
+fn parse_string() -> Result<(), Error> {
     let mut parser = Parser::from_str(r#""some string" ;not string"#);
     assert_eq!(string_ref("some string"), parser.parse_string()?);
     assert_eq!(parser.remaining(), " ;not string".as_bytes());
@@ -479,7 +478,7 @@ fn parse_string_errors() {
 }
 
 #[test]
-fn parse_token() -> Result<(), Box<dyn StdError>> {
+fn parse_token() -> Result<(), Error> {
     let mut parser = Parser::from_str("*some:token}not token");
     assert_eq!(token_ref("*some:token"), parser.parse_token()?);
     assert_eq!(parser.remaining(), b"}not token");
@@ -530,7 +529,7 @@ fn parse_token_errors() {
 }
 
 #[test]
-fn parse_byte_sequence() -> Result<(), Box<dyn StdError>> {
+fn parse_byte_sequence() -> Result<(), Error> {
     let mut parser = Parser::from_str(":aGVsbG8:rest_of_str");
     assert_eq!("hello".as_bytes(), parser.parse_byte_sequence()?);
     assert_eq!(parser.remaining(), b"rest_of_str");
@@ -571,7 +570,7 @@ fn parse_byte_sequence_errors() {
 }
 
 #[test]
-fn parse_number_int() -> Result<(), Box<dyn StdError>> {
+fn parse_number_int() -> Result<(), Error> {
     let mut parser = Parser::from_str("-733333333332d.14");
     assert_eq!(Num::Integer(integer(-733333333332)), parser.parse_number()?);
     assert_eq!(parser.remaining(), b"d.14");
@@ -625,7 +624,7 @@ fn parse_number_int() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn parse_number_decimal() -> Result<(), Box<dyn StdError>> {
+fn parse_number_decimal() -> Result<(), Error> {
     let mut parser = Parser::from_str("00.42 test string");
     assert_eq!(
         Num::Decimal(Decimal::try_from(0.42)?),
@@ -739,7 +738,7 @@ fn parse_number_errors() {
 
 #[test]
 #[cfg(feature = "parsed-types")]
-fn parse_params_string() -> Result<(), Box<dyn StdError>> {
+fn parse_params_string() -> Result<(), Error> {
     let input = r#";b="param_val""#;
     let expected = Parameters::from_iter(vec![(
         key_ref("b").to_owned(),
@@ -753,7 +752,7 @@ fn parse_params_string() -> Result<(), Box<dyn StdError>> {
 
 #[test]
 #[cfg(feature = "parsed-types")]
-fn parse_params_bool() -> Result<(), Box<dyn StdError>> {
+fn parse_params_bool() -> Result<(), Error> {
     let input = ";b;a";
     let expected = Parameters::from_iter(vec![
         (key_ref("b").to_owned(), BareItem::Boolean(true)),
@@ -767,7 +766,7 @@ fn parse_params_bool() -> Result<(), Box<dyn StdError>> {
 
 #[test]
 #[cfg(feature = "parsed-types")]
-fn parse_params_mixed_types() -> Result<(), Box<dyn StdError>> {
+fn parse_params_mixed_types() -> Result<(), Error> {
     let input = ";key1=?0;key2=746.15";
     let expected = Parameters::from_iter(vec![
         (key_ref("key1").to_owned(), BareItem::Boolean(false)),
@@ -784,7 +783,7 @@ fn parse_params_mixed_types() -> Result<(), Box<dyn StdError>> {
 
 #[test]
 #[cfg(feature = "parsed-types")]
-fn parse_params_with_spaces() -> Result<(), Box<dyn StdError>> {
+fn parse_params_with_spaces() -> Result<(), Error> {
     let input = "; key1=?0; key2=11111";
     let expected = Parameters::from_iter(vec![
         (key_ref("key1").to_owned(), BareItem::Boolean(false)),
@@ -798,7 +797,7 @@ fn parse_params_with_spaces() -> Result<(), Box<dyn StdError>> {
 
 #[test]
 #[cfg(feature = "parsed-types")]
-fn parse_params_empty() -> Result<(), Box<dyn StdError>> {
+fn parse_params_empty() -> Result<(), Error> {
     let mut params = Parameters::new();
     Parser::from_str(" key1=?0; key2=11111").parse_parameters(&mut params)?;
     assert_eq!(Parameters::new(), params);
@@ -812,7 +811,7 @@ fn parse_params_empty() -> Result<(), Box<dyn StdError>> {
 }
 
 #[test]
-fn parse_key() -> Result<(), Box<dyn StdError>> {
+fn parse_key() -> Result<(), Error> {
     assert_eq!(key_ref("a"), Parser::from_str("a=1").parse_key()?);
     assert_eq!(key_ref("a1"), Parser::from_str("a1=10").parse_key()?);
     assert_eq!(key_ref("*1"), Parser::from_str("*1=10").parse_key()?);
@@ -833,7 +832,7 @@ fn parse_key_errors() {
 
 #[test]
 #[cfg(feature = "parsed-types")]
-fn parse_more_list() -> Result<(), Box<dyn StdError>> {
+fn parse_more_list() -> Result<(), Error> {
     let item1 = Item::new(1);
     let item2 = Item::new(2);
     let item3 = Item::new(42);
@@ -848,7 +847,7 @@ fn parse_more_list() -> Result<(), Box<dyn StdError>> {
 
 #[test]
 #[cfg(feature = "parsed-types")]
-fn parse_more_dict() -> Result<(), Box<dyn StdError>> {
+fn parse_more_dict() -> Result<(), Error> {
     let item2_params = Parameters::from_iter(vec![(
         key_ref("foo").to_owned(),
         BareItem::Token(token_ref("*").to_owned()),
@@ -870,7 +869,7 @@ fn parse_more_dict() -> Result<(), Box<dyn StdError>> {
 
 #[test]
 #[cfg(feature = "parsed-types")]
-fn parse_more_errors() -> Result<(), Box<dyn StdError>> {
+fn parse_more_errors() -> Result<(), Error> {
     let mut parsed_dict_header = Parser::from_str("a=1, b;foo=*").parse_dictionary()?;
     assert!(Parser::from_str(",a")
         .parse_dictionary_with_visitor(&mut parsed_dict_header)

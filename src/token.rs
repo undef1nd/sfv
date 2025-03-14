@@ -1,3 +1,4 @@
+use crate::error::{Error, NonEmptyStringError};
 use crate::utils;
 
 use std::borrow::Borrow;
@@ -31,46 +32,20 @@ pub struct Token(String);
 #[repr(transparent)]
 pub struct TokenRef(str);
 
-/// An error produced during conversion to a token.
-#[derive(Debug)]
-pub struct TokenError {
-    byte_index: Option<usize>,
-}
-
-impl fmt::Display for TokenError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if let Some(byte_index) = self.byte_index {
-            write!(
-                f,
-                "invalid character for token at byte index {}",
-                byte_index
-            )
-        } else {
-            f.write_str("token cannot be empty")
-        }
-    }
-}
-
-impl std::error::Error for TokenError {}
-
-const fn validate(v: &[u8]) -> Result<(), TokenError> {
+const fn validate(v: &[u8]) -> Result<(), NonEmptyStringError> {
     if v.is_empty() {
-        return Err(TokenError { byte_index: None });
+        return Err(NonEmptyStringError::empty());
     }
 
     if !utils::is_allowed_start_token_char(v[0]) {
-        return Err(TokenError {
-            byte_index: Some(0),
-        });
+        return Err(NonEmptyStringError::invalid_character(0));
     }
 
     let mut index = 1;
 
     while index < v.len() {
         if !utils::is_allowed_inner_token_char(v[index]) {
-            return Err(TokenError {
-                byte_index: Some(index),
-            });
+            return Err(NonEmptyStringError::invalid_character(index));
         }
         index += 1;
     }
@@ -84,7 +59,7 @@ impl TokenRef {
 
     /// Creates a `&TokenRef` from a `&str`.
     #[allow(clippy::should_implement_trait)]
-    pub fn from_str(v: &str) -> Result<&Self, TokenError> {
+    pub fn from_str(v: &str) -> Result<&Self, Error> {
         validate(v.as_bytes())?;
         Ok(Self::cast(v))
     }
@@ -104,13 +79,7 @@ impl TokenRef {
     pub const fn constant(v: &str) -> &Self {
         match validate(v.as_bytes()) {
             Ok(_) => Self::cast(v),
-            Err(err) => {
-                if err.byte_index.is_none() {
-                    panic!("token cannot be empty")
-                } else {
-                    panic!("invalid character for token")
-                }
-            }
+            Err(err) => panic!("{}", err.msg()),
         }
     }
 
@@ -153,9 +122,9 @@ impl From<Token> for String {
 }
 
 impl TryFrom<String> for Token {
-    type Error = TokenError;
+    type Error = Error;
 
-    fn try_from(v: String) -> Result<Token, TokenError> {
+    fn try_from(v: String) -> Result<Token, Error> {
         validate(v.as_bytes())?;
         Ok(Token(v))
     }
@@ -165,10 +134,10 @@ impl Token {
     /// Creates a `Token` from a `String`.
     ///
     /// Returns the original value if the conversion failed.
-    pub fn from_string(v: String) -> Result<Self, (TokenError, String)> {
+    pub fn from_string(v: String) -> Result<Self, (Error, String)> {
         match validate(v.as_bytes()) {
             Ok(_) => Ok(Self(v)),
-            Err(err) => Err((err, v)),
+            Err(err) => Err((err.into(), v)),
         }
     }
 }
@@ -215,9 +184,9 @@ impl_eq!(Token, TokenRef);
 impl_eq!(Token, &TokenRef);
 
 impl<'a> TryFrom<&'a str> for &'a TokenRef {
-    type Error = TokenError;
+    type Error = Error;
 
-    fn try_from(v: &'a str) -> Result<&'a TokenRef, TokenError> {
+    fn try_from(v: &'a str) -> Result<&'a TokenRef, Error> {
         TokenRef::from_str(v)
     }
 }

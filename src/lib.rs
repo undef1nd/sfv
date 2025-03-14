@@ -103,7 +103,7 @@ Creates `Item` with empty parameters:
 ```
 use sfv::{StringRef, Item, SerializeValue};
 
-# fn main() -> Result<(), Box<dyn std::error::Error>> {
+# fn main() -> Result<(), sfv::Error> {
 let str_item = Item::new(StringRef::from_str("foo")?);
 assert_eq!(str_item.serialize_value()?, r#""foo""#);
 # Ok(())
@@ -116,7 +116,7 @@ Creates `Item` field value with parameters:
 use std::convert::TryFrom;
 use sfv::{KeyRef, Item, BareItem, SerializeValue, Parameters, Decimal};
 
-# fn main() -> Result<(), Box<dyn std::error::Error>> {
+# fn main() -> Result<(), sfv::Error> {
 let mut params = Parameters::new();
 let decimal = Decimal::try_from(13.45655)?;
 params.insert(KeyRef::from_str("key")?.to_owned(), BareItem::Decimal(decimal));
@@ -130,7 +130,7 @@ Creates `List` field value with `Item` and parametrized `InnerList` as members:
 ```
 use sfv::{KeyRef, StringRef, TokenRef, Item, BareItem, InnerList, List, SerializeValue, Parameters};
 
-# fn main() -> Result<(), Box<dyn std::error::Error>> {
+# fn main() -> Result<(), sfv::Error> {
 let tok_item = BareItem::Token(TokenRef::from_str("tok")?.to_owned());
 
 // Creates Item.
@@ -159,7 +159,7 @@ Creates `Dictionary` field value:
 ```
 use sfv::{KeyRef, StringRef, Parser, Item, SerializeValue, Dictionary};
 
-# fn main() -> Result<(), Box<dyn std::error::Error>> {
+# fn main() -> Result<(), sfv::Error> {
 let member_value1 = Item::new(StringRef::from_str("apple")?.to_owned());
 let member_value2 = Item::new(true);
 let member_value3 = Item::new(false);
@@ -211,17 +211,17 @@ mod test_token;
 use std::borrow::{Borrow, Cow};
 use std::convert::TryFrom;
 
-pub use decimal::{Decimal, DecimalError};
+pub use decimal::Decimal;
 pub use error::Error;
-pub use integer::{integer, Integer, OutOfRangeError};
-pub use key::{key_ref, Key, KeyError, KeyRef};
+pub use integer::{integer, Integer};
+pub use key::{key_ref, Key, KeyRef};
 pub use parser::Parser;
 pub use ref_serializer::{
     RefDictSerializer, RefInnerListSerializer, RefItemSerializer, RefListSerializer,
     RefParameterSerializer,
 };
-pub use string::{string_ref, String, StringError, StringRef};
-pub use token::{token_ref, Token, TokenError, TokenRef};
+pub use string::{string_ref, String, StringRef};
+pub use token::{token_ref, Token, TokenRef};
 
 #[cfg(feature = "parsed-types")]
 pub use parsed::{Dictionary, InnerList, Item, List, ListEntry, Parameters};
@@ -363,17 +363,17 @@ impl<S, B, T> From<Decimal> for GenericBareItem<S, B, T> {
 }
 
 impl<S, B, T> TryFrom<f32> for GenericBareItem<S, B, T> {
-    type Error = DecimalError;
+    type Error = Error;
 
-    fn try_from(val: f32) -> Result<Self, DecimalError> {
+    fn try_from(val: f32) -> Result<Self, Error> {
         Decimal::try_from(val).map(Self::Decimal)
     }
 }
 
 impl<S, B, T> TryFrom<f64> for GenericBareItem<S, B, T> {
-    type Error = DecimalError;
+    type Error = Error;
 
-    fn try_from(val: f64) -> Result<Self, DecimalError> {
+    fn try_from(val: f64) -> Result<Self, Error> {
         Decimal::try_from(val).map(Self::Decimal)
     }
 }

@@ -10,7 +10,7 @@ use std::borrow::BorrowMut;
 /// ```
 /// use sfv::{KeyRef, RefItemSerializer};
 ///
-/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// # fn main() -> Result<(), sfv::Error> {
 /// let serialized_item = RefItemSerializer::new()
 ///     .bare_item(11)
 ///     .parameter(KeyRef::from_str("foo")?, true)
@@ -97,7 +97,7 @@ fn maybe_write_separator(buffer: &mut String, first: &mut bool) {
 /// ```
 /// use sfv::{KeyRef, StringRef, TokenRef, RefListSerializer};
 ///
-/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// # fn main() -> Result<(), sfv::Error> {
 /// let mut ser = RefListSerializer::new();
 ///
 /// ser.bare_item(11)
@@ -202,7 +202,7 @@ impl<W: BorrowMut<String>> RefListSerializer<W> {
 /// use sfv::{KeyRef, StringRef, TokenRef, RefDictSerializer, Decimal};
 /// use std::convert::TryFrom;
 ///
-/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// # fn main() -> Result<(), sfv::Error> {
 /// let mut ser = RefDictSerializer::new();
 ///
 /// ser.bare_item(KeyRef::from_str("member1")?, 11)
