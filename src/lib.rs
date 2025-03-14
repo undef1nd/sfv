@@ -15,7 +15,10 @@ There's also a few primitive types used to construct structured field values:
 - `Parameters` are an ordered map of key-value pairs that are associated with an `Item` or `InnerList`. The keys are unique within the scope the `Parameters` they occur within, and the values are `BareItem`.
 - `InnerList` is an array of zero or more `Items`. Can have `Parameters`.
 - `ListEntry` represents either `Item` or `InnerList` as a member of `List` or as member-value in `Dictionary`.
-
+*/
+#![cfg_attr(
+    feature = "parsed-types",
+    doc = r##"
 # Examples
 
 ### Parsing
@@ -173,12 +176,14 @@ assert_eq!(
 # Ok(())
 # }
 ```
-*/
+"##
+)]
 
 mod decimal;
 mod error;
 mod integer;
 mod key;
+#[cfg(feature = "parsed-types")]
 mod parsed;
 mod parser;
 mod ref_serializer;
@@ -215,11 +220,14 @@ pub use ref_serializer::{
     RefDictSerializer, RefInnerListSerializer, RefItemSerializer, RefListSerializer,
     RefParameterSerializer,
 };
-pub use serializer::SerializeValue;
 pub use string::{string_ref, String, StringError, StringRef};
 pub use token::{token_ref, Token, TokenError, TokenRef};
 
+#[cfg(feature = "parsed-types")]
 pub use parsed::{Dictionary, InnerList, Item, List, ListEntry, Parameters};
+
+#[cfg(feature = "parsed-types")]
+pub use serializer::SerializeValue;
 
 type SFVResult<T> = std::result::Result<T, Error>;
 

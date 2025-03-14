@@ -1,9 +1,11 @@
 use crate::utils;
 use crate::visitor::*;
 use crate::{
-    BareItemFromInput, Decimal, Dictionary, Error, Integer, Item, KeyRef, List, Num, SFVResult,
-    String, StringRef, TokenRef,
+    BareItemFromInput, Decimal, Error, Integer, KeyRef, Num, SFVResult, String, StringRef, TokenRef,
 };
+
+#[cfg(feature = "parsed-types")]
+use crate::{Dictionary, Item, List};
 
 use std::borrow::Cow;
 use std::convert::TryFrom;
@@ -115,6 +117,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses input into structured field value of Dictionary type
+    #[cfg(feature = "parsed-types")]
     pub fn parse_dictionary(self) -> SFVResult<Dictionary> {
         let mut dict = Dictionary::new();
         self.parse_dictionary_with_visitor(&mut dict)?;
@@ -122,23 +125,27 @@ impl<'a> Parser<'a> {
     }
 
     /// Like `parse_dictionary`, but uses the given visitor instead of producing a [`Dictionary`].
-    ///
-    /// This can also be used to parse a dictionary that is split into multiple lines by merging
-    /// them into an existing structure:
-    ///
-    /// ```
-    /// # use sfv::{Parser, SerializeValue};
-    /// # fn main() -> Result<(), sfv::Error> {
-    /// let mut dict = Parser::from_str("a=1").parse_dictionary()?;
-    ///
-    /// Parser::from_str("b=2").parse_dictionary_with_visitor(&mut dict)?;
-    ///
-    /// assert_eq!(
-    ///     dict.serialize_value()?,
-    ///     "a=1, b=2",
-    /// );
-    /// # Ok(())
-    /// # }
+    #[cfg_attr(
+        feature = "parsed-types",
+        doc = r##"
+This can also be used to parse a dictionary that is split into multiple lines by merging
+them into an existing structure:
+
+```
+# use sfv::{Parser, SerializeValue};
+# fn main() -> Result<(), sfv::Error> {
+let mut dict = Parser::from_str("a=1").parse_dictionary()?;
+
+Parser::from_str("b=2").parse_dictionary_with_visitor(&mut dict)?;
+
+assert_eq!(
+    dict.serialize_value()?,
+    "a=1, b=2",
+);
+# Ok(())
+# }
+"##
+    )]
     pub fn parse_dictionary_with_visitor(
         self,
         visitor: &mut (impl ?Sized + DictionaryVisitor<'a>),
@@ -147,6 +154,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses input into structured field value of List type
+    #[cfg(feature = "parsed-types")]
     pub fn parse_list(self) -> SFVResult<List> {
         let mut list = List::new();
         self.parse_list_with_visitor(&mut list)?;
@@ -154,24 +162,27 @@ impl<'a> Parser<'a> {
     }
 
     /// Like `parse_list`, but uses the given visitor instead of producing a [`List`].
-    ///
-    /// This can also be used to parse a list that is split into multiple lines by merging them
-    /// into an existing structure:
-    ///
-    /// ```
-    /// # use sfv::{Parser, SerializeValue};
-    /// # fn main() -> Result<(), sfv::Error> {
-    /// let mut list = Parser::from_str("11, (12 13)").parse_list()?;
-    ///
-    /// Parser::from_str(r#""foo",        "bar""#).parse_list_with_visitor(&mut list)?;
-    ///
-    /// assert_eq!(
-    ///     list.serialize_value()?,
-    ///     r#"11, (12 13), "foo", "bar""#,
-    /// );
-    /// # Ok(())
-    /// # }
-    /// ```
+    #[cfg_attr(
+        feature = "parsed-types",
+        doc = r##"
+This can also be used to parse a list that is split into multiple lines by merging them
+into an existing structure:
+```
+# use sfv::{Parser, SerializeValue};
+# fn main() -> Result<(), sfv::Error> {
+let mut list = Parser::from_str("11, (12 13)").parse_list()?;
+
+Parser::from_str(r#""foo",        "bar""#).parse_list_with_visitor(&mut list)?;
+
+assert_eq!(
+    list.serialize_value()?,
+    r#"11, (12 13), "foo", "bar""#,
+);
+# Ok(())
+# }
+```
+"##
+    )]
     pub fn parse_list_with_visitor(
         self,
         visitor: &mut (impl ?Sized + ListVisitor<'a>),
@@ -180,6 +191,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses input into structured field value of Item type
+    #[cfg(feature = "parsed-types")]
     pub fn parse_item(self) -> SFVResult<Item> {
         let mut item = Item::new(false);
         self.parse_item_with_visitor(&mut item)?;

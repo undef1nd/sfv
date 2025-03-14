@@ -26,6 +26,14 @@ jobs:
         with:
           command: check
           args: --all-targets
+      - uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --all-targets --no-default-features
+      - uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --all-targets --all-features
 
   test:
     name: Run tests

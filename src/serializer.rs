@@ -1,10 +1,12 @@
 use crate::utils;
-use crate::{
-    Decimal, Dictionary, Integer, Item, KeyRef, List, RefBareItem, SFVResult, StringRef, TokenRef,
-};
+use crate::{Decimal, Integer, KeyRef, RefBareItem, StringRef, TokenRef};
 use std::fmt::Write as _;
 
+#[cfg(feature = "parsed-types")]
+use crate::{Dictionary, Item, List, SFVResult};
+
 /// Serializes structured field value into String.
+#[cfg(feature = "parsed-types")]
 pub trait SerializeValue {
     /// Serializes structured field value into String.
     /// # Examples
@@ -23,6 +25,7 @@ pub trait SerializeValue {
     fn serialize_value(&self) -> SFVResult<String>;
 }
 
+#[cfg(feature = "parsed-types")]
 impl SerializeValue for Dictionary {
     fn serialize_value(&self) -> SFVResult<String> {
         let mut ser = crate::RefDictSerializer::new();
@@ -31,6 +34,7 @@ impl SerializeValue for Dictionary {
     }
 }
 
+#[cfg(feature = "parsed-types")]
 impl SerializeValue for List {
     fn serialize_value(&self) -> SFVResult<String> {
         let mut ser = crate::RefListSerializer::new();
@@ -39,6 +43,7 @@ impl SerializeValue for List {
     }
 }
 
+#[cfg(feature = "parsed-types")]
 impl SerializeValue for Item {
     fn serialize_value(&self) -> SFVResult<String> {
         Ok(crate::RefItemSerializer::new()
