@@ -273,6 +273,7 @@ impl<S, B, T> GenericBareItem<S, B, T> {
             _ => None,
         }
     }
+
     /// If `BareItem` is an integer, returns `Integer`, otherwise returns `None`.
     /// ```
     /// # use sfv::{integer, BareItem};
@@ -285,6 +286,7 @@ impl<S, B, T> GenericBareItem<S, B, T> {
             _ => None,
         }
     }
+
     /// If `BareItem` is `String`, returns `&str`, otherwise returns `None`.
     /// ```
     /// # use sfv::{string_ref, BareItem};
@@ -297,6 +299,7 @@ impl<S, B, T> GenericBareItem<S, B, T> {
             _ => None,
         }
     }
+
     /// If `BareItem` is a `ByteSeq`, returns `&Vec<u8>`, otherwise returns `None`.
     /// ```
     /// # use sfv::BareItem;
@@ -309,6 +312,7 @@ impl<S, B, T> GenericBareItem<S, B, T> {
             _ => None,
         }
     }
+
     /// If `BareItem` is a `Boolean`, returns `bool`, otherwise returns `None`.
     /// ```
     /// # use sfv::{BareItem};
@@ -321,6 +325,7 @@ impl<S, B, T> GenericBareItem<S, B, T> {
             _ => None,
         }
     }
+
     /// If `BareItem` is a `Token`, returns `&Token`, otherwise returns `None`.
     /// ```
     /// use sfv::{token_ref, BareItem};
@@ -357,8 +362,8 @@ impl<S, B, T> From<Decimal> for GenericBareItem<S, B, T> {
     /// let bare_item: BareItem = decimal_number.into();
     /// assert_eq!(bare_item.as_decimal().unwrap(), decimal_number);
     /// ```
-    fn from(item: Decimal) -> Self {
-        Self::Decimal(item)
+    fn from(val: Decimal) -> Self {
+        Self::Decimal(val)
     }
 }
 

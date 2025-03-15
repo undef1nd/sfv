@@ -19,15 +19,16 @@ pub struct Item {
 
 impl Item {
     /// Returns new `Item` with empty `Parameters`.
-    pub fn new(bare_item: impl Into<BareItem>) -> Item {
-        Item {
+    pub fn new(bare_item: impl Into<BareItem>) -> Self {
+        Self {
             bare_item: bare_item.into(),
             params: Parameters::new(),
         }
     }
+
     /// Returns new `Item` with specified `Parameters`.
-    pub fn with_params(bare_item: impl Into<BareItem>, params: Parameters) -> Item {
-        Item {
+    pub fn with_params(bare_item: impl Into<BareItem>, params: Parameters) -> Self {
+        Self {
             bare_item: bare_item.into(),
             params,
         }
@@ -73,8 +74,8 @@ impl From<Item> for ListEntry {
 }
 
 impl From<InnerList> for ListEntry {
-    fn from(item: InnerList) -> Self {
-        ListEntry::InnerList(item)
+    fn from(inner_list: InnerList) -> Self {
+        ListEntry::InnerList(inner_list)
     }
 }
 
@@ -92,16 +93,16 @@ pub struct InnerList {
 
 impl InnerList {
     /// Returns new `InnerList` with empty `Parameters`.
-    pub fn new(items: Vec<Item>) -> InnerList {
-        InnerList {
+    pub fn new(items: Vec<Item>) -> Self {
+        Self {
             items,
             params: Parameters::new(),
         }
     }
 
     /// Returns new `InnerList` with specified `Parameters`.
-    pub fn with_params(items: Vec<Item>, params: Parameters) -> InnerList {
-        InnerList { items, params }
+    pub fn with_params(items: Vec<Item>, params: Parameters) -> Self {
+        Self { items, params }
     }
 }
 
