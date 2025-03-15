@@ -58,7 +58,7 @@ impl<W: BorrowMut<String>> RefItemSerializer<W> {
     }
 }
 
-/// Used by `RefItemSerializer`, `RefListSerializer`, `RefDictSerializer` to serialize a single `Parameter`.
+/// Serializes parameters incrementally.
 #[derive(Debug)]
 pub struct RefParameterSerializer<W> {
     buffer: W,
@@ -315,7 +315,7 @@ impl<W: BorrowMut<String>> RefDictSerializer<W> {
     }
 }
 
-/// Used by `RefItemSerializer`, `RefListSerializer`, `RefDictSerializer` to serialize `InnerList`.
+/// Serializes inner lists incrementally.
 // https://httpwg.org/specs/rfc8941.html#ser-innerlist
 #[derive(Debug)]
 pub struct RefInnerListSerializer<'a> {
