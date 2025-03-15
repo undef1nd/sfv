@@ -15,12 +15,13 @@ There are also a few lower-level types used to construct structured field values
 - `Parameters` are an ordered map of key-value pairs that are associated with an `Item` or `InnerList`. The keys are unique within the scope the `Parameters` they occur within, and the values are `BareItem`.
 - `InnerList` is an array of zero or more `Items`. Can have associated `Parameters`.
 - `ListEntry` represents either `Item` or `InnerList` as a member of `List` or as member-value in `Dictionary`.
+
+# Examples
+
 */
 #![cfg_attr(
     feature = "parsed-types",
     doc = r##"
-# Examples
-
 ### Parsing
 
 ```
@@ -66,86 +67,78 @@ match dict.get("u") {
 # Ok(())
 # }
 ```
-
-### Structured Field Value Construction and Serialization
-Creates an `Item` with empty parameters:
+"##
+)]
+/*!
+### Serialization
+Serializes an `Item`:
 ```
-use sfv::{StringRef, Item, SerializeValue};
-
-# fn main() -> Result<(), sfv::Error> {
-let str_item = Item::new(StringRef::from_str("foo")?);
-assert_eq!(str_item.serialize_value()?, r#""foo""#);
-# Ok(())
-# }
-```
-
-Creates an `Item` with parameters:
-```
+use sfv::{Decimal, KeyRef, RefItemSerializer, StringRef};
 use std::convert::TryFrom;
-use sfv::{KeyRef, Item, BareItem, SerializeValue, Parameters, Decimal};
 
 # fn main() -> Result<(), sfv::Error> {
-let mut params = Parameters::new();
-let decimal = Decimal::try_from(13.45655)?;
-params.insert(KeyRef::from_str("key")?.to_owned(), BareItem::Decimal(decimal));
-let int_item = Item::with_params(99, params);
-assert_eq!(int_item.serialize_value()?, "99;key=13.457");
+let serialized_item = RefItemSerializer::new()
+    .bare_item(StringRef::from_str("foo")?)
+    .parameter(KeyRef::from_str("key")?, Decimal::try_from(13.45655)?)
+    .finish();
+
+assert_eq!(serialized_item, r#""foo";key=13.457"#);
 # Ok(())
 # }
 ```
 
-Creates a `List` with an `Item` and parameterized `InnerList` as members:
+Serializes a `List`:
 ```
-use sfv::{KeyRef, StringRef, TokenRef, Item, BareItem, InnerList, List, SerializeValue, Parameters};
+use sfv::{KeyRef, RefListSerializer, StringRef, TokenRef};
 
 # fn main() -> Result<(), sfv::Error> {
-let tok_item = BareItem::Token(TokenRef::from_str("tok")?.to_owned());
+let mut ser = RefListSerializer::new();
 
-// Creates Item.
-let str_item = Item::new(StringRef::from_str("foo")?);
+ser.bare_item(TokenRef::from_str("tok")?);
 
-// Creates InnerList members.
-let mut int_item_params = Parameters::new();
-int_item_params.insert(KeyRef::from_str("key")?.to_owned(), BareItem::Boolean(false));
-let int_item = Item::with_params(99, int_item_params);
+{
+    let mut ser = ser.inner_list();
 
-// Creates InnerList.
-let mut inner_list_params = Parameters::new();
-inner_list_params.insert(KeyRef::from_str("bar")?.to_owned(), BareItem::Boolean(true));
-let inner_list = InnerList::with_params(vec![int_item, str_item], inner_list_params);
+    ser.bare_item(99).parameter(KeyRef::from_str("key")?, false);
 
-let list: List = vec![Item::new(tok_item).into(), inner_list.into()];
+    ser.bare_item(StringRef::from_str("foo")?);
+
+    ser.finish().parameter(KeyRef::from_str("bar")?, true);
+}
+
+let serialized_list = ser.finish()?;
+
 assert_eq!(
-    list.serialize_value()?,
+    serialized_list,
     r#"tok, (99;key=?0 "foo");bar"#
 );
 # Ok(())
 # }
 ```
 
-Creates a `Dictionary`:
+Serializes a `Dictionary`:
 ```
-use sfv::{KeyRef, StringRef, Parser, Item, SerializeValue, Dictionary};
+use sfv::{KeyRef, RefDictSerializer, StringRef};
 
 # fn main() -> Result<(), sfv::Error> {
-let member_value1 = Item::new(StringRef::from_str("apple")?.to_owned());
-let member_value2 = Item::new(true);
-let member_value3 = Item::new(false);
+let mut ser = RefDictSerializer::new();
 
-let mut dict = Dictionary::new();
-dict.insert(KeyRef::from_str("key1")?.to_owned(), member_value1.into());
-dict.insert(KeyRef::from_str("key2")?.to_owned(), member_value2.into());
-dict.insert(KeyRef::from_str("key3")?.to_owned(), member_value3.into());
+ser.bare_item(KeyRef::from_str("key1")?, StringRef::from_str("apple")?);
+
+ser.bare_item(KeyRef::from_str("key2")?, true);
+
+ser.bare_item(KeyRef::from_str("key3")?, false);
+
+let serialized_dict = ser.finish()?;
 
 assert_eq!(
-    dict.serialize_value()?,
+    serialized_dict,
     r#"key1="apple", key2, key3=?0"#
 );
 # Ok(())
 # }
 ```
-"##
-)]
+*/
 
 mod decimal;
 mod error;
