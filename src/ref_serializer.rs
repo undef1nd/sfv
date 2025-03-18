@@ -1,5 +1,4 @@
-use crate::serializer::Serializer;
-use crate::{Error, KeyRef, RefBareItem, SFVResult};
+use crate::{Error, Format, KeyRef, RefBareItem, SFVResult};
 
 #[cfg(feature = "parsed-types")]
 use crate::{Item, ListEntry};
@@ -20,10 +19,11 @@ use std::borrow::BorrowMut;
 /// # Ok(())
 /// # }
 /// ```
-// https://httpwg.org/specs/rfc8941.html#ser-item
+// https://httpwg.org/specs/rfc9651.html#ser-item
 #[derive(Debug)]
 pub struct ItemSerializer<W> {
     buffer: W,
+    format: Format,
 }
 
 impl Default for ItemSerializer<String> {
@@ -33,16 +33,35 @@ impl Default for ItemSerializer<String> {
 }
 
 impl ItemSerializer<String> {
+    /// Creates a serializer with [`Format::Rfc9651`].
     pub fn new() -> Self {
+        Self::with_format(Format::Rfc9651)
+    }
+
+    /// Creates a serializer with the given format.
+    ///
+    /// Note: Attempting to serialize a [`RefBareItem::Date`] or
+    /// [`RefBareItem::DisplayString`] with [`Format::Rfc8941`] will panic.
+    pub fn with_format(format: Format) -> Self {
         Self {
             buffer: String::new(),
+            format,
         }
     }
 }
 
 impl<'a> ItemSerializer<&'a mut String> {
+    /// Creates a serializer that writes into the given buffer with [`Format::Rfc9651`].
     pub fn with_buffer(buffer: &'a mut String) -> Self {
-        Self { buffer }
+        Self::with_buffer_and_format(buffer, Format::Rfc9651)
+    }
+
+    /// Creates a serializer that writes into the given buffer with the given format.
+    ///
+    /// Note: Attempting to serialize a [`RefBareItem::Date`] or
+    /// [`RefBareItem::DisplayString`] with [`Format::Rfc8941`] will panic.
+    pub fn with_buffer_and_format(buffer: &'a mut String, format: Format) -> Self {
+        Self { buffer, format }
     }
 }
 
@@ -51,9 +70,11 @@ impl<W: BorrowMut<String>> ItemSerializer<W> {
         mut self,
         bare_item: impl Into<RefBareItem<'b>>,
     ) -> ParameterSerializer<W> {
-        Serializer::serialize_bare_item(bare_item, self.buffer.borrow_mut());
+        self.format
+            .serialize_bare_item(bare_item, self.buffer.borrow_mut());
         ParameterSerializer {
             buffer: self.buffer,
+            format: self.format,
         }
     }
 }
@@ -62,11 +83,13 @@ impl<W: BorrowMut<String>> ItemSerializer<W> {
 #[derive(Debug)]
 pub struct ParameterSerializer<W> {
     buffer: W,
+    format: Format,
 }
 
 impl<W: BorrowMut<String>> ParameterSerializer<W> {
     pub fn parameter<'b>(mut self, name: &KeyRef, value: impl Into<RefBareItem<'b>>) -> Self {
-        Serializer::serialize_parameter(name, value, self.buffer.borrow_mut());
+        self.format
+            .serialize_parameter(name, value, self.buffer.borrow_mut());
         self
     }
 
@@ -75,7 +98,8 @@ impl<W: BorrowMut<String>> ParameterSerializer<W> {
         params: impl IntoIterator<Item = (impl AsRef<KeyRef>, impl Into<RefBareItem<'b>>)>,
     ) -> Self {
         for (name, value) in params {
-            Serializer::serialize_parameter(name.as_ref(), value, self.buffer.borrow_mut());
+            self.format
+                .serialize_parameter(name.as_ref(), value, self.buffer.borrow_mut());
         }
         self
     }
@@ -122,11 +146,12 @@ fn maybe_write_separator(buffer: &mut String, first: &mut bool) {
 /// # Ok(())
 /// # }
 /// ```
-// https://httpwg.org/specs/rfc8941.html#ser-list
+// https://httpwg.org/specs/rfc9651.html#ser-list
 #[derive(Debug)]
 pub struct ListSerializer<W> {
     buffer: W,
     first: bool,
+    format: Format,
 }
 
 impl Default for ListSerializer<String> {
@@ -136,19 +161,39 @@ impl Default for ListSerializer<String> {
 }
 
 impl ListSerializer<String> {
+    /// Creates a serializer with [`Format::Rfc9651`].
     pub fn new() -> Self {
+        Self::with_format(Format::Rfc9651)
+    }
+
+    /// Creates a serializer with the given format.
+    ///
+    /// Note: Attempting to serialize a [`RefBareItem::Date`] or
+    /// [`RefBareItem::DisplayString`] with [`Format::Rfc8941`] will panic.
+    pub fn with_format(format: Format) -> Self {
         Self {
             buffer: String::new(),
             first: true,
+            format,
         }
     }
 }
 
 impl<'a> ListSerializer<&'a mut String> {
+    /// Creates a serializer that writes into the given buffer with [`Format::Rfc9651`].
     pub fn with_buffer(buffer: &'a mut String) -> Self {
+        Self::with_buffer_and_format(buffer, Format::Rfc9651)
+    }
+
+    /// Creates a serializer that writes into the given buffer with the given format.
+    ///
+    /// Note: Attempting to serialize a [`RefBareItem::Date`] or
+    /// [`RefBareItem::DisplayString`] with [`Format::Rfc8941`] will panic.
+    pub fn with_buffer_and_format(buffer: &'a mut String, format: Format) -> Self {
         Self {
             buffer,
             first: true,
+            format,
         }
     }
 }
@@ -160,8 +205,11 @@ impl<W: BorrowMut<String>> ListSerializer<W> {
     ) -> ParameterSerializer<&mut String> {
         let buffer = self.buffer.borrow_mut();
         maybe_write_separator(buffer, &mut self.first);
-        Serializer::serialize_bare_item(bare_item, buffer);
-        ParameterSerializer { buffer }
+        self.format.serialize_bare_item(bare_item, buffer);
+        ParameterSerializer {
+            buffer,
+            format: self.format,
+        }
     }
 
     pub fn inner_list(&mut self) -> InnerListSerializer {
@@ -170,6 +218,7 @@ impl<W: BorrowMut<String>> ListSerializer<W> {
         buffer.push('(');
         InnerListSerializer {
             buffer: Some(buffer),
+            format: self.format,
         }
     }
 
@@ -193,7 +242,7 @@ impl<W: BorrowMut<String>> ListSerializer<W> {
     ///
     /// This can only fail if no members were serialized, as [empty lists are
     /// not meant to be serialized at
-    /// all](https://httpwg.org/specs/rfc8941.html#text-serialize).
+    /// all](https://httpwg.org/specs/rfc9651.html#text-serialize).
     pub fn finish(self) -> SFVResult<W> {
         if self.first {
             return Err(Error::new("serializing empty list is not allowed"));
@@ -234,11 +283,12 @@ impl<W: BorrowMut<String>> ListSerializer<W> {
 /// # Ok(())
 /// # }
 /// ```
-// https://httpwg.org/specs/rfc8941.html#ser-dictionary
+// https://httpwg.org/specs/rfc9651.html#ser-dictionary
 #[derive(Debug)]
 pub struct DictSerializer<W> {
     buffer: W,
     first: bool,
+    format: Format,
 }
 
 impl Default for DictSerializer<String> {
@@ -248,19 +298,39 @@ impl Default for DictSerializer<String> {
 }
 
 impl DictSerializer<String> {
+    /// Creates a serializer with [`Format::Rfc9651`].
     pub fn new() -> Self {
+        Self::with_format(Format::Rfc9651)
+    }
+
+    /// Creates a serializer with the given format.
+    ///
+    /// Note: Attempting to serialize a [`RefBareItem::Date`] or
+    /// [`RefBareItem::DisplayString`] with [`Format::Rfc8941`] will panic.
+    pub fn with_format(format: Format) -> Self {
         Self {
             buffer: String::new(),
             first: true,
+            format,
         }
     }
 }
 
 impl<'a> DictSerializer<&'a mut String> {
+    /// Creates a serializer that writes into the given buffer with [`Format::Rfc9651`].
     pub fn with_buffer(buffer: &'a mut String) -> Self {
+        Self::with_buffer_and_format(buffer, Format::Rfc9651)
+    }
+
+    /// Creates a serializer that writes into the given buffer with the given format.
+    ///
+    /// Note: Attempting to serialize a [`RefBareItem::Date`] or
+    /// [`RefBareItem::DisplayString`] with [`Format::Rfc8941`] will panic.
+    pub fn with_buffer_and_format(buffer: &'a mut String, format: Format) -> Self {
         Self {
             buffer,
             first: true,
+            format,
         }
     }
 }
@@ -273,22 +343,26 @@ impl<W: BorrowMut<String>> DictSerializer<W> {
     ) -> ParameterSerializer<&mut String> {
         let buffer = self.buffer.borrow_mut();
         maybe_write_separator(buffer, &mut self.first);
-        Serializer::serialize_key(name, buffer);
+        Format::serialize_key(name, buffer);
         let value = value.into();
         if value != RefBareItem::Boolean(true) {
             buffer.push('=');
-            Serializer::serialize_bare_item(value, buffer);
+            self.format.serialize_bare_item(value, buffer);
         }
-        ParameterSerializer { buffer }
+        ParameterSerializer {
+            buffer,
+            format: self.format,
+        }
     }
 
     pub fn inner_list(&mut self, name: &KeyRef) -> InnerListSerializer {
         let buffer = self.buffer.borrow_mut();
         maybe_write_separator(buffer, &mut self.first);
-        Serializer::serialize_key(name, buffer);
+        Format::serialize_key(name, buffer);
         buffer.push_str("=(");
         InnerListSerializer {
             buffer: Some(buffer),
+            format: self.format,
         }
     }
 
@@ -316,7 +390,7 @@ impl<W: BorrowMut<String>> DictSerializer<W> {
     ///
     /// This can only fail if no members were serialized, as [empty dictionaries
     /// are not meant to be serialized at
-    /// all](https://httpwg.org/specs/rfc8941.html#text-serialize).
+    /// all](https://httpwg.org/specs/rfc9651.html#text-serialize).
     pub fn finish(self) -> SFVResult<W> {
         if self.first {
             return Err(Error::new("serializing empty dictionary is not allowed"));
@@ -326,10 +400,11 @@ impl<W: BorrowMut<String>> DictSerializer<W> {
 }
 
 /// Serializes inner lists incrementally.
-// https://httpwg.org/specs/rfc8941.html#ser-innerlist
+// https://httpwg.org/specs/rfc9651.html#ser-innerlist
 #[derive(Debug)]
 pub struct InnerListSerializer<'a> {
     buffer: Option<&'a mut String>,
+    format: Format,
 }
 
 impl Drop for InnerListSerializer<'_> {
@@ -349,8 +424,11 @@ impl<'a> InnerListSerializer<'a> {
         if !buffer.is_empty() & !buffer.ends_with('(') {
             buffer.push(' ');
         }
-        Serializer::serialize_bare_item(bare_item, buffer);
-        ParameterSerializer { buffer }
+        self.format.serialize_bare_item(bare_item, buffer);
+        ParameterSerializer {
+            buffer,
+            format: self.format,
+        }
     }
 
     #[cfg(feature = "parsed-types")]
@@ -363,7 +441,10 @@ impl<'a> InnerListSerializer<'a> {
     pub fn finish(mut self) -> ParameterSerializer<&'a mut String> {
         let buffer = self.buffer.take().unwrap();
         buffer.push(')');
-        ParameterSerializer { buffer }
+        ParameterSerializer {
+            buffer,
+            format: self.format,
+        }
     }
 }
 

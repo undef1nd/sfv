@@ -7,7 +7,7 @@ use std::fmt;
 ///
 /// Decimals have 12 digits of integer precision and 3 digits of fractional precision.
 ///
-/// [decimal]: <https://httpwg.org/specs/rfc8941.html#decimal>
+/// [decimal]: <https://httpwg.org/specs/rfc9651.html#decimal>
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Decimal(Integer);
