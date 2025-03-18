@@ -73,11 +73,11 @@ match dict.get("u") {
 ### Serialization
 Serializes an `Item`:
 ```
-use sfv::{Decimal, KeyRef, RefItemSerializer, StringRef};
+use sfv::{Decimal, ItemSerializer, KeyRef, StringRef};
 use std::convert::TryFrom;
 
 # fn main() -> Result<(), sfv::Error> {
-let serialized_item = RefItemSerializer::new()
+let serialized_item = ItemSerializer::new()
     .bare_item(StringRef::from_str("foo")?)
     .parameter(KeyRef::from_str("key")?, Decimal::try_from(13.45655)?)
     .finish();
@@ -89,10 +89,10 @@ assert_eq!(serialized_item, r#""foo";key=13.457"#);
 
 Serializes a `List`:
 ```
-use sfv::{KeyRef, RefListSerializer, StringRef, TokenRef};
+use sfv::{KeyRef, ListSerializer, StringRef, TokenRef};
 
 # fn main() -> Result<(), sfv::Error> {
-let mut ser = RefListSerializer::new();
+let mut ser = ListSerializer::new();
 
 ser.bare_item(TokenRef::from_str("tok")?);
 
@@ -118,10 +118,10 @@ assert_eq!(
 
 Serializes a `Dictionary`:
 ```
-use sfv::{KeyRef, RefDictSerializer, StringRef};
+use sfv::{DictSerializer, KeyRef, StringRef};
 
 # fn main() -> Result<(), sfv::Error> {
-let mut ser = RefDictSerializer::new();
+let mut ser = DictSerializer::new();
 
 ser.bare_item(KeyRef::from_str("key1")?, StringRef::from_str("apple")?);
 
@@ -178,8 +178,7 @@ pub use integer::{integer, Integer};
 pub use key::{key_ref, Key, KeyRef};
 pub use parser::Parser;
 pub use ref_serializer::{
-    RefDictSerializer, RefInnerListSerializer, RefItemSerializer, RefListSerializer,
-    RefParameterSerializer,
+    DictSerializer, InnerListSerializer, ItemSerializer, ListSerializer, ParameterSerializer,
 };
 pub use string::{string_ref, String, StringRef};
 pub use token::{token_ref, Token, TokenRef};
@@ -354,7 +353,7 @@ pub type BareItem = GenericBareItem<String, Vec<u8>, Token>;
 
 /// A [bare item] that borrows its data.
 ///
-/// Used to serialize values via [`RefItemSerializer`], [`RefListSerializer`], and [`RefDictSerializer`].
+/// Used to serialize values via [`ItemSerializer`], [`ListSerializer`], and [`DictSerializer`].
 ///
 /// [bare item]: <https://httpwg.org/specs/rfc8941.html#item>
 pub type RefBareItem<'a> = GenericBareItem<&'a StringRef, &'a [u8], &'a TokenRef>;

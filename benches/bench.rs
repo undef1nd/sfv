@@ -3,8 +3,8 @@ extern crate criterion;
 
 use criterion::{BenchmarkId, Criterion};
 use sfv::{
-    integer, key_ref, string_ref, token_ref, Decimal, Parser, RefDictSerializer, RefItemSerializer,
-    RefListSerializer, SerializeValue,
+    integer, key_ref, string_ref, token_ref, Decimal, DictSerializer, ItemSerializer,
+    ListSerializer, Parser, SerializeValue,
 };
 use std::convert::TryFrom;
 
@@ -105,7 +105,7 @@ fn serializing_ref_item(c: &mut Criterion) {
         &fixture,
         move |bench, &input| {
             bench.iter(|| {
-                let ser = RefItemSerializer::new();
+                let ser = ItemSerializer::new();
                 ser.bare_item(input.as_bytes()).finish()
             });
         },
@@ -115,7 +115,7 @@ fn serializing_ref_item(c: &mut Criterion) {
 fn serializing_ref_list(c: &mut Criterion) {
     c.bench_function("serializing_ref_list", move |bench| {
         bench.iter(|| {
-            let mut ser = RefListSerializer::new();
+            let mut ser = ListSerializer::new();
             ser.bare_item(token_ref("a"));
             ser.bare_item(token_ref("abcdefghigklmnoprst"));
             ser.bare_item(integer(123456785686457));
@@ -139,7 +139,7 @@ fn serializing_ref_list(c: &mut Criterion) {
 fn serializing_ref_dict(c: &mut Criterion) {
     c.bench_function("serializing_ref_dict", move |bench| {
         bench.iter(|| {
-            let mut ser = RefDictSerializer::new();
+            let mut ser = DictSerializer::new();
             ser.bare_item(key_ref("a"), true);
             ser.bare_item(key_ref("dict_key2"), token_ref("abcdefghigklmnoprst"));
             ser.bare_item(key_ref("dict_key3"), integer(123456785686457));
