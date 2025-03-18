@@ -100,7 +100,7 @@ fn parse_dictionary<'a>(
     Ok(())
 }
 
-/// Exposes methods for parsing input into structured field value.
+/// Exposes methods for parsing input into a structured field value.
 pub struct Parser<'a> {
     input: &'a [u8],
     index: usize,
@@ -116,7 +116,7 @@ impl<'a> Parser<'a> {
         Self::from_bytes(input.as_bytes())
     }
 
-    /// Parses input into structured field value of Dictionary type
+    /// Parses input into a structured field value of `Dictionary` type.
     #[cfg(feature = "parsed-types")]
     pub fn parse_dictionary(self) -> SFVResult<Dictionary> {
         let mut dict = Dictionary::new();
@@ -153,7 +153,7 @@ assert_eq!(
         self.parse(|parser| parse_dictionary(parser, visitor))
     }
 
-    /// Parses input into structured field value of List type
+    /// Parses input into a structured field value of `List` type.
     #[cfg(feature = "parsed-types")]
     pub fn parse_list(self) -> SFVResult<List> {
         let mut list = List::new();
@@ -190,7 +190,7 @@ assert_eq!(
         self.parse(|parser| parse_list(parser, visitor))
     }
 
-    /// Parses input into structured field value of Item type
+    /// Parses input into a structured field value of `Item` type.
     #[cfg(feature = "parsed-types")]
     pub fn parse_item(self) -> SFVResult<Item> {
         let mut item = Item::new(false);

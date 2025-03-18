@@ -5,10 +5,10 @@ use std::fmt::Write as _;
 #[cfg(feature = "parsed-types")]
 use crate::{Dictionary, Item, List, SFVResult};
 
-/// Serializes structured field value into String.
+/// Serializes a structured field value into a string.
 #[cfg(feature = "parsed-types")]
 pub trait SerializeValue {
-    /// Serializes structured field value into String.
+    /// Serializes a structured field value into a string.
     /// # Examples
     /// ```
     /// # use sfv::{Parser, SerializeValue};
@@ -53,7 +53,6 @@ impl SerializeValue for Item {
     }
 }
 
-/// Container serialization functions
 pub(crate) struct Serializer;
 
 impl Serializer {
