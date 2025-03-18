@@ -1,14 +1,24 @@
 use crate::utils;
-use crate::{Decimal, Integer, KeyRef, RefBareItem, StringRef, TokenRef};
+use crate::{Date, Decimal, Integer, KeyRef, RefBareItem, StringRef, TokenRef};
 use std::fmt::Write as _;
 
 #[cfg(feature = "parsed-types")]
 use crate::{Dictionary, Item, List, SFVResult};
 
 /// Serializes a structured field value into a string.
+///
+/// Note: The serialization conforms to [RFC 9651], meaning that
+/// [`Dates`][crate::Date] and [`Display Strings`][RefBareItem::DisplayString],
+/// which cause parsing errors under [RFC 8941], will be serialized
+/// unconditionally. The consumer of this API is responsible for determining
+/// whether it is valid to serialize these bare items for any specific header.
+///
+/// [RFC 8941]: <https://httpwg.org/specs/rfc8941.html>
+/// [RFC 9651]: <https://httpwg.org/specs/rfc9651.html>
 #[cfg(feature = "parsed-types")]
 pub trait SerializeValue {
     /// Serializes a structured field value into a string.
+    ///
     /// # Examples
     /// ```
     /// # use sfv::{Parser, SerializeValue};
@@ -57,7 +67,7 @@ pub(crate) struct Serializer;
 
 impl Serializer {
     pub(crate) fn serialize_bare_item<'b>(value: impl Into<RefBareItem<'b>>, output: &mut String) {
-        // https://httpwg.org/specs/rfc8941.html#ser-bare-item
+        // https://httpwg.org/specs/rfc9651.html#ser-bare-item
 
         match value.into() {
             RefBareItem::Boolean(value) => Self::serialize_bool(value, output),
@@ -66,6 +76,8 @@ impl Serializer {
             RefBareItem::Token(value) => Self::serialize_token(value, output),
             RefBareItem::Integer(value) => Self::serialize_integer(value, output),
             RefBareItem::Decimal(value) => Self::serialize_decimal(value, output),
+            RefBareItem::Date(value) => Self::serialize_date(value, output),
+            RefBareItem::DisplayString(value) => Self::serialize_display_string(value, output),
         }
     }
 
@@ -74,7 +86,7 @@ impl Serializer {
         value: impl Into<RefBareItem<'b>>,
         output: &mut String,
     ) {
-        // https://httpwg.org/specs/rfc8941.html#ser-params
+        // https://httpwg.org/specs/rfc9651.html#ser-params
         output.push(';');
         Self::serialize_key(name, output);
 
@@ -86,25 +98,25 @@ impl Serializer {
     }
 
     pub(crate) fn serialize_key(input_key: &KeyRef, output: &mut String) {
-        // https://httpwg.org/specs/rfc8941.html#ser-key
+        // https://httpwg.org/specs/rfc9651.html#ser-key
 
         output.push_str(input_key.as_str());
     }
 
     pub(crate) fn serialize_integer(value: Integer, output: &mut String) {
-        //https://httpwg.org/specs/rfc8941.html#ser-integer
+        //https://httpwg.org/specs/rfc9651.html#ser-integer
 
         write!(output, "{}", value).unwrap();
     }
 
     pub(crate) fn serialize_decimal(value: Decimal, output: &mut String) {
-        // https://httpwg.org/specs/rfc8941.html#ser-decimal
+        // https://httpwg.org/specs/rfc9651.html#ser-decimal
 
         write!(output, "{}", value).unwrap();
     }
 
     pub(crate) fn serialize_string(value: &StringRef, output: &mut String) {
-        // https://httpwg.org/specs/rfc8941.html#ser-string
+        // https://httpwg.org/specs/rfc9651.html#ser-string
 
         output.push('"');
         for char in value.as_str().chars() {
@@ -117,13 +129,13 @@ impl Serializer {
     }
 
     pub(crate) fn serialize_token(value: &TokenRef, output: &mut String) {
-        // https://httpwg.org/specs/rfc8941.html#ser-token
+        // https://httpwg.org/specs/rfc9651.html#ser-token
 
         output.push_str(value.as_str());
     }
 
     pub(crate) fn serialize_byte_sequence(value: &[u8], output: &mut String) {
-        // https://httpwg.org/specs/rfc8941.html#ser-binary
+        // https://httpwg.org/specs/rfc9651.html#ser-binary
 
         output.push(':');
         base64::Engine::encode_string(&utils::BASE64, value, output);
@@ -131,8 +143,31 @@ impl Serializer {
     }
 
     pub(crate) fn serialize_bool(value: bool, output: &mut String) {
-        // https://httpwg.org/specs/rfc8941.html#ser-boolean
+        // https://httpwg.org/specs/rfc9651.html#ser-boolean
 
         output.push_str(if value { "?1" } else { "?0" });
+    }
+
+    pub(crate) fn serialize_date(value: Date, output: &mut String) {
+        // https://httpwg.org/specs/rfc9651.html#ser-date
+
+        write!(output, "{}", value).unwrap();
+    }
+
+    pub(crate) fn serialize_display_string(value: &str, output: &mut String) {
+        // https://httpwg.org/specs/rfc9651.html#ser-display
+
+        output.push_str(r#"%""#);
+        for c in value.bytes() {
+            match c {
+                b'%' | b'"' | 0x00..=0x1f | 0x7f..=0xff => {
+                    output.push('%');
+                    output.push(char::from_digit((c as u32 >> 4) & 0xf, 16).unwrap());
+                    output.push(char::from_digit(c as u32 & 0xf, 16).unwrap());
+                }
+                _ => output.push(c as char),
+            }
+        }
+        output.push('"');
     }
 }

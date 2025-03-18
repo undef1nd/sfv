@@ -10,7 +10,7 @@ use std::string::String as StdString;
 /// Strings may only contain printable ASCII characters (i.e. the range
 /// `0x20 ..= 0x7e`).
 ///
-/// [string]: <https://httpwg.org/specs/rfc8941.html#string>
+/// [string]: <https://httpwg.org/specs/rfc9651.html#string>
 #[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct String(StdString);
 
@@ -21,7 +21,7 @@ pub struct String(StdString);
 ///
 /// This type is to [`String`] as [`str`] is to [`std::string::String`].
 ///
-/// [string]: <https://httpwg.org/specs/rfc8941.html#string>
+/// [string]: <https://httpwg.org/specs/rfc9651.html#string>
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, ref_cast::RefCastCustom)]
 #[repr(transparent)]
 pub struct StringRef(str);

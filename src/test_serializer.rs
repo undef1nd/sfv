@@ -1,5 +1,5 @@
 use crate::serializer::Serializer;
-use crate::{integer, key_ref, string_ref, token_ref, Decimal, Error};
+use crate::{integer, key_ref, string_ref, token_ref, Date, Decimal, Error};
 use std::convert::TryFrom;
 
 #[cfg(feature = "parsed-types")]
@@ -399,4 +399,18 @@ fn serialize_dict_empty_member_value() -> Result<(), Error> {
     let input = Dictionary::from_iter(vec![(key_ref("a").to_owned(), inner_list.into())]);
     assert_eq!("a=()", input.serialize_value()?);
     Ok(())
+}
+
+#[test]
+fn serialize_date_with() {
+    let mut buf = String::new();
+    Serializer::serialize_date(Date::UNIX_EPOCH, &mut buf);
+    assert_eq!(buf, "@0");
+}
+
+#[test]
+fn serialize_display_string() {
+    let mut buf = String::new();
+    Serializer::serialize_display_string("üsers", &mut buf);
+    assert_eq!(buf, r#"%"%c3%bcsers""#);
 }

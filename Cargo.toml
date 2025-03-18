@@ -7,7 +7,7 @@ license = "MIT/Apache-2.0"
 readme = "README.md"
 documentation = "https://docs.rs/sfv"
 description = """Structured Field Values for HTTP parser.
-Implementation of RFC 8941."""
+Implementation of RFC 8941 and RFC 9651."""
 repository = "https://github.com/undef1nd/sfv"
 keywords = ["http-header", "structured-header", ]
 exclude = ["tests/**", ".github/*"]

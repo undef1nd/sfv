@@ -1,7 +1,8 @@
 use crate::utils;
 use crate::visitor::*;
 use crate::{
-    BareItemFromInput, Decimal, Error, Integer, KeyRef, Num, SFVResult, String, StringRef, TokenRef,
+    BareItemFromInput, Date, Decimal, Error, Integer, KeyRef, Num, SFVResult, String, StringRef,
+    TokenRef, Version,
 };
 
 #[cfg(feature = "parsed-types")]
@@ -12,7 +13,7 @@ use std::convert::TryFrom;
 use std::string::String as StdString;
 
 fn parse_item<'a>(parser: &mut Parser<'a>, visitor: impl ItemVisitor<'a>) -> SFVResult<()> {
-    // https://httpwg.org/specs/rfc8941.html#parse-item
+    // https://httpwg.org/specs/rfc9651.html#parse-item
     let param_visitor = visitor
         .bare_item(parser.parse_bare_item()?)
         .map_err(Error::custom)?;
@@ -23,7 +24,7 @@ fn parse_list<'a>(
     parser: &mut Parser<'a>,
     visitor: &mut (impl ?Sized + ListVisitor<'a>),
 ) -> SFVResult<()> {
-    // https://httpwg.org/specs/rfc8941.html#parse-list
+    // https://httpwg.org/specs/rfc9651.html#parse-list
     // List represents an array of (item_or_inner_list, parameters)
 
     while parser.peek().is_some() {
@@ -104,15 +105,23 @@ fn parse_dictionary<'a>(
 pub struct Parser<'a> {
     input: &'a [u8],
     index: usize,
+    version: Version,
 }
 
 impl<'a> Parser<'a> {
-    /// Creates a parser from the given input.
+    /// Creates a parser from the given input with [`Version::Rfc9651`].
     pub fn new(input: &'a (impl ?Sized + AsRef<[u8]>)) -> Self {
         Self {
             input: input.as_ref(),
             index: 0,
+            version: Version::Rfc9651,
         }
+    }
+
+    /// Sets the parser's version and returns it.
+    pub fn with_version(mut self, version: Version) -> Self {
+        self.version = version;
+        self
     }
 
     /// Parses input into a structured field value of `Dictionary` type.
@@ -220,7 +229,7 @@ assert_eq!(
     // Generic parse method for checking input before parsing
     // and handling trailing text error
     fn parse(mut self, f: impl FnOnce(&mut Self) -> SFVResult<()>) -> SFVResult<()> {
-        // https://httpwg.org/specs/rfc8941.html#text-parse
+        // https://httpwg.org/specs/rfc9651.html#text-parse
 
         self.consume_sp_chars();
 
@@ -236,7 +245,7 @@ assert_eq!(
     }
 
     fn parse_list_entry(&mut self, visitor: impl EntryVisitor<'a>) -> SFVResult<()> {
-        // https://httpwg.org/specs/rfc8941.html#parse-item-or-list
+        // https://httpwg.org/specs/rfc9651.html#parse-item-or-list
         // ListEntry represents a tuple (item_or_inner_list, parameters)
 
         match self.peek() {
@@ -249,7 +258,7 @@ assert_eq!(
         &mut self,
         mut visitor: impl InnerListVisitor<'a>,
     ) -> SFVResult<()> {
-        // https://httpwg.org/specs/rfc8941.html#parse-innerlist
+        // https://httpwg.org/specs/rfc9651.html#parse-innerlist
 
         if Some(b'(') != self.peek() {
             return self.error("expected start of inner list");
@@ -279,12 +288,16 @@ assert_eq!(
     }
 
     pub(crate) fn parse_bare_item(&mut self) -> SFVResult<BareItemFromInput<'a>> {
-        // https://httpwg.org/specs/rfc8941.html#parse-bare-item
+        // https://httpwg.org/specs/rfc9651.html#parse-bare-item
 
         match self.peek() {
             Some(b'?') => Ok(BareItemFromInput::Boolean(self.parse_bool()?)),
             Some(b'"') => Ok(BareItemFromInput::String(self.parse_string()?)),
             Some(b':') => Ok(BareItemFromInput::ByteSeq(self.parse_byte_sequence()?)),
+            Some(b'@') => Ok(BareItemFromInput::Date(self.parse_date()?)),
+            Some(b'%') => Ok(BareItemFromInput::DisplayString(
+                self.parse_display_string()?,
+            )),
             Some(c) if utils::is_allowed_start_token_char(c) => {
                 Ok(BareItemFromInput::Token(self.parse_token()?))
             }
@@ -297,7 +310,7 @@ assert_eq!(
     }
 
     pub(crate) fn parse_bool(&mut self) -> SFVResult<bool> {
-        // https://httpwg.org/specs/rfc8941.html#parse-boolean
+        // https://httpwg.org/specs/rfc9651.html#parse-boolean
 
         if self.peek() != Some(b'?') {
             return self.error("expected start of boolean ('?')");
@@ -319,7 +332,7 @@ assert_eq!(
     }
 
     pub(crate) fn parse_string(&mut self) -> SFVResult<Cow<'a, StringRef>> {
-        // https://httpwg.org/specs/rfc8941.html#parse-string
+        // https://httpwg.org/specs/rfc9651.html#parse-string
 
         if self.peek() != Some(b'"') {
             return self.error(r#"expected start of string ('"')"#);
@@ -400,7 +413,7 @@ assert_eq!(
     }
 
     pub(crate) fn parse_token(&mut self) -> SFVResult<&'a TokenRef> {
-        // https://httpwg.org/specs/rfc8941.html#parse-token
+        // https://httpwg.org/specs/9651.html#parse-token
 
         match self.parse_non_empty_str(
             utils::is_allowed_start_token_char,
@@ -412,7 +425,7 @@ assert_eq!(
     }
 
     pub(crate) fn parse_byte_sequence(&mut self) -> SFVResult<Vec<u8>> {
-        // https://httpwg.org/specs/rfc8941.html#parse-binary
+        // https://httpwg.org/specs/rfc9651.html#parse-binary
 
         if self.peek() != Some(b':') {
             return self.error("expected start of byte sequence (':')");
@@ -451,7 +464,7 @@ assert_eq!(
     }
 
     pub(crate) fn parse_number(&mut self) -> SFVResult<Num> {
-        // https://httpwg.org/specs/rfc8941.html#parse-number
+        // https://httpwg.org/specs/rfc9651.html#parse-number
 
         fn char_to_i64(c: u8) -> i64 {
             (c - b'0') as i64
@@ -519,11 +532,117 @@ assert_eq!(
         }
     }
 
+    pub(crate) fn parse_date(&mut self) -> SFVResult<Date> {
+        // https://httpwg.org/specs/rfc9651.html#parse-date
+
+        if self.peek() != Some(b'@') {
+            return self.error("expected start of date ('@')");
+        }
+
+        match self.version {
+            Version::Rfc8941 => return self.error("RFC 8941 does not support dates"),
+            Version::Rfc9651 => {}
+        }
+
+        let start = self.index;
+        self.next();
+
+        match self.parse_number()? {
+            Num::Integer(seconds) => Ok(Date::from_unix_seconds(seconds)),
+            Num::Decimal(_) => Err(Error::with_index(
+                "date must be an integer number of seconds",
+                start,
+            )),
+        }
+    }
+
+    pub(crate) fn parse_display_string(&mut self) -> SFVResult<Cow<'a, str>> {
+        // https://httpwg.org/specs/rfc9651.html#parse-display
+
+        if self.peek() != Some(b'%') {
+            return self.error("expected start of display string ('%')");
+        }
+
+        match self.version {
+            Version::Rfc8941 => return self.error("RFC 8941 does not support display strings"),
+            Version::Rfc9651 => {}
+        }
+
+        self.next();
+
+        if self.peek() != Some(b'"') {
+            return self.error(r#"expected '"'"#);
+        }
+
+        self.next();
+
+        let start = self.index;
+        let mut output = Cow::Borrowed(&[] as &[u8]);
+
+        while let Some(curr_char) = self.peek() {
+            match curr_char {
+                b'"' => {
+                    self.next();
+                    return match output {
+                        Cow::Borrowed(output) => match std::str::from_utf8(output) {
+                            Ok(output) => Ok(Cow::Borrowed(output)),
+                            Err(err) => Err(Error::with_index(
+                                "invalid UTF-8 in display string",
+                                start + err.valid_up_to(),
+                            )),
+                        },
+                        Cow::Owned(output) => match StdString::from_utf8(output) {
+                            Ok(output) => Ok(Cow::Owned(output)),
+                            Err(err) => Err(Error::with_index(
+                                "invalid UTF-8 in display string",
+                                start + err.utf8_error().valid_up_to(),
+                            )),
+                        },
+                    };
+                }
+                0x00..=0x1f | 0x7f..=0xff => {
+                    return self.error("invalid display string character");
+                }
+                b'%' => {
+                    self.next();
+
+                    let mut octet = 0;
+
+                    for _ in 0..2 {
+                        octet = (octet << 4)
+                            + match self.peek() {
+                                Some(c @ b'0'..=b'9') => {
+                                    self.next();
+                                    c - b'0'
+                                }
+                                Some(c @ b'a'..=b'f') => {
+                                    self.next();
+                                    c - b'a' + 10
+                                }
+                                None => return self.error("unterminated escape sequence"),
+                                Some(_) => return self.error("invalid escape sequence"),
+                            };
+                    }
+
+                    output.to_mut().push(octet);
+                }
+                _ => {
+                    self.next();
+                    match output {
+                        Cow::Borrowed(ref mut output) => *output = &self.input[start..self.index],
+                        Cow::Owned(ref mut output) => output.push(curr_char),
+                    }
+                }
+            }
+        }
+        self.error("unterminated display string")
+    }
+
     pub(crate) fn parse_parameters(
         &mut self,
         mut visitor: impl ParameterVisitor<'a>,
     ) -> SFVResult<()> {
-        // https://httpwg.org/specs/rfc8941.html#parse-param
+        // https://httpwg.org/specs/rfc9651.html#parse-param
 
         while let Some(b';') = self.peek() {
             self.next();
@@ -547,7 +666,7 @@ assert_eq!(
     }
 
     pub(crate) fn parse_key(&mut self) -> SFVResult<&'a KeyRef> {
-        // https://httpwg.org/specs/rfc8941.html#parse-key
+        // https://httpwg.org/specs/rfc9651.html#parse-key
 
         match self.parse_non_empty_str(
             utils::is_allowed_start_key_char,

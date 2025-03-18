@@ -3,8 +3,8 @@ use serde_json::Value;
 use sfv::Parser;
 use sfv::SerializeValue;
 use sfv::{
-    BareItem, Decimal, Dictionary, InnerList, Item, KeyRef, List, ListEntry, Parameters, StringRef,
-    TokenRef,
+    BareItem, Date, Decimal, Dictionary, InnerList, Item, KeyRef, List, ListEntry, Parameters,
+    StringRef, TokenRef,
 };
 use std::convert::{TryFrom, TryInto};
 use std::error::Error;
@@ -283,6 +283,23 @@ fn build_bare_item(bare_item_value: &Value) -> Result<BareItem, Box<dyn Error>> 
                     .ok_or("build_bare_item: invalid base32")?,
             ))
         }
+        bare_item if (bare_item.is_object() && bare_item["__type"] == "date") => {
+            Ok(BareItem::Date(Date::from_unix_seconds(
+                bare_item["value"]
+                    .as_i64()
+                    .ok_or("build_bare_item: bare_item value is not an i64")?
+                    .try_into()
+                    .unwrap(),
+            )))
+        }
+        bare_item if (bare_item.is_object() && bare_item["__type"] == "displaystring") => {
+            Ok(BareItem::DisplayString(
+                bare_item["value"]
+                    .as_str()
+                    .ok_or("build_bare_item: bare_item value is not a str")?
+                    .to_owned(),
+            ))
+        }
         _ => Err("build_bare_item: unknown bare_item value".into()),
     }
 }
@@ -330,12 +347,7 @@ fn run_spec_parse_serialize_tests() -> Result<(), Box<dyn Error>> {
     let test_suites_dir: PathBuf = env::current_dir()?.join("tests").join("spec_tests");
     let json_files = fs::read_dir(test_suites_dir)?
         .filter_map(Result::ok)
-        .filter(|fp| {
-            fp.path().extension().unwrap_or_default() == "json"
-            // These are only supported in RFC 9651.
-            && fp.path().file_stem().unwrap_or_default() != "date"
-            && fp.path().file_stem().unwrap_or_default() != "display-string"
-        });
+        .filter(|fp| fp.path().extension().unwrap_or_default() == "json");
 
     for file_path in json_files {
         println!("\n## Test suite file: {:?}\n", &file_path.file_name());

@@ -7,7 +7,7 @@ use std::convert::Infallible;
 ///
 /// Can be used as a member of `List` or `Dictionary`.
 ///
-/// [item]: <https://httpwg.org/specs/rfc8941.html#item>
+/// [item]: <https://httpwg.org/specs/rfc9651.html#item>
 // sf-item   = bare-item parameters
 // bare-item = sf-integer / sf-decimal / sf-string / sf-token
 //             / sf-binary / sf-boolean
@@ -40,7 +40,7 @@ impl Item {
 
 /// A [dictionary]-type structured field value.
 ///
-/// [dictionary]: <https://httpwg.org/specs/rfc8941.html#dictionary>
+/// [dictionary]: <https://httpwg.org/specs/rfc9651.html#dictionary>
 // sf-dictionary  = dict-member *( OWS "," OWS dict-member )
 // dict-member    = member-name [ "=" member-value ]
 // member-name    = key
@@ -49,14 +49,14 @@ pub type Dictionary = IndexMap<Key, ListEntry>;
 
 /// A [list]-type structured field value.
 ///
-/// [list]: <https://httpwg.org/specs/rfc8941.html#list>
+/// [list]: <https://httpwg.org/specs/rfc9651.html#list>
 // sf-list       = list-member *( OWS "," OWS list-member )
 // list-member   = sf-item / inner-list
 pub type List = Vec<ListEntry>;
 
 /// [Parameters] of an [`Item`] or [`InnerList`].
 ///
-/// [parameters]: <https://httpwg.org/specs/rfc8941.html#param>
+/// [parameters]: <https://httpwg.org/specs/rfc9651.html#param>
 // parameters    = *( ";" *SP parameter )
 // parameter     = param-name [ "=" param-value ]
 // param-name    = key
@@ -90,7 +90,7 @@ impl From<InnerList> for ListEntry {
 
 /// An [array] of [`Item`]s with associated [`Parameters`].
 ///
-/// [array]: <https://httpwg.org/specs/rfc8941.html#inner-list>
+/// [array]: <https://httpwg.org/specs/rfc9651.html#inner-list>
 // inner-list    = "(" *SP [ sf-item *( 1*SP sf-item ) *SP ] ")"
 //                 parameters
 #[derive(Debug, Default, PartialEq, Clone)]
