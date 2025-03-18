@@ -28,7 +28,7 @@ pub trait SerializeValue {
 #[cfg(feature = "parsed-types")]
 impl SerializeValue for Dictionary {
     fn serialize_value(&self) -> SFVResult<String> {
-        let mut ser = crate::RefDictSerializer::new();
+        let mut ser = crate::DictSerializer::new();
         ser.members(self);
         ser.finish()
     }
@@ -37,7 +37,7 @@ impl SerializeValue for Dictionary {
 #[cfg(feature = "parsed-types")]
 impl SerializeValue for List {
     fn serialize_value(&self) -> SFVResult<String> {
-        let mut ser = crate::RefListSerializer::new();
+        let mut ser = crate::ListSerializer::new();
         ser.members(self);
         ser.finish()
     }
@@ -46,7 +46,7 @@ impl SerializeValue for List {
 #[cfg(feature = "parsed-types")]
 impl SerializeValue for Item {
     fn serialize_value(&self) -> SFVResult<String> {
-        Ok(crate::RefItemSerializer::new()
+        Ok(crate::ItemSerializer::new()
             .bare_item(&self.bare_item)
             .parameters(&self.params)
             .finish())
