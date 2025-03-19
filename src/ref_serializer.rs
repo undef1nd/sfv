@@ -189,6 +189,11 @@ impl<W: BorrowMut<String>> ListSerializer<W> {
         }
     }
 
+    /// Finishes serialization of the list and returns the underlying output.
+    ///
+    /// This can only fail if no members were serialized, as [empty lists are
+    /// not meant to be serialized at
+    /// all](https://httpwg.org/specs/rfc8941.html#text-serialize).
     pub fn finish(self) -> SFVResult<W> {
         if self.first {
             return Err(Error::new("serializing empty list is not allowed"));
@@ -307,6 +312,11 @@ impl<W: BorrowMut<String>> DictSerializer<W> {
         }
     }
 
+    /// Finishes serialization of the dictionary and returns the underlying output.
+    ///
+    /// This can only fail if no members were serialized, as [empty dictionaries
+    /// are not meant to be serialized at
+    /// all](https://httpwg.org/specs/rfc8941.html#text-serialize).
     pub fn finish(self) -> SFVResult<W> {
         if self.first {
             return Err(Error::new("serializing empty dictionary is not allowed"));
