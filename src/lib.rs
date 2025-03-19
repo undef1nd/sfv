@@ -209,6 +209,7 @@ type SFVResult<T> = std::result::Result<T, Error>;
 /// In general most users will be interested in:
 /// - [`BareItem`], for completely owned data
 /// - [`RefBareItem`], for completely borrowed data
+/// - [`BareItemFromInput`], for data borrowed from input when possible
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum GenericBareItem<S, B, T> {
