@@ -138,6 +138,19 @@ assert_eq!(
 # Ok(())
 # }
 ```
+
+# Crate features
+
+- `parsed-types` (enabled by default) -- When enabled, exposes fully owned types
+  `Item`, `Dictionary`, `List`, and their components, which can be obtained from
+  [`Parser::parse_item`], etc. These types are implemented using the
+  [`indexmap`](https://crates.io/crates/indexmap) crate, so disabling this
+  feature can avoid that dependency if parsing using a visitor
+  ([`Parser::parse_item_with_visitor`], etc.) is sufficient.
+
+- `arbitrary` -- Implements the
+  [`Arbitrary`](https://docs.rs/arbitrary/1.4.1/arbitrary/trait.Arbitrary.html)
+  trait for this crate's types, making them easier to use with fuzzing.
 */
 
 mod decimal;
