@@ -6,9 +6,9 @@ It also exposes a set of types that might be useful for defining new structured 
 
 There are three types of structured fields:
 
-- `Item` - an `Integer`, `Decimal`, `String`, `Token`, `Byte Sequence`, or `Boolean`. It can have associated `Parameters`.
-- `List` - an array of zero or more members, each of which can be an `Item` or an `InnerList`, both of which can have `Parameters`.
-- `Dictionary` - an ordered map of name-value pairs, where the names are short textual strings and the values are `Item`s or arrays of `Items` (represented with `InnerList`), both of which can have associated parameters. There can be zero or more members, and their names are unique in the scope of the `Dictionary` they occur within.
+- `Item` -- an `Integer`, `Decimal`, `String`, `Token`, `Byte Sequence`, or `Boolean`. It can have associated `Parameters`.
+- `List` -- an array of zero or more members, each of which can be an `Item` or an `InnerList`, both of which can have `Parameters`.
+- `Dictionary` -- an ordered map of name-value pairs, where the names are short textual strings and the values are `Item`s or arrays of `Items` (represented with `InnerList`), both of which can have associated parameters. There can be zero or more members, and their names are unique in the scope of the `Dictionary` they occur within.
 
 There are also a few lower-level types used to construct structured field values:
 - `BareItem` is used as `Item`'s value or as a parameter value in `Parameters`.
