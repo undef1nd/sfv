@@ -255,23 +255,25 @@ fn serialize_bool() {
 
 #[test]
 #[cfg(feature = "parsed-types")]
-fn serialize_params_bool() {
+fn serialize_params_bool() -> Result<(), Error> {
     let mut buf = String::new();
-    Format::Rfc8941.serialize_parameter(key_ref("*b"), true, &mut buf);
+    Format::Rfc8941.serialize_parameter(key_ref("*b"), true, &mut buf)?;
     assert_eq!(";*b", buf);
 
     buf.clear();
-    Format::Rfc8941.serialize_parameter(key_ref("a.a"), false, &mut buf);
+    Format::Rfc8941.serialize_parameter(key_ref("a.a"), false, &mut buf)?;
     assert_eq!(";a.a=?0", buf);
+    Ok(())
 }
 
 #[test]
 #[cfg(feature = "parsed-types")]
-fn serialize_params_string() {
+fn serialize_params_string() -> Result<(), Error> {
     let mut buf = String::new();
 
-    Format::Rfc8941.serialize_parameter(key_ref("b"), string_ref("param_val"), &mut buf);
+    Format::Rfc8941.serialize_parameter(key_ref("b"), string_ref("param_val"), &mut buf)?;
     assert_eq!(r#";b="param_val""#, buf);
+    Ok(())
 }
 
 #[test]
@@ -279,11 +281,11 @@ fn serialize_params_string() {
 fn serialize_params_numbers() -> Result<(), Error> {
     let mut buf = String::new();
 
-    Format::Rfc8941.serialize_parameter(key_ref("key1"), Decimal::try_from(746.15)?, &mut buf);
+    Format::Rfc8941.serialize_parameter(key_ref("key1"), Decimal::try_from(746.15)?, &mut buf)?;
     assert_eq!(";key1=746.15", buf);
 
     buf.clear();
-    Format::Rfc8941.serialize_parameter(key_ref("key2"), 11111, &mut buf);
+    Format::Rfc8941.serialize_parameter(key_ref("key2"), 11111, &mut buf)?;
     assert_eq!(";key2=11111", buf);
     Ok(())
 }
@@ -401,15 +403,17 @@ fn serialize_dict_empty_member_value() -> Result<(), Error> {
 }
 
 #[test]
-#[should_panic]
 fn serialize_date_with_rfc8941() {
     let mut buf = String::new();
-    Format::Rfc8941.serialize_bare_item(Date::UNIX_EPOCH, &mut buf);
+    assert!(Format::Rfc8941
+        .serialize_bare_item(Date::UNIX_EPOCH, &mut buf)
+        .is_err());
 }
 
 #[test]
-#[should_panic]
 fn serialize_display_string_with_rfc8941() {
     let mut buf = String::new();
-    Format::Rfc8941.serialize_bare_item(RefBareItem::DisplayString(""), &mut buf);
+    assert!(Format::Rfc8941
+        .serialize_bare_item(RefBareItem::DisplayString(""), &mut buf)
+        .is_err());
 }

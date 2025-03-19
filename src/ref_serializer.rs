@@ -11,8 +11,8 @@ use std::borrow::BorrowMut;
 ///
 /// # fn main() -> Result<(), sfv::Error> {
 /// let serialized_item = ItemSerializer::new()
-///     .bare_item(11)
-///     .parameter(KeyRef::from_str("foo")?, true)
+///     .bare_item(11)?
+///     .parameter(KeyRef::from_str("foo")?, true)?
 ///     .finish();
 ///
 /// assert_eq!(serialized_item, "11;foo");
@@ -39,9 +39,6 @@ impl ItemSerializer<String> {
     }
 
     /// Creates a serializer with the given format.
-    ///
-    /// Note: Attempting to serialize a [`RefBareItem::Date`] or
-    /// [`RefBareItem::DisplayString`] with [`Format::Rfc8941`] will panic.
     pub fn with_format(format: Format) -> Self {
         Self {
             buffer: String::new(),
@@ -57,9 +54,6 @@ impl<'a> ItemSerializer<&'a mut String> {
     }
 
     /// Creates a serializer that writes into the given buffer with the given format.
-    ///
-    /// Note: Attempting to serialize a [`RefBareItem::Date`] or
-    /// [`RefBareItem::DisplayString`] with [`Format::Rfc8941`] will panic.
     pub fn with_buffer_and_format(buffer: &'a mut String, format: Format) -> Self {
         Self { buffer, format }
     }
@@ -69,13 +63,13 @@ impl<W: BorrowMut<String>> ItemSerializer<W> {
     pub fn bare_item<'b>(
         mut self,
         bare_item: impl Into<RefBareItem<'b>>,
-    ) -> ParameterSerializer<W> {
+    ) -> SFVResult<ParameterSerializer<W>> {
         self.format
-            .serialize_bare_item(bare_item, self.buffer.borrow_mut());
-        ParameterSerializer {
+            .serialize_bare_item(bare_item, self.buffer.borrow_mut())?;
+        Ok(ParameterSerializer {
             buffer: self.buffer,
             format: self.format,
-        }
+        })
     }
 }
 
@@ -87,21 +81,25 @@ pub struct ParameterSerializer<W> {
 }
 
 impl<W: BorrowMut<String>> ParameterSerializer<W> {
-    pub fn parameter<'b>(mut self, name: &KeyRef, value: impl Into<RefBareItem<'b>>) -> Self {
+    pub fn parameter<'b>(
+        mut self,
+        name: &KeyRef,
+        value: impl Into<RefBareItem<'b>>,
+    ) -> SFVResult<Self> {
         self.format
-            .serialize_parameter(name, value, self.buffer.borrow_mut());
-        self
+            .serialize_parameter(name, value, self.buffer.borrow_mut())?;
+        Ok(self)
     }
 
     pub fn parameters<'b>(
         mut self,
         params: impl IntoIterator<Item = (impl AsRef<KeyRef>, impl Into<RefBareItem<'b>>)>,
-    ) -> Self {
+    ) -> SFVResult<Self> {
         for (name, value) in params {
             self.format
-                .serialize_parameter(name.as_ref(), value, self.buffer.borrow_mut());
+                .serialize_parameter(name.as_ref(), value, self.buffer.borrow_mut())?;
         }
-        self
+        Ok(self)
     }
 
     pub fn finish(self) -> W {
@@ -124,19 +122,19 @@ fn maybe_write_separator(buffer: &mut String, first: &mut bool) {
 /// # fn main() -> Result<(), sfv::Error> {
 /// let mut ser = ListSerializer::new();
 ///
-/// ser.bare_item(11)
-///     .parameter(KeyRef::from_str("foo")?, true);
+/// ser.bare_item(11)?
+///     .parameter(KeyRef::from_str("foo")?, true)?;
 ///
 /// {
 ///     let mut ser = ser.inner_list();
 ///
-///     ser.bare_item(TokenRef::from_str("abc")?)
-///         .parameter(KeyRef::from_str("abc_param")?, false);
+///     ser.bare_item(TokenRef::from_str("abc")?)?
+///         .parameter(KeyRef::from_str("abc_param")?, false)?;
 ///
-///     ser.bare_item(TokenRef::from_str("def")?);
+///     ser.bare_item(TokenRef::from_str("def")?)?;
 ///
 ///     ser.finish()
-///         .parameter(KeyRef::from_str("bar")?, StringRef::from_str("val")?);
+///         .parameter(KeyRef::from_str("bar")?, StringRef::from_str("val")?)?;
 /// }
 ///
 /// assert_eq!(
@@ -167,9 +165,6 @@ impl ListSerializer<String> {
     }
 
     /// Creates a serializer with the given format.
-    ///
-    /// Note: Attempting to serialize a [`RefBareItem::Date`] or
-    /// [`RefBareItem::DisplayString`] with [`Format::Rfc8941`] will panic.
     pub fn with_format(format: Format) -> Self {
         Self {
             buffer: String::new(),
@@ -186,9 +181,6 @@ impl<'a> ListSerializer<&'a mut String> {
     }
 
     /// Creates a serializer that writes into the given buffer with the given format.
-    ///
-    /// Note: Attempting to serialize a [`RefBareItem::Date`] or
-    /// [`RefBareItem::DisplayString`] with [`Format::Rfc8941`] will panic.
     pub fn with_buffer_and_format(buffer: &'a mut String, format: Format) -> Self {
         Self {
             buffer,
@@ -202,14 +194,14 @@ impl<W: BorrowMut<String>> ListSerializer<W> {
     pub fn bare_item<'b>(
         &mut self,
         bare_item: impl Into<RefBareItem<'b>>,
-    ) -> ParameterSerializer<&mut String> {
+    ) -> SFVResult<ParameterSerializer<&mut String>> {
         let buffer = self.buffer.borrow_mut();
         maybe_write_separator(buffer, &mut self.first);
-        self.format.serialize_bare_item(bare_item, buffer);
-        ParameterSerializer {
+        self.format.serialize_bare_item(bare_item, buffer)?;
+        Ok(ParameterSerializer {
             buffer,
             format: self.format,
-        }
+        })
     }
 
     pub fn inner_list(&mut self) -> InnerListSerializer {
@@ -223,19 +215,24 @@ impl<W: BorrowMut<String>> ListSerializer<W> {
     }
 
     #[cfg(feature = "parsed-types")]
-    pub fn members<'b>(&mut self, members: impl IntoIterator<Item = &'b ListEntry>) {
+    pub fn members<'b>(
+        &mut self,
+        members: impl IntoIterator<Item = &'b ListEntry>,
+    ) -> SFVResult<()> {
         for value in members {
             match value {
                 ListEntry::Item(value) => {
-                    self.bare_item(&value.bare_item).parameters(&value.params);
+                    self.bare_item(&value.bare_item)?
+                        .parameters(&value.params)?;
                 }
                 ListEntry::InnerList(value) => {
                     let mut ser = self.inner_list();
-                    ser.items(&value.items);
-                    ser.finish().parameters(&value.params);
+                    ser.items(&value.items)?;
+                    ser.finish().parameters(&value.params)?;
                 }
             }
         }
+        Ok(())
     }
 
     /// Finishes serialization of the list and returns the underlying output.
@@ -259,22 +256,22 @@ impl<W: BorrowMut<String>> ListSerializer<W> {
 /// # fn main() -> Result<(), sfv::Error> {
 /// let mut ser = DictSerializer::new();
 ///
-/// ser.bare_item(KeyRef::from_str("member1")?, 11)
-///     .parameter(KeyRef::from_str("foo")?, true);
+/// ser.bare_item(KeyRef::from_str("member1")?, 11)?
+///     .parameter(KeyRef::from_str("foo")?, true)?;
 ///
 /// {
 ///   let mut ser = ser.inner_list(KeyRef::from_str("member2")?);
 ///
-///   ser.bare_item(TokenRef::from_str("abc")?)
-///       .parameter(KeyRef::from_str("abc_param")?, false);
+///   ser.bare_item(TokenRef::from_str("abc")?)?
+///       .parameter(KeyRef::from_str("abc_param")?, false)?;
 ///
-///   ser.bare_item(TokenRef::from_str("def")?);
+///   ser.bare_item(TokenRef::from_str("def")?)?;
 ///
 ///   ser.finish()
-///      .parameter(KeyRef::from_str("bar")?, StringRef::from_str("val")?);
+///      .parameter(KeyRef::from_str("bar")?, StringRef::from_str("val")?)?;
 /// }
 ///
-/// ser.bare_item(KeyRef::from_str("member3")?, Decimal::try_from(12.34566)?);
+/// ser.bare_item(KeyRef::from_str("member3")?, Decimal::try_from(12.34566)?)?;
 ///
 /// assert_eq!(
 ///     ser.finish()?,
@@ -304,9 +301,6 @@ impl DictSerializer<String> {
     }
 
     /// Creates a serializer with the given format.
-    ///
-    /// Note: Attempting to serialize a [`RefBareItem::Date`] or
-    /// [`RefBareItem::DisplayString`] with [`Format::Rfc8941`] will panic.
     pub fn with_format(format: Format) -> Self {
         Self {
             buffer: String::new(),
@@ -323,9 +317,6 @@ impl<'a> DictSerializer<&'a mut String> {
     }
 
     /// Creates a serializer that writes into the given buffer with the given format.
-    ///
-    /// Note: Attempting to serialize a [`RefBareItem::Date`] or
-    /// [`RefBareItem::DisplayString`] with [`Format::Rfc8941`] will panic.
     pub fn with_buffer_and_format(buffer: &'a mut String, format: Format) -> Self {
         Self {
             buffer,
@@ -340,19 +331,19 @@ impl<W: BorrowMut<String>> DictSerializer<W> {
         &mut self,
         name: &KeyRef,
         value: impl Into<RefBareItem<'b>>,
-    ) -> ParameterSerializer<&mut String> {
+    ) -> SFVResult<ParameterSerializer<&mut String>> {
         let buffer = self.buffer.borrow_mut();
         maybe_write_separator(buffer, &mut self.first);
         Format::serialize_key(name, buffer);
         let value = value.into();
         if value != RefBareItem::Boolean(true) {
             buffer.push('=');
-            self.format.serialize_bare_item(value, buffer);
+            self.format.serialize_bare_item(value, buffer)?;
         }
-        ParameterSerializer {
+        Ok(ParameterSerializer {
             buffer,
             format: self.format,
-        }
+        })
     }
 
     pub fn inner_list(&mut self, name: &KeyRef) -> InnerListSerializer {
@@ -370,20 +361,21 @@ impl<W: BorrowMut<String>> DictSerializer<W> {
     pub fn members<'b>(
         &mut self,
         members: impl IntoIterator<Item = (impl AsRef<KeyRef>, &'b ListEntry)>,
-    ) {
+    ) -> SFVResult<()> {
         for (name, value) in members {
             match value {
                 ListEntry::Item(value) => {
-                    self.bare_item(name.as_ref(), &value.bare_item)
-                        .parameters(&value.params);
+                    self.bare_item(name.as_ref(), &value.bare_item)?
+                        .parameters(&value.params)?;
                 }
                 ListEntry::InnerList(value) => {
                     let mut ser = self.inner_list(name.as_ref());
-                    ser.items(&value.items);
-                    ser.finish().parameters(&value.params);
+                    ser.items(&value.items)?;
+                    ser.finish().parameters(&value.params)?;
                 }
             }
         }
+        Ok(())
     }
 
     /// Finishes serialization of the dictionary and returns the underlying output.
@@ -419,23 +411,24 @@ impl<'a> InnerListSerializer<'a> {
     pub fn bare_item<'b>(
         &mut self,
         bare_item: impl Into<RefBareItem<'b>>,
-    ) -> ParameterSerializer<&mut String> {
+    ) -> SFVResult<ParameterSerializer<&mut String>> {
         let buffer = self.buffer.as_mut().unwrap();
         if !buffer.is_empty() & !buffer.ends_with('(') {
             buffer.push(' ');
         }
-        self.format.serialize_bare_item(bare_item, buffer);
-        ParameterSerializer {
+        self.format.serialize_bare_item(bare_item, buffer)?;
+        Ok(ParameterSerializer {
             buffer,
             format: self.format,
-        }
+        })
     }
 
     #[cfg(feature = "parsed-types")]
-    pub fn items<'b>(&mut self, items: impl IntoIterator<Item = &'b Item>) {
+    pub fn items<'b>(&mut self, items: impl IntoIterator<Item = &'b Item>) -> SFVResult<()> {
         for item in items {
-            self.bare_item(&item.bare_item).parameters(&item.params);
+            self.bare_item(&item.bare_item)?.parameters(&item.params)?;
         }
+        Ok(())
     }
 
     pub fn finish(mut self) -> ParameterSerializer<&'a mut String> {
@@ -455,33 +448,35 @@ mod alternative_serializer_tests {
     use std::convert::TryFrom;
 
     #[test]
-    fn test_fast_serialize_item() {
-        fn check(ser: ItemSerializer<impl BorrowMut<String>>) {
+    fn test_fast_serialize_item() -> SFVResult<()> {
+        fn check(ser: ItemSerializer<impl BorrowMut<String>>) -> SFVResult<()> {
             let output = ser
-                .bare_item(token_ref("hello"))
-                .parameter(key_ref("abc"), true)
+                .bare_item(token_ref("hello"))?
+                .parameter(key_ref("abc"), true)?
                 .finish();
             assert_eq!("hello;abc", output.borrow());
+            Ok(())
         }
 
-        check(ItemSerializer::new());
-        check(ItemSerializer::with_buffer(&mut String::new()));
+        check(ItemSerializer::new())?;
+        check(ItemSerializer::with_buffer(&mut String::new()))?;
+        Ok(())
     }
 
     #[test]
     fn test_fast_serialize_list() -> SFVResult<()> {
         fn check(mut ser: ListSerializer<impl BorrowMut<String>>) -> SFVResult<()> {
-            ser.bare_item(token_ref("hello"))
-                .parameter(key_ref("key1"), true)
-                .parameter(key_ref("key2"), false);
+            ser.bare_item(token_ref("hello"))?
+                .parameter(key_ref("key1"), true)?
+                .parameter(key_ref("key2"), false)?;
 
             {
                 let mut ser = ser.inner_list();
-                ser.bare_item(string_ref("some_string"));
-                ser.bare_item(12)
-                    .parameter(key_ref("inner-member-key"), true);
+                ser.bare_item(string_ref("some_string"))?;
+                ser.bare_item(12)?
+                    .parameter(key_ref("inner-member-key"), true)?;
                 ser.finish()
-                    .parameter(key_ref("inner-list-param"), token_ref("*"));
+                    .parameter(key_ref("inner-list-param"), token_ref("*"))?;
             }
 
             let output = ser.finish()?;
@@ -500,30 +495,30 @@ mod alternative_serializer_tests {
     #[test]
     fn test_fast_serialize_dict() -> SFVResult<()> {
         fn check(mut ser: DictSerializer<impl BorrowMut<String>>) -> SFVResult<()> {
-            ser.bare_item(key_ref("member1"), token_ref("hello"))
-                .parameter(key_ref("key1"), true)
-                .parameter(key_ref("key2"), false);
+            ser.bare_item(key_ref("member1"), token_ref("hello"))?
+                .parameter(key_ref("key1"), true)?
+                .parameter(key_ref("key2"), false)?;
 
-            ser.bare_item(key_ref("member2"), true)
-                .parameter(key_ref("key3"), Decimal::try_from(45.4586).unwrap())
-                .parameter(key_ref("key4"), string_ref("str"));
+            ser.bare_item(key_ref("member2"), true)?
+                .parameter(key_ref("key3"), Decimal::try_from(45.4586).unwrap())?
+                .parameter(key_ref("key4"), string_ref("str"))?;
 
             {
                 let mut ser = ser.inner_list(key_ref("key5"));
-                ser.bare_item(45);
-                ser.bare_item(0);
+                ser.bare_item(45)?;
+                ser.bare_item(0)?;
             }
 
-            ser.bare_item(key_ref("key6"), string_ref("foo"));
+            ser.bare_item(key_ref("key6"), string_ref("foo"))?;
 
             {
                 let mut ser = ser.inner_list(key_ref("key7"));
-                ser.bare_item("some_string".as_bytes());
-                ser.bare_item("other_string".as_bytes());
-                ser.finish().parameter(key_ref("lparam"), 10);
+                ser.bare_item("some_string".as_bytes())?;
+                ser.bare_item("other_string".as_bytes())?;
+                ser.finish().parameter(key_ref("lparam"), 10)?;
             }
 
-            ser.bare_item(key_ref("key8"), true);
+            ser.bare_item(key_ref("key8"), true)?;
 
             let output = ser.finish()?;
             assert_eq!(
@@ -554,11 +549,11 @@ mod alternative_serializer_tests {
     #[test]
     fn test_with_buffer_separator() -> SFVResult<()> {
         let mut output = String::from(" ");
-        ListSerializer::with_buffer(&mut output).bare_item(1);
+        ListSerializer::with_buffer(&mut output).bare_item(1)?;
         assert_eq!(output, " 1");
 
         let mut output = String::from(" ");
-        DictSerializer::with_buffer(&mut output).bare_item(key_ref("key1"), 1);
+        DictSerializer::with_buffer(&mut output).bare_item(key_ref("key1"), 1)?;
         assert_eq!(output, " key1=1");
 
         Ok(())
