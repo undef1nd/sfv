@@ -360,9 +360,11 @@ pub(crate) enum Num {
 
 /// A [bare item] that owns its data.
 ///
-/// Used to construct an [`Item`] or [`Parameters`] values.
-///
 /// [bare item]: <https://httpwg.org/specs/rfc8941.html#item>
+#[cfg_attr(
+    feature = "parsed-types",
+    doc = "Used to construct an [`Item`] or [`Parameters`] values."
+)]
 pub type BareItem = GenericBareItem<String, Vec<u8>, Token>;
 
 /// A [bare item] that borrows its data.

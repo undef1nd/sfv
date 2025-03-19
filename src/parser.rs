@@ -124,7 +124,8 @@ impl<'a> Parser<'a> {
         Ok(dict)
     }
 
-    /// Like `parse_dictionary`, but uses the given visitor instead of producing a [`Dictionary`].
+    /// Parses input into a structured field value of `Dictionary` type, using
+    /// the given visitor.
     #[cfg_attr(
         feature = "parsed-types",
         doc = r##"
@@ -161,7 +162,8 @@ assert_eq!(
         Ok(list)
     }
 
-    /// Like `parse_list`, but uses the given visitor instead of producing a [`List`].
+    /// Parses input into a structured field value of `List` type, using the
+    /// given visitor.
     #[cfg_attr(
         feature = "parsed-types",
         doc = r##"
@@ -198,7 +200,8 @@ assert_eq!(
         Ok(item)
     }
 
-    /// Like `parse_item`, but uses the given visitor instead of producing an [`Item`].
+    /// Parses input into a structured field value of `Item` type, using the
+    /// given visitor.
     pub fn parse_item_with_visitor(self, visitor: impl ItemVisitor<'a>) -> SFVResult<()> {
         self.parse(|parser| parse_item(parser, visitor))
     }
