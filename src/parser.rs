@@ -124,7 +124,8 @@ impl<'a> Parser<'a> {
         Ok(dict)
     }
 
-    /// Like `parse_dictionary`, but uses the given visitor instead of producing a [`Dictionary`].
+    /// Parses input into a structured field value of `Dictionary` type, using
+    /// the given visitor.
     #[cfg_attr(
         feature = "parsed-types",
         doc = r##"
@@ -161,7 +162,8 @@ assert_eq!(
         Ok(list)
     }
 
-    /// Like `parse_list`, but uses the given visitor instead of producing a [`List`].
+    /// Parses input into a structured field value of `List` type, using the
+    /// given visitor.
     #[cfg_attr(
         feature = "parsed-types",
         doc = r##"
@@ -198,7 +200,8 @@ assert_eq!(
         Ok(item)
     }
 
-    /// Like `parse_item`, but uses the given visitor instead of producing an [`Item`].
+    /// Parses input into a structured field value of `Item` type, using the
+    /// given visitor.
     pub fn parse_item_with_visitor(self, visitor: impl ItemVisitor<'a>) -> SFVResult<()> {
         self.parse(|parser| parse_item(parser, visitor))
     }
@@ -371,31 +374,41 @@ assert_eq!(
         self.error("unterminated string")
     }
 
-    pub(crate) fn parse_token(&mut self) -> SFVResult<&'a TokenRef> {
-        // https://httpwg.org/specs/rfc8941.html#parse-token
-
+    fn parse_non_empty_str(
+        &mut self,
+        is_allowed_start_char: impl FnOnce(u8) -> bool,
+        is_allowed_inner_char: impl Fn(u8) -> bool,
+    ) -> Option<&'a str> {
         let start = self.index;
 
         match self.peek() {
-            Some(c) if utils::is_allowed_start_token_char(c) => {
+            Some(c) if is_allowed_start_char(c) => {
                 self.next();
             }
-            _ => return self.error("expected start of token"),
+            _ => return None,
         }
 
         loop {
             match self.peek() {
-                Some(c) if utils::is_allowed_inner_token_char(c) => {
+                Some(c) if is_allowed_inner_char(c) => {
                     self.next();
                 }
                 // TODO: The UTF-8 validation is redundant with the preceding character checks, but
                 // its removal is only possible with unsafe code.
-                _ => {
-                    return Ok(TokenRef::from_validated_str(
-                        std::str::from_utf8(&self.input[start..self.index]).unwrap(),
-                    ));
-                }
+                _ => return Some(std::str::from_utf8(&self.input[start..self.index]).unwrap()),
             }
+        }
+    }
+
+    pub(crate) fn parse_token(&mut self) -> SFVResult<&'a TokenRef> {
+        // https://httpwg.org/specs/rfc8941.html#parse-token
+
+        match self.parse_non_empty_str(
+            utils::is_allowed_start_token_char,
+            utils::is_allowed_inner_token_char,
+        ) {
+            None => self.error("expected start of token"),
+            Some(str) => Ok(TokenRef::from_validated_str(str)),
         }
     }
 
@@ -535,28 +548,14 @@ assert_eq!(
     }
 
     pub(crate) fn parse_key(&mut self) -> SFVResult<&'a KeyRef> {
-        let start = self.index;
+        // https://httpwg.org/specs/rfc8941.html#parse-key
 
-        match self.peek() {
-            Some(c) if utils::is_allowed_start_key_char(c) => {
-                self.next();
-            }
-            _ => return self.error("expected start of key ('a'-'z' or '*')"),
-        }
-
-        loop {
-            match self.peek() {
-                Some(c) if utils::is_allowed_inner_key_char(c) => {
-                    self.next();
-                }
-                // TODO: The UTF-8 validation is redundant with the preceding character checks, but
-                // its removal is only possible with unsafe code.
-                _ => {
-                    return Ok(KeyRef::from_validated_str(
-                        std::str::from_utf8(&self.input[start..self.index]).unwrap(),
-                    ));
-                }
-            }
+        match self.parse_non_empty_str(
+            utils::is_allowed_start_key_char,
+            utils::is_allowed_inner_key_char,
+        ) {
+            None => self.error("expected start of key ('a'-'z' or '*')"),
+            Some(str) => Ok(KeyRef::from_validated_str(str)),
         }
     }
 
