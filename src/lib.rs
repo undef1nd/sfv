@@ -236,7 +236,23 @@ pub enum GenericBareItem<S, B, T, D> {
     Boolean(bool),
     // sf-token = ( ALPHA / "*" ) *( tchar / ":" / "/" )
     Token(T),
+    /// [`Parser`] will never produce this variant when used with
+    /// [`Format::Rfc8941`].
+    // sf-date = "@" sf-integer
     Date(Date),
+    /// A structured field value [display string].
+    ///
+    /// Display Strings are similar to [`String`]s, in that they consist of zero
+    /// or more characters, but they allow Unicode scalar values (i.e., all
+    /// Unicode code points except for surrogates), unlike [`String`]s.
+    ///
+    /// [`Parser`] will never produce this variant when used with
+    /// [`Format::Rfc8941`].
+    ///
+    /// [display string]: <https://httpwg.org/specs/rfc9651.html#displaystring>
+    // sf-displaystring = "%" DQUOTE *( unescaped / "\" / pct-encoded ) DQUOTE
+    // pct-encoded      = "%" lc-hexdig lc-hexdig
+    // lc-hexdig        = DIGIT / %x61-66 ; 0-9, a-f
     DisplayString(D),
 }
 

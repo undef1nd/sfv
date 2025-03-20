@@ -15,14 +15,16 @@ use std::fmt;
 pub struct Date(Integer);
 
 impl Date {
-    /// The minimum value for a parsed or serialized date.
-    pub const MIN: Self = Self(Integer::MIN);
+    /// The minimum value for a parsed or serialized date, corresponding to
+    /// [`Integer::MIN`] seconds from the Unix epoch.
+    pub const MIN: Self = Self::from_unix_seconds(Integer::MIN);
 
-    /// The maximum value for a parsed or serialized date.
-    pub const MAX: Self = Self(Integer::MAX);
+    /// The maximum value for a parsed or serialized date, corresponding to
+    /// [`Integer::MAX`] seconds from the Unix epoch.
+    pub const MAX: Self = Self::from_unix_seconds(Integer::MAX);
 
     /// The Unix epoch: `1970-01-01T00:00:00Z`.
-    pub const UNIX_EPOCH: Self = Self(Integer::ZERO);
+    pub const UNIX_EPOCH: Self = Self::from_unix_seconds(Integer::ZERO);
 
     /// Returns the date as an integer number of seconds from the Unix epoch.
     pub fn unix_seconds(&self) -> Integer {
@@ -37,6 +39,6 @@ impl Date {
 
 impl fmt::Display for Date {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "@{}", self.0)
+        write!(f, "@{}", self.unix_seconds())
     }
 }
