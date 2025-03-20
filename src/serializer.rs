@@ -1,19 +1,23 @@
 use crate::utils;
-use crate::{Date, Decimal, Format, Integer, KeyRef, RefBareItem, StringRef, TokenRef};
+use crate::{Date, Decimal, Integer, KeyRef, RefBareItem, StringRef, TokenRef};
 use std::fmt::Write as _;
 
 #[cfg(feature = "parsed-types")]
 use crate::{Dictionary, Item, List, SFVResult};
 
-/// Serializes a structured field value into a string using [`Format::Rfc9651`].
+/// Serializes a structured field value into a string.
 ///
-/// Use [`ItemSerializer::with_format`][`crate::ItemSerializer::with_format`],
-/// [`DictSerializer::with_format`][`crate::DictSerializer::with_format`], or
-/// [`ListSerializer::with_format`][`crate::ListSerializer::with_format`] to use a different format.
+/// Note: The serialization conforms to [RFC 9651], meaning that
+/// [`Dates`][crate::Date] and [`Display Strings`][RefBareItem::DisplayString],
+/// which cause parsing errors under [RFC 8941], will be serialized
+/// unconditionally. The consumer of this API is responsible for determining
+/// whether it is valid to serialize these bare items for any specific header.
+///
+/// [RFC 8941]: <https://httpwg.org/specs/rfc8941.html>
+/// [RFC 9651]: <https://httpwg.org/specs/rfc9651.html>
 #[cfg(feature = "parsed-types")]
 pub trait SerializeValue {
-    /// Serializes a structured field value into a string using
-    /// [`Format::Rfc9651`].
+    /// Serializes a structured field value into a string.
     ///
     /// # Examples
     /// ```
@@ -59,12 +63,10 @@ impl SerializeValue for Item {
     }
 }
 
-impl Format {
-    pub(crate) fn serialize_bare_item<'b>(
-        &self,
-        value: impl Into<RefBareItem<'b>>,
-        output: &mut String,
-    ) {
+pub(crate) struct Serializer;
+
+impl Serializer {
+    pub(crate) fn serialize_bare_item<'b>(value: impl Into<RefBareItem<'b>>, output: &mut String) {
         // https://httpwg.org/specs/rfc9651.html#ser-bare-item
 
         match value.into() {
@@ -74,13 +76,12 @@ impl Format {
             RefBareItem::Token(value) => Self::serialize_token(value, output),
             RefBareItem::Integer(value) => Self::serialize_integer(value, output),
             RefBareItem::Decimal(value) => Self::serialize_decimal(value, output),
-            RefBareItem::Date(value) => self.serialize_date(value, output),
-            RefBareItem::DisplayString(value) => self.serialize_display_string(value, output),
+            RefBareItem::Date(value) => Self::serialize_date(value, output),
+            RefBareItem::DisplayString(value) => Self::serialize_display_string(value, output),
         }
     }
 
     pub(crate) fn serialize_parameter<'b>(
-        &self,
         name: &KeyRef,
         value: impl Into<RefBareItem<'b>>,
         output: &mut String,
@@ -92,7 +93,7 @@ impl Format {
         let value = value.into();
         if value != RefBareItem::Boolean(true) {
             output.push('=');
-            self.serialize_bare_item(value, output);
+            Self::serialize_bare_item(value, output);
         }
     }
 
@@ -147,22 +148,14 @@ impl Format {
         output.push_str(if value { "?1" } else { "?0" });
     }
 
-    pub(crate) fn serialize_date(&self, value: Date, output: &mut String) {
+    pub(crate) fn serialize_date(value: Date, output: &mut String) {
         // https://httpwg.org/specs/rfc9651.html#ser-date
 
-        match self {
-            Self::Rfc8941 => panic!("RFC 8941 does not support dates"),
-            Self::Rfc9651 => write!(output, "{}", value).unwrap(),
-        }
+        write!(output, "{}", value).unwrap();
     }
 
-    pub(crate) fn serialize_display_string(&self, value: &str, output: &mut String) {
+    pub(crate) fn serialize_display_string(value: &str, output: &mut String) {
         // https://httpwg.org/specs/rfc9651.html#ser-display
-
-        match self {
-            Self::Rfc8941 => panic!("RFC 8941 does not support display strings"),
-            Self::Rfc9651 => {}
-        }
 
         output.push_str(r#"%""#);
         for c in value.bytes() {

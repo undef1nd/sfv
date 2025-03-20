@@ -567,25 +567,6 @@ pub enum Format {
     Rfc9651,
 }
 
-impl Format {
-    /// Returns true if the format can parse and serialize the given bare item
-    /// without error, false otherwise.
-    pub fn supports_bare_item(&self, bare_item: RefBareItem) -> bool {
-        match bare_item {
-            RefBareItem::Decimal(_)
-            | RefBareItem::Integer(_)
-            | RefBareItem::String(_)
-            | RefBareItem::ByteSeq(_)
-            | RefBareItem::Boolean(_)
-            | RefBareItem::Token(_) => true,
-            RefBareItem::Date(_) | RefBareItem::DisplayString(_) => match self {
-                Format::Rfc8941 => false,
-                Format::Rfc9651 => true,
-            },
-        }
-    }
-}
-
 impl fmt::Display for Format {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_str(match self {

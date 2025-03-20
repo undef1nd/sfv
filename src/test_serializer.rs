@@ -1,4 +1,5 @@
-use crate::{integer, key_ref, string_ref, token_ref, Date, Decimal, Error, Format, RefBareItem};
+use crate::serializer::Serializer;
+use crate::{integer, key_ref, string_ref, token_ref, Date, Decimal, Error};
 use std::convert::TryFrom;
 
 #[cfg(feature = "parsed-types")]
@@ -105,58 +106,58 @@ fn serialize_item_with_token_param() -> Result<(), Error> {
 #[test]
 fn serialize_integer() {
     let mut buf = String::new();
-    Format::serialize_integer(integer(-12), &mut buf);
+    Serializer::serialize_integer(integer(-12), &mut buf);
     assert_eq!("-12", &buf);
 
     buf.clear();
-    Format::serialize_integer(integer(0), &mut buf);
+    Serializer::serialize_integer(integer(0), &mut buf);
     assert_eq!("0", &buf);
 
     buf.clear();
-    Format::serialize_integer(integer(999_999_999_999_999), &mut buf);
+    Serializer::serialize_integer(integer(999_999_999_999_999), &mut buf);
     assert_eq!("999999999999999", &buf);
 
     buf.clear();
-    Format::serialize_integer(integer(-999_999_999_999_999), &mut buf);
+    Serializer::serialize_integer(integer(-999_999_999_999_999), &mut buf);
     assert_eq!("-999999999999999", &buf);
 }
 
 #[test]
 fn serialize_decimal() -> Result<(), Error> {
     let mut buf = String::new();
-    Format::serialize_decimal(Decimal::try_from(-99.1346897)?, &mut buf);
+    Serializer::serialize_decimal(Decimal::try_from(-99.1346897)?, &mut buf);
     assert_eq!("-99.135", &buf);
 
     buf.clear();
-    Format::serialize_decimal(Decimal::try_from(-1.00)?, &mut buf);
+    Serializer::serialize_decimal(Decimal::try_from(-1.00)?, &mut buf);
     assert_eq!("-1.0", &buf);
 
     buf.clear();
-    Format::serialize_decimal(Decimal::try_from(-99.1346897)?, &mut buf);
+    Serializer::serialize_decimal(Decimal::try_from(-99.1346897)?, &mut buf);
     assert_eq!("-99.135", &buf);
 
     buf.clear();
-    Format::serialize_decimal(Decimal::try_from(100.13)?, &mut buf);
+    Serializer::serialize_decimal(Decimal::try_from(100.13)?, &mut buf);
     assert_eq!("100.13", &buf);
 
     buf.clear();
-    Format::serialize_decimal(Decimal::try_from(-100.130)?, &mut buf);
+    Serializer::serialize_decimal(Decimal::try_from(-100.130)?, &mut buf);
     assert_eq!("-100.13", &buf);
 
     buf.clear();
-    Format::serialize_decimal(Decimal::try_from(-100.100)?, &mut buf);
+    Serializer::serialize_decimal(Decimal::try_from(-100.100)?, &mut buf);
     assert_eq!("-100.1", &buf);
 
     buf.clear();
-    Format::serialize_decimal(Decimal::try_from(-137.0)?, &mut buf);
+    Serializer::serialize_decimal(Decimal::try_from(-137.0)?, &mut buf);
     assert_eq!("-137.0", &buf);
 
     buf.clear();
-    Format::serialize_decimal(Decimal::try_from(137121212112.123)?, &mut buf);
+    Serializer::serialize_decimal(Decimal::try_from(137121212112.123)?, &mut buf);
     assert_eq!("137121212112.123", &buf);
 
     buf.clear();
-    Format::serialize_decimal(Decimal::try_from(137121212112.1238)?, &mut buf);
+    Serializer::serialize_decimal(Decimal::try_from(137121212112.1238)?, &mut buf);
     assert_eq!("137121212112.124", &buf);
     Ok(())
 }
@@ -164,92 +165,92 @@ fn serialize_decimal() -> Result<(), Error> {
 #[test]
 fn serialize_string() {
     let mut buf = String::new();
-    Format::serialize_string(string_ref("1.1 text"), &mut buf);
+    Serializer::serialize_string(string_ref("1.1 text"), &mut buf);
     assert_eq!(r#""1.1 text""#, &buf);
 
     buf.clear();
-    Format::serialize_string(string_ref(r#"hello "name""#), &mut buf);
+    Serializer::serialize_string(string_ref(r#"hello "name""#), &mut buf);
     assert_eq!(r#""hello \"name\"""#, &buf);
 
     buf.clear();
-    Format::serialize_string(string_ref(r#"something\nothing"#), &mut buf);
+    Serializer::serialize_string(string_ref(r#"something\nothing"#), &mut buf);
     assert_eq!(r#""something\\nothing""#, &buf);
 
     buf.clear();
-    Format::serialize_string(string_ref(""), &mut buf);
+    Serializer::serialize_string(string_ref(""), &mut buf);
     assert_eq!(r#""""#, &buf);
 
     buf.clear();
-    Format::serialize_string(string_ref(" "), &mut buf);
+    Serializer::serialize_string(string_ref(" "), &mut buf);
     assert_eq!(r#"" ""#, &buf);
 
     buf.clear();
-    Format::serialize_string(string_ref("    "), &mut buf);
+    Serializer::serialize_string(string_ref("    "), &mut buf);
     assert_eq!(r#""    ""#, &buf);
 }
 
 #[test]
 fn serialize_token() {
     let mut buf = String::new();
-    Format::serialize_token(token_ref("*"), &mut buf);
+    Serializer::serialize_token(token_ref("*"), &mut buf);
     assert_eq!("*", &buf);
 
     buf.clear();
-    Format::serialize_token(token_ref("abc"), &mut buf);
+    Serializer::serialize_token(token_ref("abc"), &mut buf);
     assert_eq!("abc", &buf);
 
     buf.clear();
-    Format::serialize_token(token_ref("abc:de"), &mut buf);
+    Serializer::serialize_token(token_ref("abc:de"), &mut buf);
     assert_eq!("abc:de", &buf);
 
     buf.clear();
-    Format::serialize_token(token_ref("smth/#!else"), &mut buf);
+    Serializer::serialize_token(token_ref("smth/#!else"), &mut buf);
     assert_eq!("smth/#!else", &buf);
 }
 
 #[test]
 fn serialize_byte_sequence() {
     let mut buf = String::new();
-    Format::serialize_byte_sequence("hello".as_bytes(), &mut buf);
+    Serializer::serialize_byte_sequence("hello".as_bytes(), &mut buf);
     assert_eq!(":aGVsbG8=:", &buf);
 
     buf.clear();
-    Format::serialize_byte_sequence("test_encode".as_bytes(), &mut buf);
+    Serializer::serialize_byte_sequence("test_encode".as_bytes(), &mut buf);
     assert_eq!(":dGVzdF9lbmNvZGU=:", &buf);
 
     buf.clear();
-    Format::serialize_byte_sequence("".as_bytes(), &mut buf);
+    Serializer::serialize_byte_sequence("".as_bytes(), &mut buf);
     assert_eq!("::", &buf);
 
     buf.clear();
-    Format::serialize_byte_sequence("pleasure.".as_bytes(), &mut buf);
+    Serializer::serialize_byte_sequence("pleasure.".as_bytes(), &mut buf);
     assert_eq!(":cGxlYXN1cmUu:", &buf);
 
     buf.clear();
-    Format::serialize_byte_sequence("leasure.".as_bytes(), &mut buf);
+    Serializer::serialize_byte_sequence("leasure.".as_bytes(), &mut buf);
     assert_eq!(":bGVhc3VyZS4=:", &buf);
 
     buf.clear();
-    Format::serialize_byte_sequence("easure.".as_bytes(), &mut buf);
+    Serializer::serialize_byte_sequence("easure.".as_bytes(), &mut buf);
     assert_eq!(":ZWFzdXJlLg==:", &buf);
 
     buf.clear();
-    Format::serialize_byte_sequence("asure.".as_bytes(), &mut buf);
+    Serializer::serialize_byte_sequence("asure.".as_bytes(), &mut buf);
     assert_eq!(":YXN1cmUu:", &buf);
 
     buf.clear();
-    Format::serialize_byte_sequence("sure.".as_bytes(), &mut buf);
+    Serializer::serialize_byte_sequence("sure.".as_bytes(), &mut buf);
     assert_eq!(":c3VyZS4=:", &buf);
 }
 
 #[test]
 fn serialize_bool() {
     let mut buf = String::new();
-    Format::serialize_bool(true, &mut buf);
+    Serializer::serialize_bool(true, &mut buf);
     assert_eq!("?1", &buf);
 
     buf.clear();
-    Format::serialize_bool(false, &mut buf);
+    Serializer::serialize_bool(false, &mut buf);
     assert_eq!("?0", &buf);
 }
 
@@ -257,11 +258,11 @@ fn serialize_bool() {
 #[cfg(feature = "parsed-types")]
 fn serialize_params_bool() {
     let mut buf = String::new();
-    Format::Rfc8941.serialize_parameter(key_ref("*b"), true, &mut buf);
+    Serializer::serialize_parameter(key_ref("*b"), true, &mut buf);
     assert_eq!(";*b", buf);
 
     buf.clear();
-    Format::Rfc8941.serialize_parameter(key_ref("a.a"), false, &mut buf);
+    Serializer::serialize_parameter(key_ref("a.a"), false, &mut buf);
     assert_eq!(";a.a=?0", buf);
 }
 
@@ -270,7 +271,7 @@ fn serialize_params_bool() {
 fn serialize_params_string() {
     let mut buf = String::new();
 
-    Format::Rfc8941.serialize_parameter(key_ref("b"), string_ref("param_val"), &mut buf);
+    Serializer::serialize_parameter(key_ref("b"), string_ref("param_val"), &mut buf);
     assert_eq!(r#";b="param_val""#, buf);
 }
 
@@ -279,11 +280,11 @@ fn serialize_params_string() {
 fn serialize_params_numbers() -> Result<(), Error> {
     let mut buf = String::new();
 
-    Format::Rfc8941.serialize_parameter(key_ref("key1"), Decimal::try_from(746.15)?, &mut buf);
+    Serializer::serialize_parameter(key_ref("key1"), Decimal::try_from(746.15)?, &mut buf);
     assert_eq!(";key1=746.15", buf);
 
     buf.clear();
-    Format::Rfc8941.serialize_parameter(key_ref("key2"), 11111, &mut buf);
+    Serializer::serialize_parameter(key_ref("key2"), 11111, &mut buf);
     assert_eq!(";key2=11111", buf);
     Ok(())
 }
@@ -291,19 +292,19 @@ fn serialize_params_numbers() -> Result<(), Error> {
 #[test]
 fn serialize_key() {
     let mut buf = String::new();
-    Format::serialize_key(key_ref("*a_fg"), &mut buf);
+    Serializer::serialize_key(key_ref("*a_fg"), &mut buf);
     assert_eq!("*a_fg", &buf);
 
     buf.clear();
-    Format::serialize_key(key_ref("*a_fg*"), &mut buf);
+    Serializer::serialize_key(key_ref("*a_fg*"), &mut buf);
     assert_eq!("*a_fg*", &buf);
 
     buf.clear();
-    Format::serialize_key(key_ref("key1"), &mut buf);
+    Serializer::serialize_key(key_ref("key1"), &mut buf);
     assert_eq!("key1", &buf);
 
     buf.clear();
-    Format::serialize_key(key_ref("ke-y.1"), &mut buf);
+    Serializer::serialize_key(key_ref("ke-y.1"), &mut buf);
     assert_eq!("ke-y.1", &buf);
 }
 
@@ -401,15 +402,15 @@ fn serialize_dict_empty_member_value() -> Result<(), Error> {
 }
 
 #[test]
-#[should_panic]
-fn serialize_date_with_rfc8941() {
+fn serialize_date_with() {
     let mut buf = String::new();
-    Format::Rfc8941.serialize_bare_item(Date::UNIX_EPOCH, &mut buf);
+    Serializer::serialize_date(Date::UNIX_EPOCH, &mut buf);
+    assert_eq!(buf, "@0");
 }
 
 #[test]
-#[should_panic]
-fn serialize_display_string_with_rfc8941() {
+fn serialize_display_string() {
     let mut buf = String::new();
-    Format::Rfc8941.serialize_bare_item(RefBareItem::DisplayString(""), &mut buf);
+    Serializer::serialize_display_string("üsers", &mut buf);
+    assert_eq!(buf, r#"%"%c3%bcsers""#);
 }
