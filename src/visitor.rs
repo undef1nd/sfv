@@ -59,6 +59,7 @@ use std::error::Error;
 ///
 /// The lifetime `'a` is the lifetime of the input.
 pub trait ParameterVisitor<'a> {
+    /// The error type that can be returned if some error occurs during parsing.
     type Error: Error;
 
     /// Called after a parameter has been parsed.
@@ -96,6 +97,7 @@ pub trait ParameterVisitor<'a> {
 /// Use this trait with
 /// [`Parser::parse_item_with_visitor`][crate::Parser::parse_item_with_visitor].
 pub trait ItemVisitor<'a> {
+    /// The error type that can be returned if some error occurs during parsing.
     type Error: Error;
 
     /// Called after a bare item has been parsed.
@@ -114,6 +116,7 @@ pub trait ItemVisitor<'a> {
 ///
 /// The lifetime `'a` is the lifetime of the input.
 pub trait InnerListVisitor<'a> {
+    /// The error type that can be returned if some error occurs during parsing.
     type Error: Error;
 
     /// Called before an item has been parsed.
@@ -151,6 +154,7 @@ pub trait EntryVisitor<'a>: ItemVisitor<'a> {
 /// Use this trait with
 /// [`Parser::parse_dictionary_with_visitor`][crate::Parser::parse_dictionary_with_visitor].
 pub trait DictionaryVisitor<'a> {
+    /// The error type that can be returned if some error occurs during parsing.
     type Error: Error;
 
     /// Called after a dictionary key has been parsed.
@@ -177,6 +181,7 @@ pub trait DictionaryVisitor<'a> {
 /// Use this trait with
 /// [`Parser::parse_list_with_visitor`][crate::Parser::parse_list_with_visitor].
 pub trait ListVisitor<'a> {
+    /// The error type that can be returned if some error occurs during parsing.
     type Error: Error;
 
     /// Called before a list entry has been parsed.

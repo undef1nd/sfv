@@ -107,10 +107,12 @@ pub struct Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
+    /// Creates a parser from the given input.
     pub fn from_bytes(input: &'a [u8]) -> Self {
         Self { input, index: 0 }
     }
 
+    /// Creates a parser from the given input.
     #[allow(clippy::should_implement_trait)]
     pub fn from_str(input: &'a str) -> Self {
         Self::from_bytes(input.as_bytes())

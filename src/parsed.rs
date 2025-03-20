@@ -70,7 +70,9 @@ pub type Parameters = IndexMap<Key, BareItem>;
 #[derive(Debug, PartialEq, Clone)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum ListEntry {
+    /// An item.
     Item(Item),
+    /// An inner list.
     InnerList(InnerList),
 }
 
