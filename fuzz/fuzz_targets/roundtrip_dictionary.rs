@@ -9,7 +9,7 @@ fuzz_target!(|dict: sfv::Dictionary| {
         assert!(serialized.is_err());
     } else {
         assert_eq!(
-            sfv::Parser::from_bytes(serialized.unwrap().as_bytes())
+            sfv::Parser::new(&serialized.unwrap())
                 .parse_dictionary()
                 .unwrap(),
             dict

@@ -107,13 +107,11 @@ pub struct Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
-    pub fn from_bytes(input: &'a [u8]) -> Self {
-        Self { input, index: 0 }
-    }
-
-    #[allow(clippy::should_implement_trait)]
-    pub fn from_str(input: &'a str) -> Self {
-        Self::from_bytes(input.as_bytes())
+    pub fn new(input: &'a (impl ?Sized + AsRef<[u8]>)) -> Self {
+        Self {
+            input: input.as_ref(),
+            index: 0,
+        }
     }
 
     /// Parses input into a structured field value of `Dictionary` type.
@@ -135,9 +133,9 @@ them into an existing structure:
 ```
 # use sfv::{Parser, SerializeValue};
 # fn main() -> Result<(), sfv::Error> {
-let mut dict = Parser::from_str("a=1").parse_dictionary()?;
+let mut dict = Parser::new("a=1").parse_dictionary()?;
 
-Parser::from_str("b=2").parse_dictionary_with_visitor(&mut dict)?;
+Parser::new("b=2").parse_dictionary_with_visitor(&mut dict)?;
 
 assert_eq!(
     dict.serialize_value()?,
@@ -172,9 +170,9 @@ into an existing structure:
 ```
 # use sfv::{Parser, SerializeValue};
 # fn main() -> Result<(), sfv::Error> {
-let mut list = Parser::from_str("11, (12 13)").parse_list()?;
+let mut list = Parser::new("11, (12 13)").parse_list()?;
 
-Parser::from_str(r#""foo",        "bar""#).parse_list_with_visitor(&mut list)?;
+Parser::new(r#""foo",        "bar""#).parse_list_with_visitor(&mut list)?;
 
 assert_eq!(
     list.serialize_value()?,

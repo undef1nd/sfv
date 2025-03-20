@@ -29,17 +29,17 @@ use sfv::Parser;
 # fn main() -> Result<(), sfv::Error> {
 // Parsing a structured field value of Item type.
 let input = "12.445;foo=bar";
-let item = Parser::from_str(input).parse_item()?;
+let item = Parser::new(input).parse_item()?;
 println!("{:#?}", item);
 
 // Parsing a structured field value of List type.
 let input = r#"1;a=tok, ("foo" "bar");baz, ()"#;
-let list = Parser::from_str(input).parse_list()?;
+let list = Parser::new(input).parse_list()?;
 println!("{:#?}", list);
 
 // Parsing a structured field value of Dictionary type.
 let input = "a=?0, b, c; foo=bar, rating=1.5, fruits=(apple pear)";
-let dict = Parser::from_str(input).parse_dictionary()?;
+let dict = Parser::new(input).parse_dictionary()?;
 println!("{:#?}", dict);
 # Ok(())
 # }
@@ -50,7 +50,7 @@ println!("{:#?}", dict);
 use sfv::*;
 # fn main() -> Result<(), sfv::Error> {
 let input = "u=2, n=(* foo 2)";
-let dict = Parser::from_str(input).parse_dictionary()?;
+let dict = Parser::new(input).parse_dictionary()?;
 
 match dict.get("u") {
     Some(ListEntry::Item(item)) => match &item.bare_item {
