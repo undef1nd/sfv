@@ -41,7 +41,7 @@ let input = "abc";
 
 let mut visitor = Visitor { token: None };
 
-sfv::Parser::from_str(input).parse_item_with_visitor(&mut visitor)?;
+sfv::Parser::new(input).parse_item_with_visitor(&mut visitor)?;
 
 // Use `visitor.token` to do something expensive or with side effects now that
 // we know the entire input is valid.

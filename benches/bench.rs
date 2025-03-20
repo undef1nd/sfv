@@ -19,7 +19,7 @@ fn parsing_item(c: &mut Criterion) {
         BenchmarkId::new("parsing_item", fixture),
         &fixture,
         move |bench, &input| {
-            bench.iter(|| Parser::from_str(input).parse_item().unwrap());
+            bench.iter(|| Parser::new(input).parse_item().unwrap());
         },
     );
 }
@@ -30,7 +30,7 @@ fn parsing_list(c: &mut Criterion) {
         BenchmarkId::new("parsing_list", fixture),
         &fixture,
         move |bench, &input| {
-            bench.iter(|| Parser::from_str(input).parse_list().unwrap());
+            bench.iter(|| Parser::new(input).parse_list().unwrap());
         },
     );
 }
@@ -41,7 +41,7 @@ fn parsing_dict(c: &mut Criterion) {
         BenchmarkId::new("parsing_dict", fixture),
         &fixture,
         move |bench, &input| {
-            bench.iter(|| Parser::from_str(input).parse_dictionary().unwrap());
+            bench.iter(|| Parser::new(input).parse_dictionary().unwrap());
         },
     );
 }
@@ -60,7 +60,7 @@ fn serializing_item(c: &mut Criterion) {
         BenchmarkId::new("serializing_item", fixture),
         &fixture,
         move |bench, &input| {
-            let parsed_item = Parser::from_str(input).parse_item().unwrap();
+            let parsed_item = Parser::new(input).parse_item().unwrap();
             bench.iter(|| parsed_item.serialize_value().unwrap());
         },
     );
@@ -72,7 +72,7 @@ fn serializing_list(c: &mut Criterion) {
         BenchmarkId::new("serializing_list", fixture),
         &fixture,
         move |bench, &input| {
-            let parsed_list = Parser::from_str(input).parse_list().unwrap();
+            let parsed_list = Parser::new(input).parse_list().unwrap();
             bench.iter(|| parsed_list.serialize_value().unwrap());
         },
     );
@@ -84,7 +84,7 @@ fn serializing_dict(c: &mut Criterion) {
         BenchmarkId::new("serializing_dict", fixture),
         &fixture,
         move |bench, &input| {
-            let parsed_dict = Parser::from_str(input).parse_dictionary().unwrap();
+            let parsed_dict = Parser::new(input).parse_dictionary().unwrap();
             bench.iter(|| parsed_dict.serialize_value().unwrap());
         },
     );
