@@ -380,33 +380,33 @@ impl<S, T, D> From<Vec<u8>> for GenericBareItem<S, Vec<u8>, T, D> {
     }
 }
 
-impl From<Token> for BareItem {
-    fn from(val: Token) -> BareItem {
-        BareItem::Token(val)
+impl<S, B, D> From<Token> for GenericBareItem<S, B, Token, D> {
+    fn from(val: Token) -> Self {
+        Self::Token(val)
     }
 }
 
-impl From<String> for BareItem {
-    fn from(val: String) -> BareItem {
-        BareItem::String(val)
+impl<B, T, D> From<String> for GenericBareItem<String, B, T, D> {
+    fn from(val: String) -> Self {
+        Self::String(val)
     }
 }
 
-impl<'a> From<&'a [u8]> for BareItem {
-    fn from(val: &'a [u8]) -> BareItem {
-        BareItem::ByteSeq(val.to_owned())
+impl<'a, S, T, D> From<&'a [u8]> for GenericBareItem<S, Vec<u8>, T, D> {
+    fn from(val: &'a [u8]) -> Self {
+        Self::ByteSeq(val.to_owned())
     }
 }
 
-impl<'a> From<&'a TokenRef> for BareItem {
-    fn from(val: &'a TokenRef) -> BareItem {
-        BareItem::Token(val.to_owned())
+impl<'a, S, B, D> From<&'a TokenRef> for GenericBareItem<S, B, Token, D> {
+    fn from(val: &'a TokenRef) -> Self {
+        Self::Token(val.to_owned())
     }
 }
 
-impl<'a> From<&'a StringRef> for BareItem {
-    fn from(val: &'a StringRef) -> BareItem {
-        BareItem::String(val.to_owned())
+impl<'a, B, T, D> From<&'a StringRef> for GenericBareItem<String, B, T, D> {
+    fn from(val: &'a StringRef) -> Self {
+        Self::String(val.to_owned())
     }
 }
 
@@ -541,9 +541,9 @@ impl<'a> From<RefBareItem<'a>> for BareItem {
     }
 }
 
-impl<'a> From<&'a [u8]> for RefBareItem<'a> {
-    fn from(val: &'a [u8]) -> RefBareItem<'a> {
-        RefBareItem::ByteSeq(val)
+impl<'a, S, T, D> From<&'a [u8]> for GenericBareItem<S, &'a [u8], T, D> {
+    fn from(val: &'a [u8]) -> Self {
+        Self::ByteSeq(val)
     }
 }
 
@@ -559,15 +559,15 @@ impl<'a, S, B, D> From<&'a TokenRef> for GenericBareItem<S, B, &'a TokenRef, D> 
     }
 }
 
-impl<'a> From<&'a String> for RefBareItem<'a> {
-    fn from(val: &'a String) -> RefBareItem<'a> {
-        RefBareItem::String(val)
+impl<'a, B, T, D> From<&'a String> for GenericBareItem<&'a StringRef, B, T, D> {
+    fn from(val: &'a String) -> Self {
+        Self::String(val)
     }
 }
 
-impl<'a> From<&'a StringRef> for RefBareItem<'a> {
-    fn from(val: &'a StringRef) -> RefBareItem<'a> {
-        RefBareItem::String(val)
+impl<'a, B, T, D> From<&'a StringRef> for GenericBareItem<&'a StringRef, B, T, D> {
+    fn from(val: &'a StringRef) -> Self {
+        Self::String(val)
     }
 }
 
