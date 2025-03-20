@@ -9,9 +9,7 @@ fuzz_target!(|list: sfv::List| {
         assert!(serialized.is_err());
     } else {
         assert_eq!(
-            sfv::Parser::from_bytes(serialized.unwrap().as_bytes())
-                .parse_list()
-                .unwrap(),
+            sfv::Parser::new(&serialized.unwrap()).parse_list().unwrap(),
             list,
         );
     }
