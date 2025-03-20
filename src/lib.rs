@@ -80,8 +80,8 @@ use std::convert::TryFrom;
 
 # fn main() -> Result<(), sfv::Error> {
 let serialized_item = ItemSerializer::new()
-    .bare_item(StringRef::from_str("foo")?)?
-    .parameter(KeyRef::from_str("key")?, Decimal::try_from(13.45655)?)?
+    .bare_item(StringRef::from_str("foo")?)
+    .parameter(KeyRef::from_str("key")?, Decimal::try_from(13.45655)?)
     .finish();
 
 assert_eq!(serialized_item, r#""foo";key=13.457"#);
@@ -96,16 +96,16 @@ use sfv::{KeyRef, ListSerializer, StringRef, TokenRef};
 # fn main() -> Result<(), sfv::Error> {
 let mut ser = ListSerializer::new();
 
-ser.bare_item(TokenRef::from_str("tok")?)?;
+ser.bare_item(TokenRef::from_str("tok")?);
 
 {
     let mut ser = ser.inner_list();
 
-    ser.bare_item(99)?.parameter(KeyRef::from_str("key")?, false)?;
+    ser.bare_item(99).parameter(KeyRef::from_str("key")?, false);
 
-    ser.bare_item(StringRef::from_str("foo")?)?;
+    ser.bare_item(StringRef::from_str("foo")?);
 
-    ser.finish().parameter(KeyRef::from_str("bar")?, true)?;
+    ser.finish().parameter(KeyRef::from_str("bar")?, true);
 }
 
 let serialized_list = ser.finish()?;

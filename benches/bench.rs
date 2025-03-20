@@ -3,7 +3,7 @@ extern crate criterion;
 
 use criterion::{BenchmarkId, Criterion};
 use sfv::{
-    integer, key_ref, string_ref, token_ref, Decimal, DictSerializer, Error, ItemSerializer,
+    integer, key_ref, string_ref, token_ref, Decimal, DictSerializer, ItemSerializer,
     ListSerializer, Parser, SerializeValue,
 };
 use std::convert::TryFrom;
@@ -104,9 +104,9 @@ fn serializing_ref_item(c: &mut Criterion) {
         BenchmarkId::new("serializing_ref_item", fixture),
         &fixture,
         move |bench, &input| {
-            bench.iter(|| -> Result<String, Error> {
+            bench.iter(|| {
                 let ser = ItemSerializer::new();
-                Ok(ser.bare_item(input.as_bytes())?.finish())
+                ser.bare_item(input.as_bytes()).finish()
             });
         },
     );
@@ -116,20 +116,20 @@ fn serializing_ref_list(c: &mut Criterion) {
     c.bench_function("serializing_ref_list", move |bench| {
         bench.iter(|| {
             let mut ser = ListSerializer::new();
-            ser.bare_item(token_ref("a"))?;
-            ser.bare_item(token_ref("abcdefghigklmnoprst"))?;
-            ser.bare_item(integer(123456785686457))?;
-            ser.bare_item(Decimal::try_from(99999999999.999).unwrap())?;
+            ser.bare_item(token_ref("a"));
+            ser.bare_item(token_ref("abcdefghigklmnoprst"));
+            ser.bare_item(integer(123456785686457));
+            ser.bare_item(Decimal::try_from(99999999999.999).unwrap());
             ser.inner_list();
             {
                 let mut ser = ser.inner_list();
-                ser.bare_item(string_ref("somelongstringvalue"))?;
-                ser.bare_item(string_ref("anotherlongstringvalue"))?
+                ser.bare_item(string_ref("somelongstringvalue"));
+                ser.bare_item(string_ref("anotherlongstringvalue"))
                     .parameter(
                         key_ref("key"),
                         "somever longstringvaluerepresentedasbytes".as_bytes(),
-                    )?;
-                ser.bare_item(145)?;
+                    );
+                ser.bare_item(145);
             }
             ser.finish()
         });
@@ -140,15 +140,15 @@ fn serializing_ref_dict(c: &mut Criterion) {
     c.bench_function("serializing_ref_dict", move |bench| {
         bench.iter(|| {
             let mut ser = DictSerializer::new();
-            ser.bare_item(key_ref("a"), true)?;
-            ser.bare_item(key_ref("dict_key2"), token_ref("abcdefghigklmnoprst"))?;
-            ser.bare_item(key_ref("dict_key3"), integer(123456785686457))?;
+            ser.bare_item(key_ref("a"), true);
+            ser.bare_item(key_ref("dict_key2"), token_ref("abcdefghigklmnoprst"));
+            ser.bare_item(key_ref("dict_key3"), integer(123456785686457));
             {
                 let mut ser = ser.inner_list(key_ref("dict_key4"));
-                ser.bare_item(string_ref("inner-list-member"))?;
-                ser.bare_item("inner-list-member".as_bytes())?;
+                ser.bare_item(string_ref("inner-list-member"));
+                ser.bare_item("inner-list-member".as_bytes());
                 ser.finish()
-                    .parameter(key_ref("key"), token_ref("aW5uZXItbGlzdC1wYXJhbWV0ZXJz"))?;
+                    .parameter(key_ref("key"), token_ref("aW5uZXItbGlzdC1wYXJhbWV0ZXJz"));
             }
             ser.finish()
         });

@@ -28,14 +28,6 @@ impl Error {
         Self::new("out of range")
     }
 
-    pub(crate) fn date_unsupported() -> Self {
-        Self::new("RFC 8941 does not support dates")
-    }
-
-    pub(crate) fn display_string_unsupported() -> Self {
-        Self::new("RFC 8941 does not support display strings")
-    }
-
     pub(crate) fn custom(msg: impl fmt::Display) -> Self {
         Self {
             msg: Cow::Owned(msg.to_string()),
