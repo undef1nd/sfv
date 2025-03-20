@@ -526,6 +526,21 @@ impl<'a> From<BareItemFromInput<'a>> for BareItem {
     }
 }
 
+impl<'a> From<RefBareItem<'a>> for BareItem {
+    fn from(val: RefBareItem<'a>) -> BareItem {
+        match val {
+            RefBareItem::Integer(val) => BareItem::Integer(val),
+            RefBareItem::Decimal(val) => BareItem::Decimal(val),
+            RefBareItem::String(val) => BareItem::String(val.to_owned()),
+            RefBareItem::ByteSeq(val) => BareItem::ByteSeq(val.to_owned()),
+            RefBareItem::Boolean(val) => BareItem::Boolean(val),
+            RefBareItem::Token(val) => BareItem::Token(val.to_owned()),
+            RefBareItem::Date(val) => BareItem::Date(val),
+            RefBareItem::DisplayString(val) => BareItem::DisplayString(val.to_owned()),
+        }
+    }
+}
+
 impl<'a> From<&'a [u8]> for RefBareItem<'a> {
     fn from(val: &'a [u8]) -> RefBareItem<'a> {
         RefBareItem::ByteSeq(val)
