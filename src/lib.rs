@@ -153,6 +153,8 @@ assert_eq!(
   trait for this crate's types, making them easier to use with fuzzing.
 */
 
+#![deny(missing_docs)]
+
 mod decimal;
 mod error;
 mod integer;
@@ -204,30 +206,38 @@ pub use serializer::SerializeValue;
 
 type SFVResult<T> = std::result::Result<T, Error>;
 
-/// An abstraction over multiple kinds of ownership of a bare item.
+/// An abstraction over multiple kinds of ownership of a [bare item].
 ///
 /// In general most users will be interested in:
 /// - [`BareItem`], for completely owned data
 /// - [`RefBareItem`], for completely borrowed data
 /// - [`BareItemFromInput`], for data borrowed from input when possible
+///
+/// [bare item]: <https://httpwg.org/specs/rfc8941.html#item>
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum GenericBareItem<S, B, T> {
+    /// A [decimal](https://httpwg.org/specs/rfc8941.html#decimal).
     // sf-decimal  = ["-"] 1*12DIGIT "." 1*3DIGIT
     Decimal(Decimal),
+    /// An [integer](https://httpwg.org/specs/rfc8941.html#integer).
     // sf-integer = ["-"] 1*15DIGIT
     Integer(Integer),
+    /// A [string](https://httpwg.org/specs/rfc8941.html#string).
     // sf-string = DQUOTE *chr DQUOTE
     // chr       = unescaped / escaped
     // unescaped = %x20-21 / %x23-5B / %x5D-7E
     // escaped   = "\" ( DQUOTE / "\" )
     String(S),
+    /// A [byte sequence](https://httpwg.org/specs/rfc8941.html#binary).
     // ":" *(base64) ":"
     // base64    = ALPHA / DIGIT / "+" / "/" / "="
     ByteSeq(B),
+    /// A [boolean](https://httpwg.org/specs/rfc8941.html#boolean).
     // sf-boolean = "?" boolean
     // boolean    = "0" / "1"
     Boolean(bool),
+    /// A [token](https://httpwg.org/specs/rfc8941.html#token).
     // sf-token = ( ALPHA / "*" ) *( tchar / ":" / "/" )
     Token(T),
 }
