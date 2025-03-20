@@ -13,7 +13,7 @@ use std::fmt;
 /// ^[A-Za-z*][A-Za-z*0-9!#$%&'+\-.^_`|~]*$
 /// ```
 ///
-/// [token]: <https://httpwg.org/specs/rfc8941.html#token>
+/// [token]: <https://httpwg.org/specs/rfc9651.html#token>
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Token(String);
 
@@ -27,7 +27,7 @@ pub struct Token(String);
 ///
 /// This type is to [`Token`] as [`str`] is to [`String`].
 ///
-/// [token]: <https://httpwg.org/specs/rfc8941.html#token>
+/// [token]: <https://httpwg.org/specs/rfc9651.html#token>
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, ref_cast::RefCastCustom)]
 #[repr(transparent)]
 pub struct TokenRef(str);

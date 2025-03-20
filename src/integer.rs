@@ -7,7 +7,7 @@ const RANGE_I64: std::ops::RangeInclusive<i64> = -999_999_999_999_999..=999_999_
 
 /// A structured field value [integer].
 ///
-/// [integer]: <https://httpwg.org/specs/rfc8941.html#integer>
+/// [integer]: <https://httpwg.org/specs/rfc9651.html#integer>
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Integer(
@@ -66,7 +66,7 @@ macro_rules! impl_conversion {
                 Integer(v.into())
             }
         }
-        impl<S, B, T> From<$t> for GenericBareItem<S, B, T> {
+        impl<S, B, T, D> From<$t> for GenericBareItem<S, B, T, D> {
             fn from(v: $t) -> Self {
                 Self::Integer(v.into())
             }
@@ -83,7 +83,7 @@ macro_rules! impl_conversion {
                 }
             }
         }
-        impl<S, B, T> TryFrom<$t> for GenericBareItem<S, B, T> {
+        impl<S, B, T, D> TryFrom<$t> for GenericBareItem<S, B, T, D> {
             type Error = Error;
 
             fn try_from(v: $t) -> Result<Self, Error> {
