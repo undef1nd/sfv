@@ -18,7 +18,7 @@ fn test_report_to_header() -> Result<(), Box<dyn Error>> {
         .params
         .get("report-to")
         .ok_or("parameter does not exist")?
-        .as_str()
+        .as_string()
         .ok_or("unexpected BareItem variant")?
         .as_str();
 
@@ -26,7 +26,7 @@ fn test_report_to_header() -> Result<(), Box<dyn Error>> {
     if let Some(ListEntry::Item(item)) = endpoints_parsed.get(coep_endpoint) {
         let item_value = item
             .bare_item
-            .as_str()
+            .as_string()
             .ok_or("unexpected BareItem variant")?;
         assert_eq!(item_value.as_str(), "https://example.com/coep");
         return Ok(());

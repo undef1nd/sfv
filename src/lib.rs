@@ -278,7 +278,7 @@ impl<S, B, T, D> GenericBareItem<S, B, T, D> {
     }
 
     /// If the bare item is an integer, returns it; otherwise returns `None`.
-    pub fn as_int(&self) -> Option<Integer> {
+    pub fn as_integer(&self) -> Option<Integer> {
         match *self {
             Self::Integer(val) => Some(val),
             _ => None,
@@ -286,23 +286,29 @@ impl<S, B, T, D> GenericBareItem<S, B, T, D> {
     }
 
     /// If the bare item is a string, returns a reference to it; otherwise returns `None`.
-    pub fn as_str(&self) -> Option<&S> {
+    pub fn as_string(&self) -> Option<&StringRef>
+    where
+        S: Borrow<StringRef>,
+    {
         match *self {
-            Self::String(ref val) => Some(val),
+            Self::String(ref val) => Some(val.borrow()),
             _ => None,
         }
     }
 
     /// If the bare item is a byte sequence, returns a reference to it; otherwise returns `None`.
-    pub fn as_byte_seq(&self) -> Option<&B> {
+    pub fn as_byte_seq(&self) -> Option<&[u8]>
+    where
+        B: Borrow<[u8]>,
+    {
         match *self {
-            Self::ByteSeq(ref val) => Some(val),
+            Self::ByteSeq(ref val) => Some(val.borrow()),
             _ => None,
         }
     }
 
     /// If the bare item is a boolean, returns it; otherwise returns `None`.
-    pub fn as_bool(&self) -> Option<bool> {
+    pub fn as_boolean(&self) -> Option<bool> {
         match *self {
             Self::Boolean(val) => Some(val),
             _ => None,
@@ -310,9 +316,12 @@ impl<S, B, T, D> GenericBareItem<S, B, T, D> {
     }
 
     /// If the bare item is a token, returns a reference to it; otherwise returns `None`.
-    pub fn as_token(&self) -> Option<&T> {
+    pub fn as_token(&self) -> Option<&TokenRef>
+    where
+        T: Borrow<TokenRef>,
+    {
         match *self {
-            Self::Token(ref val) => Some(val),
+            Self::Token(ref val) => Some(val.borrow()),
             _ => None,
         }
     }
