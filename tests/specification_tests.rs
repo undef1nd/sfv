@@ -55,7 +55,7 @@ fn run_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
         .ok_or("run_test_case: raw value is not specified")?
         .join(", ");
 
-    let parser = Parser::from_str(&input);
+    let parser = Parser::new(&input);
 
     let actual_result = match test_case.header_type {
         HeaderType::Item => parser.parse_item().map(FieldType::Item),
