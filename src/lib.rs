@@ -584,6 +584,7 @@ where
 ///
 /// [RFC 9651]: <https://httpwg.org/specs/rfc9651.html#using-new-structured-types-in-extensions>
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum Version {
     /// [RFC 8941], which does not support dates or display strings.
     ///
