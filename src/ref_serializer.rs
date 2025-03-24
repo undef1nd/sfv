@@ -33,6 +33,7 @@ impl Default for ItemSerializer<String> {
 }
 
 impl ItemSerializer<String> {
+    /// Creates a serializer that writes into a new string.
     pub fn new() -> Self {
         Self {
             buffer: String::new(),
@@ -41,12 +42,16 @@ impl ItemSerializer<String> {
 }
 
 impl<'a> ItemSerializer<&'a mut String> {
+    /// Creates a serializer that writes into the given string.
     pub fn with_buffer(buffer: &'a mut String) -> Self {
         Self { buffer }
     }
 }
 
 impl<W: BorrowMut<String>> ItemSerializer<W> {
+    /// Serializes the given bare item.
+    ///
+    /// Returns a serializer for the item's parameters.
     pub fn bare_item<'b>(
         mut self,
         bare_item: impl Into<RefBareItem<'b>>,
@@ -65,11 +70,17 @@ pub struct ParameterSerializer<W> {
 }
 
 impl<W: BorrowMut<String>> ParameterSerializer<W> {
+    /// Serializes a parameter with the given name and value.
+    ///
+    /// Returns the serializer.
     pub fn parameter<'b>(mut self, name: &KeyRef, value: impl Into<RefBareItem<'b>>) -> Self {
         Serializer::serialize_parameter(name, value, self.buffer.borrow_mut());
         self
     }
 
+    /// Serializes the given parameters.
+    ///
+    /// Returns the serializer.
     pub fn parameters<'b>(
         mut self,
         params: impl IntoIterator<Item = (impl AsRef<KeyRef>, impl Into<RefBareItem<'b>>)>,
@@ -80,6 +91,7 @@ impl<W: BorrowMut<String>> ParameterSerializer<W> {
         self
     }
 
+    /// Finishes parameter serialization and returns the serializer's output.
     pub fn finish(self) -> W {
         self.buffer
     }
@@ -94,6 +106,7 @@ fn maybe_write_separator(buffer: &mut String, first: &mut bool) {
 }
 
 /// Serializes `List` field value components incrementally.
+///
 /// ```
 /// use sfv::{KeyRef, StringRef, TokenRef, ListSerializer};
 ///
@@ -136,6 +149,7 @@ impl Default for ListSerializer<String> {
 }
 
 impl ListSerializer<String> {
+    /// Creates a serializer that writes into a new string.
     pub fn new() -> Self {
         Self {
             buffer: String::new(),
@@ -145,6 +159,7 @@ impl ListSerializer<String> {
 }
 
 impl<'a> ListSerializer<&'a mut String> {
+    /// Creates a serializer that writes into the given string.
     pub fn with_buffer(buffer: &'a mut String) -> Self {
         Self {
             buffer,
@@ -154,6 +169,9 @@ impl<'a> ListSerializer<&'a mut String> {
 }
 
 impl<W: BorrowMut<String>> ListSerializer<W> {
+    /// Serializes the given bare item as a member of the list.
+    ///
+    /// Returns a serializer for the item's parameters.
     pub fn bare_item<'b>(
         &mut self,
         bare_item: impl Into<RefBareItem<'b>>,
@@ -164,6 +182,8 @@ impl<W: BorrowMut<String>> ListSerializer<W> {
         ParameterSerializer { buffer }
     }
 
+    /// Opens an inner list, returning a serializer to be used for its items and
+    /// parameters.
     pub fn inner_list(&mut self) -> InnerListSerializer {
         let buffer = self.buffer.borrow_mut();
         maybe_write_separator(buffer, &mut self.first);
@@ -173,6 +193,7 @@ impl<W: BorrowMut<String>> ListSerializer<W> {
         }
     }
 
+    /// Serializes the given members of the list.
     #[cfg(feature = "parsed-types")]
     pub fn members<'b>(&mut self, members: impl IntoIterator<Item = &'b ListEntry>) {
         for value in members {
@@ -248,6 +269,7 @@ impl Default for DictSerializer<String> {
 }
 
 impl DictSerializer<String> {
+    /// Creates a serializer that writes into a new string.
     pub fn new() -> Self {
         Self {
             buffer: String::new(),
@@ -257,6 +279,7 @@ impl DictSerializer<String> {
 }
 
 impl<'a> DictSerializer<&'a mut String> {
+    /// Creates a serializer that writes into the given string.
     pub fn with_buffer(buffer: &'a mut String) -> Self {
         Self {
             buffer,
@@ -266,6 +289,10 @@ impl<'a> DictSerializer<&'a mut String> {
 }
 
 impl<W: BorrowMut<String>> DictSerializer<W> {
+    /// Serializes the given bare item as a member of the dictionary with the
+    /// given key.
+    ///
+    /// Returns a serializer for the item's parameters.
     pub fn bare_item<'b>(
         &mut self,
         name: &KeyRef,
@@ -282,6 +309,8 @@ impl<W: BorrowMut<String>> DictSerializer<W> {
         ParameterSerializer { buffer }
     }
 
+    /// Opens an inner list with the given key, returning a serializer to be
+    /// used for its items and parameters.
     pub fn inner_list(&mut self, name: &KeyRef) -> InnerListSerializer {
         let buffer = self.buffer.borrow_mut();
         maybe_write_separator(buffer, &mut self.first);
@@ -292,6 +321,7 @@ impl<W: BorrowMut<String>> DictSerializer<W> {
         }
     }
 
+    /// Serializes the given members of the dictionary.
     #[cfg(feature = "parsed-types")]
     pub fn members<'b>(
         &mut self,
@@ -326,6 +356,12 @@ impl<W: BorrowMut<String>> DictSerializer<W> {
 }
 
 /// Serializes inner lists incrementally.
+///
+/// The inner list will be closed automatically when the serializer is dropped.
+/// To set the inner list's parameters, call [`InnerListSerializer::finish`].
+///
+/// Failing to drop the serializer or call its `finish` method will result in
+/// an invalid serialization that lacks a closing `)` character.
 // https://httpwg.org/specs/rfc8941.html#ser-innerlist
 #[derive(Debug)]
 pub struct InnerListSerializer<'a> {
@@ -341,6 +377,9 @@ impl Drop for InnerListSerializer<'_> {
 }
 
 impl<'a> InnerListSerializer<'a> {
+    /// Serializes the given bare item as a member of the inner list.
+    ///
+    /// Returns a serializer for the item's parameters.
     pub fn bare_item<'b>(
         &mut self,
         bare_item: impl Into<RefBareItem<'b>>,
@@ -353,6 +392,7 @@ impl<'a> InnerListSerializer<'a> {
         ParameterSerializer { buffer }
     }
 
+    /// Serializes the given items as members of the inner list.
     #[cfg(feature = "parsed-types")]
     pub fn items<'b>(&mut self, items: impl IntoIterator<Item = &'b Item>) {
         for item in items {
@@ -360,6 +400,7 @@ impl<'a> InnerListSerializer<'a> {
         }
     }
 
+    /// Closes the inner list and returns a serializer for its parameters.
     pub fn finish(mut self) -> ParameterSerializer<&'a mut String> {
         let buffer = self.buffer.take().unwrap();
         buffer.push(')');
