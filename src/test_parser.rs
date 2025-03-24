@@ -3,7 +3,7 @@ use crate::{integer, key_ref, string_ref, token_ref, Decimal, Error, Num, Parser
 use std::convert::TryFrom;
 
 #[cfg(feature = "parsed-types")]
-use crate::{BareItem, Dictionary, InnerList, Item, List, Parameters};
+use crate::{BareItem, Date, Dictionary, InnerList, Item, List, Parameters, Version};
 
 #[cfg(feature = "parsed-types")]
 use std::iter::FromIterator;
@@ -855,5 +855,43 @@ fn parse_more_errors() -> Result<(), Error> {
     assert!(Parser::new("(a, 2)")
         .parse_list_with_visitor(&mut parsed_list_header)
         .is_err());
+    Ok(())
+}
+
+#[test]
+#[cfg(feature = "parsed-types")]
+fn parse_date() -> Result<(), Error> {
+    let input = "@0";
+
+    assert!(Parser::new(input)
+        .with_version(Version::Rfc8941)
+        .parse_item()
+        .is_err());
+
+    assert_eq!(
+        Parser::new(input).parse_item()?,
+        Item::new(Date::UNIX_EPOCH)
+    );
+
+    Ok(())
+}
+
+#[test]
+#[cfg(feature = "parsed-types")]
+fn parse_display_string() -> Result<(), Error> {
+    let input = r#"%"This is intended for display to %c3%bcsers.""#;
+
+    assert!(Parser::new(input)
+        .with_version(Version::Rfc8941)
+        .parse_item()
+        .is_err());
+
+    assert_eq!(
+        Parser::new(input).parse_item()?,
+        Item::new(BareItem::DisplayString(
+            "This is intended for display to üsers.".to_owned()
+        ))
+    );
+
     Ok(())
 }

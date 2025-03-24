@@ -66,13 +66,13 @@ pub trait ParameterVisitor<'a> {
     ///
     /// Parsing will be terminated early if an error is returned.
     ///
-    /// Note: Per [RFC 8941], when duplicate parameter keys are encountered in
+    /// Note: Per [RFC 9651], when duplicate parameter keys are encountered in
     /// the same scope, all but the last instance are ignored. Implementations
     /// of this trait must respect that requirement in order to comply with the
     /// specification. For example, if parameters are stored in a map, earlier
     /// values for a given parameter key must be overwritten by later ones.
     ///
-    /// [RFC 8941]: <https://httpwg.org/specs/rfc8941.html#parse-param>
+    /// [RFC 9651]: <https://httpwg.org/specs/rfc9651.html#parse-param>
     fn parameter(
         &mut self,
         key: &'a KeyRef,
@@ -163,14 +163,14 @@ pub trait DictionaryVisitor<'a> {
     ///
     /// Parsing will be terminated early if an error is returned.
     ///
-    /// Note: Per [RFC 8941], when duplicate dictionary keys are encountered in
+    /// Note: Per [RFC 9651], when duplicate dictionary keys are encountered in
     /// the same scope, all but the last instance are ignored. Implementations
     /// of this trait must respect that requirement in order to comply with the
     /// specification. For example, if dictionary entries are stored in a map,
     /// earlier values for a given dictionary key must be overwritten by later
     /// ones.
     ///
-    /// [RFC 8941]: <https://httpwg.org/specs/rfc8941.html#parse-dictionary>
+    /// [RFC 9651]: <https://httpwg.org/specs/rfc9651.html#parse-dictionary>
     fn entry(&mut self, key: &'a KeyRef) -> Result<impl EntryVisitor<'a>, Self::Error>;
 }
 

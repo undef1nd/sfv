@@ -13,7 +13,7 @@ use std::fmt;
 /// ^[A-Za-z*][A-Za-z*0-9!#$%&'+\-.^_`|~]*$
 /// ```
 ///
-/// [key]: <https://httpwg.org/specs/rfc8941.html#key>
+/// [key]: <https://httpwg.org/specs/rfc9651.html#key>
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Key(String);
 
@@ -27,7 +27,7 @@ pub struct Key(String);
 ///
 /// This type is to [`Key`] as [`str`] is to [`String`].
 ///
-/// [key]: <https://httpwg.org/specs/rfc8941.html#key>
+/// [key]: <https://httpwg.org/specs/rfc9651.html#key>
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, ref_cast::RefCastCustom)]
 #[repr(transparent)]
 pub struct KeyRef(str);

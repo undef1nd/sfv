@@ -7,6 +7,15 @@ use crate::{Item, ListEntry};
 use std::borrow::BorrowMut;
 
 /// Serializes `Item` field value components incrementally.
+///
+/// Note: The serialization conforms to [RFC 9651], meaning that
+/// [`Dates`][crate::Date] and [`Display Strings`][RefBareItem::DisplayString],
+/// which cause parsing errors under [RFC 8941], will be serialized
+/// unconditionally. The consumer of this API is responsible for determining
+/// whether it is valid to serialize these bare items for any specific header.
+///
+/// [RFC 8941]: <https://httpwg.org/specs/rfc8941.html>
+/// [RFC 9651]: <https://httpwg.org/specs/rfc9651.html>
 /// ```
 /// use sfv::{KeyRef, ItemSerializer};
 ///
@@ -20,7 +29,7 @@ use std::borrow::BorrowMut;
 /// # Ok(())
 /// # }
 /// ```
-// https://httpwg.org/specs/rfc8941.html#ser-item
+// https://httpwg.org/specs/rfc9651.html#ser-item
 #[derive(Debug)]
 pub struct ItemSerializer<W> {
     buffer: W,
@@ -107,6 +116,14 @@ fn maybe_write_separator(buffer: &mut String, first: &mut bool) {
 
 /// Serializes `List` field value components incrementally.
 ///
+/// Note: The serialization conforms to [RFC 9651], meaning that
+/// [`Dates`][crate::Date] and [`Display Strings`][RefBareItem::DisplayString],
+/// which cause parsing errors under [RFC 8941], will be serialized
+/// unconditionally. The consumer of this API is responsible for determining
+/// whether it is valid to serialize these bare items for any specific header.
+///
+/// [RFC 8941]: <https://httpwg.org/specs/rfc8941.html>
+/// [RFC 9651]: <https://httpwg.org/specs/rfc9651.html>
 /// ```
 /// use sfv::{KeyRef, StringRef, TokenRef, ListSerializer};
 ///
@@ -135,7 +152,7 @@ fn maybe_write_separator(buffer: &mut String, first: &mut bool) {
 /// # Ok(())
 /// # }
 /// ```
-// https://httpwg.org/specs/rfc8941.html#ser-list
+// https://httpwg.org/specs/rfc9651.html#ser-list
 #[derive(Debug)]
 pub struct ListSerializer<W> {
     buffer: W,
@@ -214,7 +231,7 @@ impl<W: BorrowMut<String>> ListSerializer<W> {
     ///
     /// This can only fail if no members were serialized, as [empty lists are
     /// not meant to be serialized at
-    /// all](https://httpwg.org/specs/rfc8941.html#text-serialize).
+    /// all](https://httpwg.org/specs/rfc9651.html#text-serialize).
     pub fn finish(self) -> SFVResult<W> {
         if self.first {
             return Err(Error::new("serializing empty list is not allowed"));
@@ -224,6 +241,16 @@ impl<W: BorrowMut<String>> ListSerializer<W> {
 }
 
 /// Serializes `Dictionary` field value components incrementally.
+///
+/// Note: The serialization conforms to [RFC 9651], meaning that
+/// [`Dates`][crate::Date] and [`Display Strings`][RefBareItem::DisplayString],
+/// which cause parsing errors under [RFC 8941], will be serialized
+/// unconditionally. The consumer of this API is responsible for determining
+/// whether it is valid to serialize these bare items for any specific header.
+///
+/// [RFC 8941]: <https://httpwg.org/specs/rfc8941.html>
+/// [RFC 9651]: <https://httpwg.org/specs/rfc9651.html>
+///
 /// ```
 /// use sfv::{KeyRef, StringRef, TokenRef, DictSerializer, Decimal};
 /// use std::convert::TryFrom;
@@ -255,7 +282,7 @@ impl<W: BorrowMut<String>> ListSerializer<W> {
 /// # Ok(())
 /// # }
 /// ```
-// https://httpwg.org/specs/rfc8941.html#ser-dictionary
+// https://httpwg.org/specs/rfc9651.html#ser-dictionary
 #[derive(Debug)]
 pub struct DictSerializer<W> {
     buffer: W,
@@ -346,7 +373,7 @@ impl<W: BorrowMut<String>> DictSerializer<W> {
     ///
     /// This can only fail if no members were serialized, as [empty dictionaries
     /// are not meant to be serialized at
-    /// all](https://httpwg.org/specs/rfc8941.html#text-serialize).
+    /// all](https://httpwg.org/specs/rfc9651.html#text-serialize).
     pub fn finish(self) -> SFVResult<W> {
         if self.first {
             return Err(Error::new("serializing empty dictionary is not allowed"));
@@ -362,7 +389,7 @@ impl<W: BorrowMut<String>> DictSerializer<W> {
 ///
 /// Failing to drop the serializer or call its `finish` method will result in
 /// an invalid serialization that lacks a closing `)` character.
-// https://httpwg.org/specs/rfc8941.html#ser-innerlist
+// https://httpwg.org/specs/rfc9651.html#ser-innerlist
 #[derive(Debug)]
 pub struct InnerListSerializer<'a> {
     buffer: Option<&'a mut String>,

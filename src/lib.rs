@@ -1,12 +1,12 @@
 /*!
-`sfv` is an implementation of *Structured Field Values for HTTP*, as specified in [RFC 8941](https://httpwg.org/specs/rfc8941.html) for parsing and serializing HTTP field values.
+`sfv` is an implementation of *Structured Field Values for HTTP*, as specified in [RFC 9651](https://httpwg.org/specs/rfc9651.html) for parsing and serializing HTTP field values.
 It also exposes a set of types that might be useful for defining new structured fields.
 
 # Data Structures
 
 There are three types of structured fields:
 
-- `Item` -- an `Integer`, `Decimal`, `String`, `Token`, `Byte Sequence`, or `Boolean`. It can have associated `Parameters`.
+- `Item` -- an `Integer`, `Decimal`, `String`, `Token`, `Byte Sequence`, `Boolean`, `Date`, or `Display String`. It can have associated `Parameters`.
 - `List` -- an array of zero or more members, each of which can be an `Item` or an `InnerList`, both of which can have `Parameters`.
 - `Dictionary` -- an ordered map of name-value pairs, where the names are short textual strings and the values are `Item`s or arrays of `Items` (represented with `InnerList`), both of which can have associated parameters. There can be zero or more members, and their names are unique in the scope of the `Dictionary` they occur within.
 
@@ -60,6 +60,8 @@ match dict.get("u") {
         BareItem::Decimal(val) => { /* ... */ }
         BareItem::String(val) => { /* ... */ }
         BareItem::ByteSeq(val) => { /* ... */ }
+        BareItem::Date(val) => { /* ... */ }
+        BareItem::DisplayString(val) => { /* ... */ }
     },
     Some(ListEntry::InnerList(inner_list)) => { /* ... */ }
     None => { /* ... */ }
@@ -155,6 +157,7 @@ assert_eq!(
 
 #![deny(missing_docs)]
 
+mod date;
 mod decimal;
 mod error;
 mod integer;
@@ -186,7 +189,10 @@ mod test_token;
 
 use std::borrow::{Borrow, Cow};
 use std::convert::TryFrom;
+use std::fmt;
+use std::string::String as StdString;
 
+pub use date::Date;
 pub use decimal::Decimal;
 pub use error::Error;
 pub use integer::{integer, Integer};
@@ -213,36 +219,56 @@ type SFVResult<T> = std::result::Result<T, Error>;
 /// - [`RefBareItem`], for completely borrowed data
 /// - [`BareItemFromInput`], for data borrowed from input when possible
 ///
-/// [bare item]: <https://httpwg.org/specs/rfc8941.html#item>
+/// [bare item]: <https://httpwg.org/specs/9651.html#item>
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub enum GenericBareItem<S, B, T> {
-    /// A [decimal](https://httpwg.org/specs/rfc8941.html#decimal).
+pub enum GenericBareItem<S, B, T, D> {
+    /// A [decimal](https://httpwg.org/specs/rfc9651.html#decimal).
     // sf-decimal  = ["-"] 1*12DIGIT "." 1*3DIGIT
     Decimal(Decimal),
-    /// An [integer](https://httpwg.org/specs/rfc8941.html#integer).
+    /// An [integer](https://httpwg.org/specs/rfc9651.html#integer).
     // sf-integer = ["-"] 1*15DIGIT
     Integer(Integer),
-    /// A [string](https://httpwg.org/specs/rfc8941.html#string).
+    /// A [string](https://httpwg.org/specs/rfc9651.html#string).
     // sf-string = DQUOTE *chr DQUOTE
     // chr       = unescaped / escaped
     // unescaped = %x20-21 / %x23-5B / %x5D-7E
     // escaped   = "\" ( DQUOTE / "\" )
     String(S),
-    /// A [byte sequence](https://httpwg.org/specs/rfc8941.html#binary).
+    /// A [byte sequence](https://httpwg.org/specs/rfc9651.html#binary).
     // ":" *(base64) ":"
     // base64    = ALPHA / DIGIT / "+" / "/" / "="
     ByteSeq(B),
-    /// A [boolean](https://httpwg.org/specs/rfc8941.html#boolean).
+    /// A [boolean](https://httpwg.org/specs/rfc9651.html#boolean).
     // sf-boolean = "?" boolean
     // boolean    = "0" / "1"
     Boolean(bool),
-    /// A [token](https://httpwg.org/specs/rfc8941.html#token).
+    /// A [token](https://httpwg.org/specs/rfc9651.html#token).
     // sf-token = ( ALPHA / "*" ) *( tchar / ":" / "/" )
     Token(T),
+    /// A [date](https://httpwg.org/specs/rfc9651.html#date).
+    ///
+    /// [`Parser`] will never produce this variant when used with
+    /// [`Version::Rfc8941`].
+    // sf-date = "@" sf-integer
+    Date(Date),
+    /// A [display string](https://httpwg.org/specs/rfc9651.html#displaystring).
+    ///
+    /// Display Strings are similar to [`String`]s, in that they consist of zero
+    /// or more characters, but they allow Unicode scalar values (i.e., all
+    /// Unicode code points except for surrogates), unlike [`String`]s.
+    ///
+    /// [`Parser`] will never produce this variant when used with
+    /// [`Version::Rfc8941`].
+    ///
+    /// [display string]: <https://httpwg.org/specs/rfc9651.html#displaystring>
+    // sf-displaystring = "%" DQUOTE *( unescaped / "\" / pct-encoded ) DQUOTE
+    // pct-encoded      = "%" lc-hexdig lc-hexdig
+    // lc-hexdig        = DIGIT / %x61-66 ; 0-9, a-f
+    DisplayString(D),
 }
 
-impl<S, B, T> GenericBareItem<S, B, T> {
+impl<S, B, T, D> GenericBareItem<S, B, T, D> {
     /// If the bare item is a decimal, returns it; otherwise returns `None`.
     pub fn as_decimal(&self) -> Option<Decimal> {
         match *self {
@@ -290,27 +316,49 @@ impl<S, B, T> GenericBareItem<S, B, T> {
             _ => None,
         }
     }
+
+    /// If the bare item is a date, returns it; otherwise returns `None`.
+    pub fn as_date(&self) -> Option<Date> {
+        match *self {
+            Self::Date(val) => Some(val),
+            _ => None,
+        }
+    }
+
+    /// If the bare item is a display string, returns a reference to it; otherwise returns `None`.
+    pub fn as_display_string(&self) -> Option<&D> {
+        match *self {
+            Self::DisplayString(ref val) => Some(val),
+            _ => None,
+        }
+    }
 }
 
-impl<S, B, T> From<Integer> for GenericBareItem<S, B, T> {
+impl<S, B, T, D> From<Integer> for GenericBareItem<S, B, T, D> {
     fn from(val: Integer) -> Self {
         Self::Integer(val)
     }
 }
 
-impl<S, B, T> From<bool> for GenericBareItem<S, B, T> {
+impl<S, B, T, D> From<bool> for GenericBareItem<S, B, T, D> {
     fn from(val: bool) -> Self {
         Self::Boolean(val)
     }
 }
 
-impl<S, B, T> From<Decimal> for GenericBareItem<S, B, T> {
+impl<S, B, T, D> From<Decimal> for GenericBareItem<S, B, T, D> {
     fn from(val: Decimal) -> Self {
         Self::Decimal(val)
     }
 }
 
-impl<S, B, T> TryFrom<f32> for GenericBareItem<S, B, T> {
+impl<S, B, T, D> From<Date> for GenericBareItem<S, B, T, D> {
+    fn from(val: Date) -> Self {
+        Self::Date(val)
+    }
+}
+
+impl<S, B, T, D> TryFrom<f32> for GenericBareItem<S, B, T, D> {
     type Error = Error;
 
     fn try_from(val: f32) -> Result<Self, Error> {
@@ -318,7 +366,7 @@ impl<S, B, T> TryFrom<f32> for GenericBareItem<S, B, T> {
     }
 }
 
-impl<S, B, T> TryFrom<f64> for GenericBareItem<S, B, T> {
+impl<S, B, T, D> TryFrom<f64> for GenericBareItem<S, B, T, D> {
     type Error = Error;
 
     fn try_from(val: f64) -> Result<Self, Error> {
@@ -326,7 +374,7 @@ impl<S, B, T> TryFrom<f64> for GenericBareItem<S, B, T> {
     }
 }
 
-impl<S, T> From<Vec<u8>> for GenericBareItem<S, Vec<u8>, T> {
+impl<S, T, D> From<Vec<u8>> for GenericBareItem<S, Vec<u8>, T, D> {
     fn from(val: Vec<u8>) -> Self {
         Self::ByteSeq(val)
     }
@@ -370,34 +418,86 @@ pub(crate) enum Num {
 
 /// A [bare item] that owns its data.
 ///
-/// [bare item]: <https://httpwg.org/specs/rfc8941.html#item>
+/// [bare item]: <https://httpwg.org/specs/rfc9651.html#item>
 #[cfg_attr(
     feature = "parsed-types",
     doc = "Used to construct an [`Item`] or [`Parameters`] values."
 )]
-pub type BareItem = GenericBareItem<String, Vec<u8>, Token>;
+///
+/// Note: This type deliberately does not implement `From<StdString>` as a
+/// shorthand for [`BareItem::DisplayString`] because it is too easy to confuse
+/// with conversions from [`String`]:
+///
+/// ```compile_fail
+/// # use sfv::BareItem;
+/// let _: BareItem = "x".to_owned().into();
+/// ```
+///
+/// Instead, use:
+///
+/// ```
+/// # use sfv::BareItem;
+/// let _ = BareItem::DisplayString("x".to_owned());
+/// ```
+pub type BareItem = GenericBareItem<String, Vec<u8>, Token, StdString>;
 
 /// A [bare item] that borrows its data.
 ///
 /// Used to serialize values via [`ItemSerializer`], [`ListSerializer`], and [`DictSerializer`].
 ///
-/// [bare item]: <https://httpwg.org/specs/rfc8941.html#item>
-pub type RefBareItem<'a> = GenericBareItem<&'a StringRef, &'a [u8], &'a TokenRef>;
+/// [bare item]: <https://httpwg.org/specs/rfc9651.html#item>
+///
+/// Note: This type deliberately does not implement `From<&str>` as a shorthand
+/// for [`RefBareItem::DisplayString`] because it is too easy to confuse with
+/// conversions from [`StringRef`]:
+///
+/// ```compile_fail
+/// # use sfv::RefBareItem;
+/// let _: RefBareItem = "x".into();
+/// ```
+///
+/// Instead, use:
+///
+/// ```
+/// # use sfv::RefBareItem;
+/// let _ = RefBareItem::DisplayString("x");
+/// ```
+pub type RefBareItem<'a> = GenericBareItem<&'a StringRef, &'a [u8], &'a TokenRef, &'a str>;
 
 /// A [bare item] that borrows data from input when possible.
 ///
 /// Used to parse input incrementally in the [`visitor`] module.
 ///
-/// [bare item]: <https://httpwg.org/specs/rfc8941.html#item>
-pub type BareItemFromInput<'a> = GenericBareItem<Cow<'a, StringRef>, Vec<u8>, &'a TokenRef>;
+/// [bare item]: <https://httpwg.org/specs/rfc9651.html#item>
+///
+/// Note: This type deliberately does not implement `From<Cow<str>>` as a
+/// shorthand for [`BareItemFromInput::DisplayString`] because it is too easy to
+/// confuse with conversions from [`Cow<StringRef>`]:
+///
+/// ```compile_fail
+/// # use sfv::BareItemFromInput;
+/// # use std::borrow::Cow;
+/// let _: BareItemFromInput = "x".to_owned().into();
+/// ```
+///
+/// Instead, use:
+///
+/// ```
+/// # use sfv::BareItemFromInput;
+/// # use std::borrow::Cow;
+/// let _ = BareItemFromInput::DisplayString(Cow::Borrowed("x"));
+/// ```
+pub type BareItemFromInput<'a> =
+    GenericBareItem<Cow<'a, StringRef>, Vec<u8>, &'a TokenRef, Cow<'a, str>>;
 
-impl<'a, S, B, T> From<&'a GenericBareItem<S, B, T>> for RefBareItem<'a>
+impl<'a, S, B, T, D> From<&'a GenericBareItem<S, B, T, D>> for RefBareItem<'a>
 where
     S: Borrow<StringRef>,
     B: Borrow<[u8]>,
     T: Borrow<TokenRef>,
+    D: Borrow<str>,
 {
-    fn from(val: &'a GenericBareItem<S, B, T>) -> RefBareItem<'a> {
+    fn from(val: &'a GenericBareItem<S, B, T, D>) -> RefBareItem<'a> {
         match val {
             GenericBareItem::Integer(val) => RefBareItem::Integer(*val),
             GenericBareItem::Decimal(val) => RefBareItem::Decimal(*val),
@@ -405,6 +505,8 @@ where
             GenericBareItem::ByteSeq(val) => RefBareItem::ByteSeq(val.borrow()),
             GenericBareItem::Boolean(val) => RefBareItem::Boolean(*val),
             GenericBareItem::Token(val) => RefBareItem::Token(val.borrow()),
+            GenericBareItem::Date(val) => RefBareItem::Date(*val),
+            GenericBareItem::DisplayString(val) => RefBareItem::DisplayString(val.borrow()),
         }
     }
 }
@@ -418,6 +520,8 @@ impl<'a> From<BareItemFromInput<'a>> for BareItem {
             BareItemFromInput::ByteSeq(val) => BareItem::ByteSeq(val),
             BareItemFromInput::Boolean(val) => BareItem::Boolean(val),
             BareItemFromInput::Token(val) => BareItem::Token(val.to_owned()),
+            BareItemFromInput::Date(val) => BareItem::Date(val),
+            BareItemFromInput::DisplayString(val) => BareItem::DisplayString(val.into_owned()),
         }
     }
 }
@@ -428,13 +532,13 @@ impl<'a> From<&'a [u8]> for RefBareItem<'a> {
     }
 }
 
-impl<'a, S, B> From<&'a Token> for GenericBareItem<S, B, &'a TokenRef> {
+impl<'a, S, B, D> From<&'a Token> for GenericBareItem<S, B, &'a TokenRef, D> {
     fn from(val: &'a Token) -> Self {
         Self::Token(val)
     }
 }
 
-impl<'a, S, B> From<&'a TokenRef> for GenericBareItem<S, B, &'a TokenRef> {
+impl<'a, S, B, D> From<&'a TokenRef> for GenericBareItem<S, B, &'a TokenRef, D> {
     fn from(val: &'a TokenRef) -> Self {
         Self::Token(val)
     }
@@ -452,12 +556,13 @@ impl<'a> From<&'a StringRef> for RefBareItem<'a> {
     }
 }
 
-impl<S1, B1, T1, S2, B2, T2> PartialEq<GenericBareItem<S2, B2, T2>> for GenericBareItem<S1, B1, T1>
+impl<S1, B1, T1, D1, S2, B2, T2, D2> PartialEq<GenericBareItem<S2, B2, T2, D2>>
+    for GenericBareItem<S1, B1, T1, D1>
 where
     for<'a> RefBareItem<'a>: From<&'a Self>,
-    for<'a> RefBareItem<'a>: From<&'a GenericBareItem<S2, B2, T2>>,
+    for<'a> RefBareItem<'a>: From<&'a GenericBareItem<S2, B2, T2, D2>>,
 {
-    fn eq(&self, other: &GenericBareItem<S2, B2, T2>) -> bool {
+    fn eq(&self, other: &GenericBareItem<S2, B2, T2, D2>) -> bool {
         match (RefBareItem::from(self), RefBareItem::from(other)) {
             (RefBareItem::Integer(a), RefBareItem::Integer(b)) => a == b,
             (RefBareItem::Decimal(a), RefBareItem::Decimal(b)) => a == b,
@@ -465,7 +570,37 @@ where
             (RefBareItem::ByteSeq(a), RefBareItem::ByteSeq(b)) => a == b,
             (RefBareItem::Boolean(a), RefBareItem::Boolean(b)) => a == b,
             (RefBareItem::Token(a), RefBareItem::Token(b)) => a == b,
+            (RefBareItem::Date(a), RefBareItem::Date(b)) => a == b,
+            (RefBareItem::DisplayString(a), RefBareItem::DisplayString(b)) => a == b,
             _ => false,
         }
+    }
+}
+
+/// A version for serialized structured field values.
+///
+/// Each HTTP specification that uses structured field values must indicate
+/// which version it uses. See [the guidance from RFC 9651] for details.
+///
+/// [RFC 9651]: <https://httpwg.org/specs/rfc9651.html#using-new-structured-types-in-extensions>
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+pub enum Version {
+    /// [RFC 8941], which does not support dates or display strings.
+    ///
+    /// [RFC 8941]: <https://httpwg.org/specs/rfc8941.html>
+    Rfc8941,
+    /// [RFC 9651], which supports dates and display strings.
+    ///
+    /// [RFC 9651]: <https://httpwg.org/specs/rfc9651.html>
+    Rfc9651,
+}
+
+impl fmt::Display for Version {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(match self {
+            Self::Rfc8941 => "RFC 8941",
+            Self::Rfc9651 => "RFC 9651",
+        })
     }
 }
