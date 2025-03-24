@@ -50,7 +50,7 @@ fn serialize_value_list_mixed_members_with_params() -> Result<(), Error> {
     let inner_list_item2 = Item::with_params(token_ref("str2"), inner_list_item2_param);
     let inner_list_param = Parameters::from_iter(vec![(
         key_ref("inner_list_param").to_owned(),
-        BareItem::ByteSeq(b"weather".to_vec()),
+        BareItem::ByteSequence(b"weather".to_vec()),
     )]);
     let inner_list =
         InnerList::with_params(vec![inner_list_item1, inner_list_item2], inner_list_param);

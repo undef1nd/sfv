@@ -382,7 +382,7 @@ fn parse_bare_item() -> Result<(), Error> {
         Parser::new("*token").parse_bare_item()?
     );
     assert_eq!(
-        RefBareItem::ByteSeq(b"base_64 encoding test"),
+        RefBareItem::ByteSequence(b"base_64 encoding test"),
         Parser::new(":YmFzZV82NCBlbmNvZGluZyB0ZXN0:").parse_bare_item()?
     );
     assert_eq!(

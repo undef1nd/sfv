@@ -72,7 +72,7 @@ impl Serializer {
         match value.into() {
             RefBareItem::Boolean(value) => Self::serialize_bool(value, output),
             RefBareItem::String(value) => Self::serialize_string(value, output),
-            RefBareItem::ByteSeq(value) => Self::serialize_byte_sequence(value, output),
+            RefBareItem::ByteSequence(value) => Self::serialize_byte_sequence(value, output),
             RefBareItem::Token(value) => Self::serialize_token(value, output),
             RefBareItem::Integer(value) => Self::serialize_integer(value, output),
             RefBareItem::Decimal(value) => Self::serialize_decimal(value, output),

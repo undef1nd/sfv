@@ -278,7 +278,7 @@ fn build_bare_item(bare_item_value: &Value) -> Result<BareItem, Box<dyn Error>> 
             let str_val = bare_item["value"]
                 .as_str()
                 .ok_or("build_bare_item: bare_item value is not a str")?;
-            Ok(BareItem::ByteSeq(
+            Ok(BareItem::ByteSequence(
                 base32::decode(base32::Alphabet::Rfc4648 { padding: true }, str_val)
                     .ok_or("build_bare_item: invalid base32")?,
             ))
