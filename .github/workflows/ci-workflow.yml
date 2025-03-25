@@ -35,6 +35,20 @@ jobs:
           command: check
           args: --all-targets --all-features
 
+  msrv:
+    name: Check MSRV
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: 'true'
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: 1.77
+          override: true
+      - name: Build with MSRV
+        run: cargo build
+
   test:
     name: Run tests
     runs-on: ubuntu-latest
