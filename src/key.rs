@@ -2,7 +2,6 @@ use crate::error::{Error, NonEmptyStringError};
 use crate::utils;
 
 use std::borrow::Borrow;
-use std::convert::TryFrom;
 use std::fmt;
 
 /// An owned structured field value [key].

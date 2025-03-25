@@ -1,12 +1,8 @@
 use crate::visitor::Ignored;
 use crate::{integer, key_ref, string_ref, token_ref, Decimal, Error, Num, Parser, RefBareItem};
-use std::convert::TryFrom;
 
 #[cfg(feature = "parsed-types")]
 use crate::{BareItem, Date, Dictionary, InnerList, Item, List, Parameters, Version};
-
-#[cfg(feature = "parsed-types")]
-use std::iter::FromIterator;
 
 #[test]
 #[cfg(feature = "parsed-types")]

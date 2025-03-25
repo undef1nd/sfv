@@ -9,7 +9,6 @@ use crate::{
 use crate::{Dictionary, Item, List};
 
 use std::borrow::Cow;
-use std::convert::TryFrom;
 use std::string::String as StdString;
 
 fn parse_item<'a>(parser: &mut Parser<'a>, visitor: impl ItemVisitor<'a>) -> SFVResult<()> {

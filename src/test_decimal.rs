@@ -1,7 +1,5 @@
 use crate::{Decimal, Error, Integer};
 
-use std::convert::TryFrom;
-
 #[test]
 fn test_display() {
     for (expected, input) in [

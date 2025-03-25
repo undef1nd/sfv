@@ -1,7 +1,6 @@
 use crate::Error;
 
 use std::borrow::{Borrow, Cow};
-use std::convert::TryFrom;
 use std::fmt;
 use std::string::String as StdString;
 

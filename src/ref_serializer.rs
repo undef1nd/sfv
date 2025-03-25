@@ -253,7 +253,6 @@ impl<W: BorrowMut<String>> ListSerializer<W> {
 ///
 /// ```
 /// use sfv::{KeyRef, StringRef, TokenRef, DictSerializer, Decimal};
-/// use std::convert::TryFrom;
 ///
 /// # fn main() -> Result<(), sfv::Error> {
 /// let mut ser = DictSerializer::new();
@@ -439,7 +438,6 @@ impl<'a> InnerListSerializer<'a> {
 mod alternative_serializer_tests {
     use super::*;
     use crate::{key_ref, string_ref, token_ref, Decimal};
-    use std::convert::TryFrom;
 
     #[test]
     fn test_fast_serialize_item() {

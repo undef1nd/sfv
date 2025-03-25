@@ -2,7 +2,7 @@
 name = "sfv"
 version = "0.10.4"
 authors = ["Tania Batieva <yalyna.ts@gmail.com>"]
-edition = "2018"
+edition = "2021"
 license = "MIT/Apache-2.0"
 readme = "README.md"
 documentation = "https://docs.rs/sfv"

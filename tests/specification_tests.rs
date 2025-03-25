@@ -6,7 +6,6 @@ use sfv::{
     BareItem, Date, Decimal, Dictionary, InnerList, Item, KeyRef, List, ListEntry, Parameters,
     StringRef, TokenRef,
 };
-use std::convert::{TryFrom, TryInto};
 use std::error::Error;
 use std::path::PathBuf;
 use std::{env, fs};

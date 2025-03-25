@@ -1,6 +1,5 @@
 use crate::{Error, Integer};
 
-use std::convert::{TryFrom, TryInto};
 use std::fmt;
 
 /// A structured field value [decimal].
@@ -29,8 +28,6 @@ impl Decimal {
     /// # Example
     ///
     /// ```
-    /// use std::convert::TryFrom;
-    ///
     /// let decimal = sfv::Decimal::try_from(1.234).unwrap();
     /// assert_eq!(i64::from(decimal.as_integer_scaled_1000()), 1234);
     /// ````

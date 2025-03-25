@@ -76,7 +76,6 @@ match dict.get("u") {
 Serializes an `Item`:
 ```
 use sfv::{Decimal, ItemSerializer, KeyRef, StringRef};
-use std::convert::TryFrom;
 
 # fn main() -> Result<(), sfv::Error> {
 let serialized_item = ItemSerializer::new()
@@ -188,7 +187,6 @@ mod test_string;
 mod test_token;
 
 use std::borrow::{Borrow, Cow};
-use std::convert::TryFrom;
 use std::fmt;
 use std::string::String as StdString;
 
