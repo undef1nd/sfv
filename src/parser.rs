@@ -293,7 +293,7 @@ assert_eq!(
         match self.peek() {
             Some(b'?') => Ok(BareItemFromInput::Boolean(self.parse_bool()?)),
             Some(b'"') => Ok(BareItemFromInput::String(self.parse_string()?)),
-            Some(b':') => Ok(BareItemFromInput::ByteSeq(self.parse_byte_sequence()?)),
+            Some(b':') => Ok(BareItemFromInput::ByteSequence(self.parse_byte_sequence()?)),
             Some(b'@') => Ok(BareItemFromInput::Date(self.parse_date()?)),
             Some(b'%') => Ok(BareItemFromInput::DisplayString(
                 self.parse_display_string()?,
