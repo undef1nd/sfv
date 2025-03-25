@@ -1,12 +1,8 @@
 use crate::serializer::Serializer;
 use crate::{integer, key_ref, string_ref, token_ref, Date, Decimal, Error};
-use std::convert::TryFrom;
 
 #[cfg(feature = "parsed-types")]
 use crate::{BareItem, Dictionary, InnerList, Item, List, Parameters, SerializeValue};
-
-#[cfg(feature = "parsed-types")]
-use std::iter::FromIterator;
 
 #[test]
 #[cfg(feature = "parsed-types")]

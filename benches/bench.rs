@@ -6,7 +6,6 @@ use sfv::{
     integer, key_ref, string_ref, token_ref, Decimal, DictSerializer, ItemSerializer,
     ListSerializer, Parser, SerializeValue,
 };
-use std::convert::TryFrom;
 
 criterion_main!(parsing, serializing, ref_serializing);
 

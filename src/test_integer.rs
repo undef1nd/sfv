@@ -1,7 +1,5 @@
 use crate::{Error, Integer};
 
-use std::convert::TryFrom;
-
 #[test]
 #[should_panic]
 fn test_constant_too_small() {
