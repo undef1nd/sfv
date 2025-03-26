@@ -1,7 +1,18 @@
 use std::borrow::Cow;
 use std::fmt;
 
-/// An error that occurs during parsing or serialization.
+/// An error that can occur in this crate.
+///
+/// The most common type of error is invalid input during parsing, but others
+/// exist as well:
+///
+/// - Conversion to or from bare-item types such as [`Integer`][crate::Integer]
+/// - Attempting to serialize an empty [list][crate::ListSerializer::finish] or
+///   [dictionary][crate::DictSerializer::finish]
+///
+/// Other than implementing the [`std::error::Error`], [`std::fmt::Debug`], and
+/// [`std::fmt::Display`] traits, this error type currently provides no
+/// introspection capabilities.
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct Error {
