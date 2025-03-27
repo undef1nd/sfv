@@ -3,7 +3,7 @@ use crate::{BareItem, BareItemFromInput, Key, KeyRef};
 use indexmap::IndexMap;
 use std::convert::Infallible;
 
-/// An item-type structured field value.
+/// An [item]-type structured field value.
 ///
 /// Can be used as a member of `List` or `Dictionary`.
 ///

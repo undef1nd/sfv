@@ -136,6 +136,7 @@ impl<'a> Parser<'a> {
     #[cfg_attr(
         feature = "parsed-types",
         doc = r##"
+
 This can also be used to parse a dictionary that is split into multiple lines by merging
 them into an existing structure:
 
@@ -174,6 +175,7 @@ assert_eq!(
     #[cfg_attr(
         feature = "parsed-types",
         doc = r##"
+
 This can also be used to parse a list that is split into multiple lines by merging them
 into an existing structure:
 ```
