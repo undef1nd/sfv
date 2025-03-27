@@ -10,7 +10,7 @@ description = """Structured Field Values for HTTP parser.
 Implementation of RFC 8941 and RFC 9651."""
 repository = "https://github.com/undef1nd/sfv"
 keywords = ["http-header", "structured-header", ]
-exclude = ["tests/**", ".github/*"]
+exclude = ["tests/**", ".github/*", "benches/**", "fuzz/**"]
 rust-version = "1.77"
 
 [dependencies]
