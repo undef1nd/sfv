@@ -1,10 +1,8 @@
 use serde::Deserialize;
 use serde_json::Value;
-use sfv::Parser;
-use sfv::SerializeValue;
 use sfv::{
-    BareItem, Date, Decimal, Dictionary, InnerList, Item, KeyRef, List, ListEntry, Parameters,
-    StringRef, TokenRef,
+    BareItem, Date, Dictionary, InnerList, Item, KeyRef, List, ListEntry, Parameters, Parser,
+    SerializeValue, StringRef, TokenRef,
 };
 use std::error::Error;
 use std::path::PathBuf;
@@ -35,6 +33,7 @@ enum FieldType {
     List(List),
     Dict(Dictionary),
 }
+
 impl FieldType {
     fn serialize(&self) -> Result<String, sfv::Error> {
         match self {
@@ -46,7 +45,7 @@ impl FieldType {
 }
 
 fn run_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
-    println!("- {}", &test_case.name);
+    println!("- {}", test_case.name);
 
     let input = test_case
         .raw
@@ -124,20 +123,11 @@ fn build_expected_field_value(test_case: &TestData) -> Result<FieldType, Box<dyn
         .ok_or("build_expected_field_value: test's expected value is not specified")?;
 
     // Build expected Structured Field Value from serde Value
-    match test_case.header_type {
-        HeaderType::Item => {
-            let item = build_item(expected_value)?;
-            Ok(FieldType::Item(item))
-        }
-        HeaderType::List => {
-            let list = build_list(expected_value)?;
-            Ok(FieldType::List(list))
-        }
-        HeaderType::Dictionary => {
-            let dict = build_dict(expected_value)?;
-            Ok(FieldType::Dict(dict))
-        }
-    }
+    Ok(match test_case.header_type {
+        HeaderType::Item => FieldType::Item(build_item(expected_value)?),
+        HeaderType::List => FieldType::List(build_list(expected_value)?),
+        HeaderType::Dictionary => FieldType::Dict(build_dict(expected_value)?),
+    })
 }
 
 fn build_list_or_item(member: &Value) -> Result<ListEntry, Box<dyn Error>> {
@@ -146,12 +136,11 @@ fn build_list_or_item(member: &Value) -> Result<ListEntry, Box<dyn Error>> {
         .ok_or("build_list_or_item: list_or_item value is not an array")?;
 
     // If member is an array of arrays, then it represents InnerList, otherwise it's an Item
-    let list_entry: ListEntry = if member_as_array[0].is_array() {
+    Ok(if member_as_array[0].is_array() {
         build_inner_list(member)?.into()
     } else {
         build_item(member)?.into()
-    };
-    Ok(list_entry)
+    })
 }
 
 fn build_dict(expected_value: &Value) -> Result<Dictionary, Box<dyn Error>> {
@@ -161,11 +150,7 @@ fn build_dict(expected_value: &Value) -> Result<Dictionary, Box<dyn Error>> {
 
     let mut dict = Dictionary::new();
 
-    if expected_array.is_empty() {
-        return Ok(dict);
-    }
-
-    for member in expected_array.iter() {
+    for member in expected_array {
         let member = member
             .as_array()
             .ok_or("build_dict: expected dict member is not an array")?;
@@ -182,16 +167,12 @@ fn build_dict(expected_value: &Value) -> Result<Dictionary, Box<dyn Error>> {
 }
 
 fn build_list(expected_value: &Value) -> Result<List, Box<dyn Error>> {
-    let expected_as_array = expected_value
+    expected_value
         .as_array()
-        .ok_or("build_list: expected value is not an array")?;
-
-    let mut list_items: Vec<ListEntry> = vec![];
-    for member in expected_as_array.iter() {
-        let item_or_inner_list: ListEntry = build_list_or_item(member)?;
-        list_items.push(item_or_inner_list);
-    }
-    Ok(list_items)
+        .ok_or("build_list: expected value is not an array")?
+        .iter()
+        .map(build_list_or_item)
+        .collect()
 }
 
 fn build_inner_list(inner_list_value: &Value) -> Result<InnerList, Box<dyn Error>> {
@@ -209,7 +190,6 @@ fn build_inner_list(inner_list_value: &Value) -> Result<InnerList, Box<dyn Error
     for item_value in inner_list_items
         .as_array()
         .ok_or("build_inner_list: inner list items value is not an array")?
-        .iter()
     {
         items.push(build_item(item_value)?);
     }
@@ -238,69 +218,44 @@ fn build_item(expected_value: &Value) -> Result<Item, Box<dyn Error>> {
     Ok(Item { bare_item, params })
 }
 
-fn build_bare_item(bare_item_value: &Value) -> Result<BareItem, Box<dyn Error>> {
-    match bare_item_value {
-        bare_item if bare_item.is_i64() => Ok(BareItem::Integer(
-            bare_item
+fn build_bare_item(value: &Value) -> Result<BareItem, Box<dyn Error>> {
+    Ok(match value {
+        value if value.is_i64() => value.as_i64().unwrap().try_into()?,
+        value if value.is_f64() => value.as_f64().unwrap().try_into()?,
+        value if value.is_boolean() => value.as_bool().unwrap().into(),
+        value if value.is_string() => StringRef::from_str(value.as_str().unwrap())?.into(),
+        value if (value.is_object() && value["__type"] == "token") => TokenRef::from_str(
+            value["value"]
+                .as_str()
+                .ok_or("build_bare_item: bare_item value is not a str")?,
+        )?
+        .into(),
+        value if (value.is_object() && value["__type"] == "binary") => {
+            let value = value["value"]
+                .as_str()
+                .ok_or("build_bare_item: bare_item value is not a str")?;
+
+            base32::decode(base32::Alphabet::Rfc4648 { padding: true }, value)
+                .ok_or("build_bare_item: invalid base32")?
+                .into()
+        }
+        value if (value.is_object() && value["__type"] == "date") => Date::from_unix_seconds(
+            value["value"]
                 .as_i64()
                 .ok_or("build_bare_item: bare_item value is not an i64")?
                 .try_into()?,
-        )),
-        bare_item if bare_item.is_f64() => {
-            let decimal = Decimal::try_from(bare_item.as_f64().unwrap())?;
-            Ok(BareItem::Decimal(decimal))
-        }
-        bare_item if bare_item.is_boolean() => Ok(BareItem::Boolean(
-            bare_item
-                .as_bool()
-                .ok_or("build_bare_item: bare_item value is not a bool")?,
-        )),
-        bare_item if bare_item.is_string() => Ok(BareItem::String(
-            StringRef::from_str(
-                bare_item
-                    .as_str()
-                    .ok_or("build_bare_item: bare_item value is not a str")?,
-            )?
-            .to_owned(),
-        )),
-        bare_item if (bare_item.is_object() && bare_item["__type"] == "token") => {
-            Ok(BareItem::Token(
-                TokenRef::from_str(
-                    bare_item["value"]
-                        .as_str()
-                        .ok_or("build_bare_item: bare_item value is not a str")?,
-                )?
-                .to_owned(),
-            ))
-        }
-        bare_item if (bare_item.is_object() && bare_item["__type"] == "binary") => {
-            let str_val = bare_item["value"]
-                .as_str()
-                .ok_or("build_bare_item: bare_item value is not a str")?;
-            Ok(BareItem::ByteSequence(
-                base32::decode(base32::Alphabet::Rfc4648 { padding: true }, str_val)
-                    .ok_or("build_bare_item: invalid base32")?,
-            ))
-        }
-        bare_item if (bare_item.is_object() && bare_item["__type"] == "date") => {
-            Ok(BareItem::Date(Date::from_unix_seconds(
-                bare_item["value"]
-                    .as_i64()
-                    .ok_or("build_bare_item: bare_item value is not an i64")?
-                    .try_into()
-                    .unwrap(),
-            )))
-        }
-        bare_item if (bare_item.is_object() && bare_item["__type"] == "displaystring") => {
-            Ok(BareItem::DisplayString(
-                bare_item["value"]
+        )
+        .into(),
+        value if (value.is_object() && value["__type"] == "displaystring") => {
+            BareItem::DisplayString(
+                value["value"]
                     .as_str()
                     .ok_or("build_bare_item: bare_item value is not a str")?
                     .to_owned(),
-            ))
+            )
         }
-        _ => Err("build_bare_item: unknown bare_item value".into()),
-    }
+        _ => Err("build_bare_item: unknown bare_item value")?,
+    })
 }
 
 fn build_parameters(params_value: &Value) -> Result<Parameters, Box<dyn Error>> {
@@ -309,11 +264,8 @@ fn build_parameters(params_value: &Value) -> Result<Parameters, Box<dyn Error>> 
     let parameters_array = params_value
         .as_array()
         .ok_or("build_parameters: params value is not an array")?;
-    if parameters_array.is_empty() {
-        return Ok(parameters);
-    };
 
-    for member in parameters_array.iter() {
+    for member in parameters_array {
         let member = member
             .as_array()
             .ok_or("build_parameters: expected parameter is not an array")?;
@@ -329,13 +281,24 @@ fn build_parameters(params_value: &Value) -> Result<Parameters, Box<dyn Error>> 
     Ok(parameters)
 }
 
-fn run_test_suite(tests_file: PathBuf, is_serialization: bool) -> Result<(), Box<dyn Error>> {
-    let test_cases: Vec<TestData> = serde_json::from_reader(fs::File::open(tests_file)?)?;
-    for test_data in test_cases.iter() {
-        if is_serialization {
-            run_test_case_serialization_only(test_data)?;
-        } else {
-            run_test_case(test_data)?;
+fn run_tests(dir: PathBuf, is_serialization: bool) -> Result<(), Box<dyn Error>> {
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+
+        if entry.path().extension().unwrap_or_default() != "json" {
+            continue;
+        }
+
+        println!("\n## Test suite file: {:?}\n", entry.file_name());
+
+        let test_cases: Vec<TestData> = serde_json::from_reader(fs::File::open(entry.path())?)?;
+
+        for test_data in &test_cases {
+            if is_serialization {
+                run_test_case_serialization_only(test_data)?;
+            } else {
+                run_test_case(test_data)?;
+            }
         }
     }
     Ok(())
@@ -343,39 +306,19 @@ fn run_test_suite(tests_file: PathBuf, is_serialization: bool) -> Result<(), Box
 
 #[test]
 fn run_spec_parse_serialize_tests() -> Result<(), Box<dyn Error>> {
-    let test_suites_dir: PathBuf = env::current_dir()?.join("tests").join("spec_tests");
-    let json_files = fs::read_dir(test_suites_dir)?
-        .filter_map(Result::ok)
-        .filter(|fp| fp.path().extension().unwrap_or_default() == "json");
-
-    for file_path in json_files {
-        println!("\n## Test suite file: {:?}\n", &file_path.file_name());
-        run_test_suite(file_path.path(), false)?
-    }
-    Ok(())
+    run_tests(
+        env::current_dir()?.join("tests").join("spec_tests"),
+        /*is_serialization=*/ false,
+    )
 }
 
 #[test]
 fn run_spec_serialize_only_tests() -> Result<(), Box<dyn Error>> {
-    let test_suites_dir: PathBuf = env::current_dir()?
-        .join("tests")
-        .join("spec_tests")
-        .join("serialisation-tests");
-    let read_dir = match fs::read_dir(test_suites_dir) {
-        Ok(dir) => dir,
-        _ => panic!("Test suite directory not found! Check that the spec_tests git submodule has been retrieved.")
-    };
-
-    let json_files = read_dir
-        .filter_map(Result::ok)
-        .filter(|fp| fp.path().extension().unwrap_or_default() == "json");
-
-    for file_path in json_files {
-        println!(
-            "\n## Serialization test suite file: {:?}\n",
-            &file_path.file_name()
-        );
-        run_test_suite(file_path.path(), true)?
-    }
-    Ok(())
+    run_tests(
+        env::current_dir()?
+            .join("tests")
+            .join("spec_tests")
+            .join("serialisation-tests"),
+        /*is_serialization=*/ true,
+    )
 }
