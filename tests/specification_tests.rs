@@ -1,341 +1,280 @@
 use serde::Deserialize;
-use serde_json::Value;
-use sfv::Parser;
-use sfv::SerializeValue;
 use sfv::{
-    BareItem, Date, Decimal, Dictionary, InnerList, Item, KeyRef, List, ListEntry, Parameters,
-    StringRef, TokenRef,
+    BareItem, Date, Dictionary, InnerList, Item, Key, List, ListEntry, Parameters, Parser,
+    SerializeValue,
 };
 use std::error::Error;
-use std::path::PathBuf;
-use std::{env, fs};
+use std::path::Path;
+use std::{env, fmt, fs};
 
 #[derive(Debug, Deserialize)]
 struct TestData {
     name: String,
-    raw: Option<Vec<String>>,
-    header_type: HeaderType,
-    expected: Option<Value>,
+    #[serde(flatten)]
+    header_type: ExpectedHeaderType,
     #[serde(default)]
     must_fail: bool,
     canonical: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "lowercase")]
-enum HeaderType {
-    Item,
-    List,
-    Dictionary,
+struct ParseTestData {
+    #[serde(flatten)]
+    data: TestData,
+    raw: Vec<String>,
 }
 
-#[derive(Debug, PartialEq)]
-enum FieldType {
-    Item(Item),
-    List(List),
-    Dict(Dictionary),
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "lowercase", tag = "header_type", content = "expected")]
+// https://github.com/httpwg/structured-field-tests/blob/main/README.md#test-format
+enum ExpectedHeaderType {
+    Item(Option<ExpectedItem>),
+    List(Option<ExpectedList>),
+    Dictionary(Option<ExpectedDict>),
 }
-impl FieldType {
-    fn serialize(&self) -> Result<String, sfv::Error> {
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "__type", content = "value")]
+enum ExpectedBareItem {
+    #[serde(rename = "binary")]
+    ByteSequence(String),
+    #[serde(rename = "token")]
+    Token(String),
+    #[serde(rename = "date")]
+    Date(i64),
+    #[serde(rename = "displaystring")]
+    DisplayString(String),
+    #[serde(untagged)]
+    Boolean(bool),
+    #[serde(untagged)]
+    Integer(i64),
+    #[serde(untagged)]
+    Decimal(f64),
+    #[serde(untagged)]
+    String(String),
+}
+
+type ExpectedParameters = Vec<(String, ExpectedBareItem)>;
+
+type ExpectedItem = (ExpectedBareItem, ExpectedParameters);
+
+type ExpectedInnerList = (Vec<ExpectedItem>, ExpectedParameters);
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum ExpectedListEntry {
+    Item(ExpectedItem),
+    InnerList(ExpectedInnerList),
+}
+
+type ExpectedList = Vec<ExpectedListEntry>;
+
+type ExpectedDict = Vec<(String, ExpectedListEntry)>;
+
+trait TestCase: for<'a> Deserialize<'a> {
+    fn run(self);
+}
+
+impl TestCase for ParseTestData {
+    fn run(mut self) {
+        fn check<T: PartialEq + fmt::Debug + SerializeValue>(
+            test_case: &ParseTestData,
+            parse: impl for<'a> FnOnce(Parser<'a>) -> Result<T, sfv::Error>,
+            expected: Option<impl Build<T>>,
+        ) {
+            println!("- {}", test_case.data.name);
+            let input = test_case.raw.join(", ");
+
+            match parse(Parser::new(&input)) {
+                Ok(actual) => {
+                    assert!(!test_case.data.must_fail);
+                    assert_eq!(
+                        actual,
+                        expected
+                            .expect("expected value should be present")
+                            .build()
+                            .expect("build should succeed")
+                    );
+
+                    let serialized = actual.serialize_value();
+
+                    match test_case.data.canonical {
+                        // If the canonical field is omitted, the canonical form is the input.
+                        None => {
+                            assert_eq!(serialized.expect("serialization should succeed"), input)
+                        }
+                        Some(ref canonical) => {
+                            // If the canonical field is an empty list, the serialization
+                            // should be omitted, which corresponds to an error from `serialize_value`.
+                            if canonical.is_empty() {
+                                assert!(serialized.is_err());
+                            } else {
+                                assert_eq!(
+                                    serialized.expect("serialization should succeed"),
+                                    canonical[0]
+                                );
+                            }
+                        }
+                    }
+                }
+                Err(_) => assert!(test_case.data.must_fail),
+            }
+        }
+
+        match self.data.header_type {
+            ExpectedHeaderType::Item(ref mut expected) => {
+                let expected = expected.take();
+                check(&self, |p| p.parse_item(), expected);
+            }
+            ExpectedHeaderType::List(ref mut expected) => {
+                let expected = expected.take();
+                check(&self, |p| p.parse_list(), expected);
+            }
+            ExpectedHeaderType::Dictionary(ref mut expected) => {
+                let expected = expected.take();
+                check(&self, |p| p.parse_dictionary(), expected);
+            }
+        }
+    }
+}
+
+impl TestCase for TestData {
+    fn run(mut self) {
+        fn check<T: SerializeValue>(test_case: &TestData, value: Option<impl Build<T>>) {
+            println!("- {}", test_case.name);
+            match value.expect("expected value should be present").build() {
+                Ok(value) => match value.serialize_value() {
+                    Ok(serialized) => {
+                        assert!(!test_case.must_fail);
+                        assert_eq!(
+                            serialized,
+                            test_case
+                                .canonical
+                                .as_ref()
+                                .expect("canonical serialization should be present")[0]
+                        )
+                    }
+                    Err(_) => assert!(test_case.must_fail),
+                },
+                Err(_) => assert!(test_case.must_fail),
+            }
+        }
+
+        match self.header_type {
+            ExpectedHeaderType::Item(ref mut expected) => {
+                let expected = expected.take();
+                check(&self, expected)
+            }
+            ExpectedHeaderType::List(ref mut expected) => {
+                let expected = expected.take();
+                check(&self, expected)
+            }
+            ExpectedHeaderType::Dictionary(ref mut expected) => {
+                let expected = expected.take();
+                check(&self, expected)
+            }
+        }
+    }
+}
+
+trait Build<O> {
+    fn build(self) -> Result<O, Box<dyn Error>>;
+}
+
+impl Build<ListEntry> for ExpectedListEntry {
+    fn build(self) -> Result<ListEntry, Box<dyn Error>> {
         match self {
-            FieldType::Item(value) => value.serialize_value(),
-            FieldType::List(value) => value.serialize_value(),
-            FieldType::Dict(value) => value.serialize_value(),
+            Self::Item(value) => value.build().map(ListEntry::from),
+            Self::InnerList(value) => value.build().map(ListEntry::from),
         }
     }
 }
 
-fn run_test_case(test_case: &TestData) -> Result<(), Box<dyn Error>> {
-    println!("- {}", &test_case.name);
-
-    let input = test_case
-        .raw
-        .as_ref()
-        .ok_or("run_test_case: raw value is not specified")?
-        .join(", ");
-
-    let parser = Parser::new(&input);
-
-    let actual_result = match test_case.header_type {
-        HeaderType::Item => parser.parse_item().map(FieldType::Item),
-        HeaderType::List => parser.parse_list().map(FieldType::List),
-        HeaderType::Dictionary => parser.parse_dictionary().map(FieldType::Dict),
-    };
-
-    // Check that actual result for must_fail tests is Err
-    if test_case.must_fail {
-        assert!(actual_result.is_err());
-        return Ok(());
-    }
-
-    let expected_field_value = build_expected_field_value(test_case)?;
-    let actual_field_value = actual_result?;
-
-    // Test parsing
-    assert_eq!(expected_field_value, actual_field_value);
-
-    // Test serialization
-    let actual_result = actual_field_value.serialize();
-    if let Some(canonical_val) = &test_case.canonical {
-        if canonical_val.is_empty() {
-            assert!(actual_result.is_err());
-        } else {
-            assert_eq!(canonical_val[0], actual_result?);
+impl Build<Dictionary> for ExpectedDict {
+    fn build(self) -> Result<Dictionary, Box<dyn Error>> {
+        let mut dict = Dictionary::new();
+        for (key, value) in self {
+            let key = Key::try_from(key)?;
+            let value = value.build()?;
+            dict.insert(key, value);
         }
-    } else {
-        // If the canonical field is omitted, the canonical form is the input.
-        assert_eq!(input, actual_result?);
-    }
-
-    Ok(())
-}
-
-fn run_test_case_serialization_only(test_case: &TestData) -> Result<(), Box<dyn Error>> {
-    let expected_field_value = match build_expected_field_value(test_case) {
-        Ok(v) => v,
-        Err(_) => {
-            assert!(test_case.must_fail);
-            return Ok(());
-        }
-    };
-    let actual_result = expected_field_value.serialize();
-
-    if test_case.must_fail {
-        assert!(actual_result.is_err());
-        return Ok(());
-    }
-
-    // Test serialization
-    if let Some(canonical_val) = &test_case.canonical {
-        if canonical_val.is_empty() {
-            assert!(actual_result.is_err());
-        } else {
-            assert_eq!(canonical_val[0], actual_result?);
-        }
-    }
-
-    Ok(())
-}
-
-fn build_expected_field_value(test_case: &TestData) -> Result<FieldType, Box<dyn Error>> {
-    let expected_value = test_case
-        .expected
-        .as_ref()
-        .ok_or("build_expected_field_value: test's expected value is not specified")?;
-
-    // Build expected Structured Field Value from serde Value
-    match test_case.header_type {
-        HeaderType::Item => {
-            let item = build_item(expected_value)?;
-            Ok(FieldType::Item(item))
-        }
-        HeaderType::List => {
-            let list = build_list(expected_value)?;
-            Ok(FieldType::List(list))
-        }
-        HeaderType::Dictionary => {
-            let dict = build_dict(expected_value)?;
-            Ok(FieldType::Dict(dict))
-        }
+        Ok(dict)
     }
 }
 
-fn build_list_or_item(member: &Value) -> Result<ListEntry, Box<dyn Error>> {
-    let member_as_array = member
-        .as_array()
-        .ok_or("build_list_or_item: list_or_item value is not an array")?;
-
-    // If member is an array of arrays, then it represents InnerList, otherwise it's an Item
-    let list_entry: ListEntry = if member_as_array[0].is_array() {
-        build_inner_list(member)?.into()
-    } else {
-        build_item(member)?.into()
-    };
-    Ok(list_entry)
+impl Build<List> for ExpectedList {
+    fn build(self) -> Result<List, Box<dyn Error>> {
+        self.into_iter().map(Build::build).collect()
+    }
 }
 
-fn build_dict(expected_value: &Value) -> Result<Dictionary, Box<dyn Error>> {
-    let expected_array = expected_value
-        .as_array()
-        .ok_or("build_dict: expected value is not an array")?;
-
-    let mut dict = Dictionary::new();
-
-    if expected_array.is_empty() {
-        return Ok(dict);
+impl Build<InnerList> for ExpectedInnerList {
+    fn build(self) -> Result<InnerList, Box<dyn Error>> {
+        Ok(InnerList {
+            items: self
+                .0
+                .into_iter()
+                .map(Build::build)
+                .collect::<Result<Vec<Item>, Box<dyn Error>>>()?,
+            params: self.1.build()?,
+        })
     }
-
-    for member in expected_array.iter() {
-        let member = member
-            .as_array()
-            .ok_or("build_dict: expected dict member is not an array")?;
-        let member_name = KeyRef::from_str(
-            member[0]
-                .as_str()
-                .ok_or("build_dict: expected dict member name is not a str")?,
-        )?;
-        let member_value = &member[1];
-        let item_or_inner_list: ListEntry = build_list_or_item(member_value)?;
-        dict.insert(member_name.to_owned(), item_or_inner_list);
-    }
-    Ok(dict)
 }
 
-fn build_list(expected_value: &Value) -> Result<List, Box<dyn Error>> {
-    let expected_as_array = expected_value
-        .as_array()
-        .ok_or("build_list: expected value is not an array")?;
-
-    let mut list_items: Vec<ListEntry> = vec![];
-    for member in expected_as_array.iter() {
-        let item_or_inner_list: ListEntry = build_list_or_item(member)?;
-        list_items.push(item_or_inner_list);
+impl Build<Item> for ExpectedItem {
+    fn build(self) -> Result<Item, Box<dyn Error>> {
+        Ok(Item {
+            bare_item: self.0.build()?,
+            params: self.1.build()?,
+        })
     }
-    Ok(list_items)
 }
 
-fn build_inner_list(inner_list_value: &Value) -> Result<InnerList, Box<dyn Error>> {
-    // Inner list contains array of items and map of parameters:
-    // inner list = [[items], {params}]
-    // each item is an array itself: item = [bare_item, {params}]
-    let inner_list_as_array = inner_list_value
-        .as_array()
-        .ok_or("build_inner_list: inner list is not an array")?;
-
-    let inner_list_items = &inner_list_as_array[0];
-    let inner_list_params = &inner_list_as_array[1];
-
-    let mut items = vec![];
-    for item_value in inner_list_items
-        .as_array()
-        .ok_or("build_inner_list: inner list items value is not an array")?
-        .iter()
-    {
-        items.push(build_item(item_value)?);
+impl Build<BareItem> for ExpectedBareItem {
+    fn build(self) -> Result<BareItem, Box<dyn Error>> {
+        Ok(match self {
+            Self::Integer(value) => value.try_into()?,
+            Self::Decimal(value) => value.try_into()?,
+            Self::Boolean(value) => value.into(),
+            Self::String(value) => BareItem::String(value.try_into()?),
+            Self::Token(value) => BareItem::Token(value.try_into()?),
+            Self::ByteSequence(ref value) => {
+                base32::decode(base32::Alphabet::Rfc4648 { padding: true }, value)
+                    .ok_or("invalid base32")?
+                    .into()
+            }
+            Self::Date(value) => Date::from_unix_seconds(value.try_into()?).into(),
+            Self::DisplayString(value) => BareItem::DisplayString(value),
+        })
     }
-
-    let params = build_parameters(inner_list_params)?;
-
-    Ok(InnerList { items, params })
 }
 
-fn build_item(expected_value: &Value) -> Result<Item, Box<dyn Error>> {
-    // item = [bare_item, {params}]
-    let expected_array = expected_value
-        .as_array()
-        .ok_or("build_item: expected value is not an array")?;
-
-    // Item array must contain 2 members only
-    if expected_array.len() != 2 {
-        return Err("Not an item".into());
-    }
-
-    let bare_item_val = &expected_array[0];
-    let params_val = &expected_array[1];
-    let bare_item = build_bare_item(bare_item_val)?;
-    let params = build_parameters(params_val)?;
-
-    Ok(Item { bare_item, params })
-}
-
-fn build_bare_item(bare_item_value: &Value) -> Result<BareItem, Box<dyn Error>> {
-    match bare_item_value {
-        bare_item if bare_item.is_i64() => Ok(BareItem::Integer(
-            bare_item
-                .as_i64()
-                .ok_or("build_bare_item: bare_item value is not an i64")?
-                .try_into()?,
-        )),
-        bare_item if bare_item.is_f64() => {
-            let decimal = Decimal::try_from(bare_item.as_f64().unwrap())?;
-            Ok(BareItem::Decimal(decimal))
+impl Build<Parameters> for ExpectedParameters {
+    fn build(self) -> Result<Parameters, Box<dyn Error>> {
+        let mut parameters = Parameters::new();
+        for (key, value) in self {
+            let key = Key::try_from(key)?;
+            let value = value.build()?;
+            parameters.insert(key, value);
         }
-        bare_item if bare_item.is_boolean() => Ok(BareItem::Boolean(
-            bare_item
-                .as_bool()
-                .ok_or("build_bare_item: bare_item value is not a bool")?,
-        )),
-        bare_item if bare_item.is_string() => Ok(BareItem::String(
-            StringRef::from_str(
-                bare_item
-                    .as_str()
-                    .ok_or("build_bare_item: bare_item value is not a str")?,
-            )?
-            .to_owned(),
-        )),
-        bare_item if (bare_item.is_object() && bare_item["__type"] == "token") => {
-            Ok(BareItem::Token(
-                TokenRef::from_str(
-                    bare_item["value"]
-                        .as_str()
-                        .ok_or("build_bare_item: bare_item value is not a str")?,
-                )?
-                .to_owned(),
-            ))
-        }
-        bare_item if (bare_item.is_object() && bare_item["__type"] == "binary") => {
-            let str_val = bare_item["value"]
-                .as_str()
-                .ok_or("build_bare_item: bare_item value is not a str")?;
-            Ok(BareItem::ByteSequence(
-                base32::decode(base32::Alphabet::Rfc4648 { padding: true }, str_val)
-                    .ok_or("build_bare_item: invalid base32")?,
-            ))
-        }
-        bare_item if (bare_item.is_object() && bare_item["__type"] == "date") => {
-            Ok(BareItem::Date(Date::from_unix_seconds(
-                bare_item["value"]
-                    .as_i64()
-                    .ok_or("build_bare_item: bare_item value is not an i64")?
-                    .try_into()
-                    .unwrap(),
-            )))
-        }
-        bare_item if (bare_item.is_object() && bare_item["__type"] == "displaystring") => {
-            Ok(BareItem::DisplayString(
-                bare_item["value"]
-                    .as_str()
-                    .ok_or("build_bare_item: bare_item value is not a str")?
-                    .to_owned(),
-            ))
-        }
-        _ => Err("build_bare_item: unknown bare_item value".into()),
+        Ok(parameters)
     }
 }
 
-fn build_parameters(params_value: &Value) -> Result<Parameters, Box<dyn Error>> {
-    let mut parameters = Parameters::new();
+fn run_tests<T: TestCase>(dir_path: impl AsRef<Path>) -> Result<(), Box<dyn Error>> {
+    for entry in fs::read_dir(env::current_dir()?.join(dir_path))? {
+        let entry = entry?;
 
-    let parameters_array = params_value
-        .as_array()
-        .ok_or("build_parameters: params value is not an array")?;
-    if parameters_array.is_empty() {
-        return Ok(parameters);
-    };
+        if entry.path().extension().unwrap_or_default() != "json" {
+            continue;
+        }
 
-    for member in parameters_array.iter() {
-        let member = member
-            .as_array()
-            .ok_or("build_parameters: expected parameter is not an array")?;
-        let key = KeyRef::from_str(
-            member[0]
-                .as_str()
-                .ok_or("build_parameters: expected parameter name is not a str")?,
-        )?;
-        let value = &member[1];
-        let itm = build_bare_item(value)?;
-        parameters.insert(key.to_owned(), itm);
-    }
-    Ok(parameters)
-}
+        println!("\n## Test suite file: {:?}\n", entry.file_name());
 
-fn run_test_suite(tests_file: PathBuf, is_serialization: bool) -> Result<(), Box<dyn Error>> {
-    let test_cases: Vec<TestData> = serde_json::from_reader(fs::File::open(tests_file)?)?;
-    for test_data in test_cases.iter() {
-        if is_serialization {
-            run_test_case_serialization_only(test_data)?;
-        } else {
-            run_test_case(test_data)?;
+        let test_cases: Vec<T> = serde_json::from_reader(fs::File::open(entry.path())?)?;
+
+        for test_case in test_cases {
+            test_case.run();
         }
     }
     Ok(())
@@ -343,39 +282,10 @@ fn run_test_suite(tests_file: PathBuf, is_serialization: bool) -> Result<(), Box
 
 #[test]
 fn run_spec_parse_serialize_tests() -> Result<(), Box<dyn Error>> {
-    let test_suites_dir: PathBuf = env::current_dir()?.join("tests").join("spec_tests");
-    let json_files = fs::read_dir(test_suites_dir)?
-        .filter_map(Result::ok)
-        .filter(|fp| fp.path().extension().unwrap_or_default() == "json");
-
-    for file_path in json_files {
-        println!("\n## Test suite file: {:?}\n", &file_path.file_name());
-        run_test_suite(file_path.path(), false)?
-    }
-    Ok(())
+    run_tests::<ParseTestData>("tests/spec_tests")
 }
 
 #[test]
 fn run_spec_serialize_only_tests() -> Result<(), Box<dyn Error>> {
-    let test_suites_dir: PathBuf = env::current_dir()?
-        .join("tests")
-        .join("spec_tests")
-        .join("serialisation-tests");
-    let read_dir = match fs::read_dir(test_suites_dir) {
-        Ok(dir) => dir,
-        _ => panic!("Test suite directory not found! Check that the spec_tests git submodule has been retrieved.")
-    };
-
-    let json_files = read_dir
-        .filter_map(Result::ok)
-        .filter(|fp| fp.path().extension().unwrap_or_default() == "json");
-
-    for file_path in json_files {
-        println!(
-            "\n## Serialization test suite file: {:?}\n",
-            &file_path.file_name()
-        );
-        run_test_suite(file_path.path(), true)?
-    }
-    Ok(())
+    run_tests::<TestData>("tests/spec_tests/serialisation-tests")
 }
