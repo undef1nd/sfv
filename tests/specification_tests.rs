@@ -4,7 +4,7 @@ use sfv::{
     SerializeValue,
 };
 use std::error::Error;
-use std::path::PathBuf;
+use std::path::Path;
 use std::{env, fmt, fs};
 
 #[derive(Debug, Deserialize)]
@@ -261,8 +261,8 @@ impl Build<Parameters> for ExpectedParameters {
     }
 }
 
-fn run_tests<T: TestCase>(dir: PathBuf) -> Result<(), Box<dyn Error>> {
-    for entry in fs::read_dir(dir)? {
+fn run_tests<T: TestCase>(dir_path: impl AsRef<Path>) -> Result<(), Box<dyn Error>> {
+    for entry in fs::read_dir(env::current_dir()?.join(dir_path))? {
         let entry = entry?;
 
         if entry.path().extension().unwrap_or_default() != "json" {
@@ -282,15 +282,10 @@ fn run_tests<T: TestCase>(dir: PathBuf) -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn run_spec_parse_serialize_tests() -> Result<(), Box<dyn Error>> {
-    run_tests::<ParseTestData>(env::current_dir()?.join("tests").join("spec_tests"))
+    run_tests::<ParseTestData>("tests/spec_tests")
 }
 
 #[test]
 fn run_spec_serialize_only_tests() -> Result<(), Box<dyn Error>> {
-    run_tests::<TestData>(
-        env::current_dir()?
-            .join("tests")
-            .join("spec_tests")
-            .join("serialisation-tests"),
-    )
+    run_tests::<TestData>("tests/spec_tests/serialisation-tests")
 }
