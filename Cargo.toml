@@ -32,7 +32,7 @@ required-features = ["parsed-types"]
 
 [features]
 default = ["parsed-types"]
-arbitrary = ["dep:arbitrary", "indexmap/arbitrary"]
+arbitrary = ["dep:arbitrary", "indexmap?/arbitrary"]
 parsed-types = ["dep:indexmap"]
 
 [[test]]
