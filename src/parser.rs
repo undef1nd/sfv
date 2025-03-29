@@ -263,10 +263,7 @@ assert_eq!(
     ) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc9651.html#parse-innerlist
 
-        if Some(b'(') != self.peek() {
-            return self.error("expected start of inner list");
-        }
-
+        debug_assert_eq!(self.peek(), Some(b'('));
         self.next();
 
         while self.peek().is_some() {
@@ -302,7 +299,7 @@ assert_eq!(
                 self.parse_display_string()?,
             )),
             Some(c) if utils::is_allowed_start_token_char(c) => {
-                Ok(BareItemFromInput::Token(self.parse_token()?))
+                Ok(BareItemFromInput::Token(self.parse_token()))
             }
             Some(c) if c == b'-' || c.is_ascii_digit() => match self.parse_number()? {
                 Num::Decimal(val) => Ok(BareItemFromInput::Decimal(val)),
@@ -315,10 +312,7 @@ assert_eq!(
     pub(crate) fn parse_bool(&mut self) -> SFVResult<bool> {
         // https://httpwg.org/specs/rfc9651.html#parse-boolean
 
-        if self.peek() != Some(b'?') {
-            return self.error("expected start of boolean ('?')");
-        }
-
+        debug_assert_eq!(self.peek(), Some(b'?'));
         self.next();
 
         match self.peek() {
@@ -337,10 +331,7 @@ assert_eq!(
     pub(crate) fn parse_string(&mut self) -> SFVResult<Cow<'a, StringRef>> {
         // https://httpwg.org/specs/rfc9651.html#parse-string
 
-        if self.peek() != Some(b'"') {
-            return self.error(r#"expected start of string ('"')"#);
-        }
-
+        debug_assert_eq!(self.peek(), Some(b'"'));
         self.next();
 
         let start = self.index;
@@ -389,19 +380,10 @@ assert_eq!(
         self.error("unterminated string")
     }
 
-    fn parse_non_empty_str(
-        &mut self,
-        is_allowed_start_char: impl FnOnce(u8) -> bool,
-        is_allowed_inner_char: impl Fn(u8) -> bool,
-    ) -> Option<&'a str> {
+    fn parse_non_empty_str(&mut self, is_allowed_inner_char: impl Fn(u8) -> bool) -> &'a str {
+        debug_assert!(self.peek().is_some());
         let start = self.index;
-
-        match self.peek() {
-            Some(c) if is_allowed_start_char(c) => {
-                self.next();
-            }
-            _ => return None,
-        }
+        self.next();
 
         loop {
             match self.peek() {
@@ -410,30 +392,23 @@ assert_eq!(
                 }
                 // TODO: The UTF-8 validation is redundant with the preceding character checks, but
                 // its removal is only possible with unsafe code.
-                _ => return Some(std::str::from_utf8(&self.input[start..self.index]).unwrap()),
+                _ => return std::str::from_utf8(&self.input[start..self.index]).unwrap(),
             }
         }
     }
 
-    pub(crate) fn parse_token(&mut self) -> SFVResult<&'a TokenRef> {
+    pub(crate) fn parse_token(&mut self) -> &'a TokenRef {
         // https://httpwg.org/specs/9651.html#parse-token
 
-        match self.parse_non_empty_str(
-            utils::is_allowed_start_token_char,
-            utils::is_allowed_inner_token_char,
-        ) {
-            None => self.error("expected start of token"),
-            Some(str) => Ok(TokenRef::from_validated_str(str)),
-        }
+        debug_assert!(self.peek().is_some_and(utils::is_allowed_start_token_char));
+
+        TokenRef::from_validated_str(self.parse_non_empty_str(utils::is_allowed_inner_token_char))
     }
 
     pub(crate) fn parse_byte_sequence(&mut self) -> SFVResult<Vec<u8>> {
         // https://httpwg.org/specs/rfc9651.html#parse-binary
 
-        if self.peek() != Some(b':') {
-            return self.error("expected start of byte sequence (':')");
-        }
-
+        debug_assert_eq!(self.peek(), Some(b':'));
         self.next();
         let start = self.index;
 
@@ -538,9 +513,7 @@ assert_eq!(
     pub(crate) fn parse_date(&mut self) -> SFVResult<Date> {
         // https://httpwg.org/specs/rfc9651.html#parse-date
 
-        if self.peek() != Some(b'@') {
-            return self.error("expected start of date ('@')");
-        }
+        debug_assert_eq!(self.peek(), Some(b'@'));
 
         match self.version {
             Version::Rfc8941 => return self.error("RFC 8941 does not support dates"),
@@ -562,9 +535,7 @@ assert_eq!(
     pub(crate) fn parse_display_string(&mut self) -> SFVResult<Cow<'a, str>> {
         // https://httpwg.org/specs/rfc9651.html#parse-display
 
-        if self.peek() != Some(b'%') {
-            return self.error("expected start of display string ('%')");
-        }
+        debug_assert_eq!(self.peek(), Some(b'%'));
 
         match self.version {
             Version::Rfc8941 => return self.error("RFC 8941 does not support display strings"),
@@ -671,13 +642,13 @@ assert_eq!(
     pub(crate) fn parse_key(&mut self) -> SFVResult<&'a KeyRef> {
         // https://httpwg.org/specs/rfc9651.html#parse-key
 
-        match self.parse_non_empty_str(
-            utils::is_allowed_start_key_char,
-            utils::is_allowed_inner_key_char,
-        ) {
-            None => self.error("expected start of key ('a'-'z' or '*')"),
-            Some(str) => Ok(KeyRef::from_validated_str(str)),
+        if !self.peek().is_some_and(utils::is_allowed_start_key_char) {
+            return self.error("expected start of key ('a'-'z' or '*')");
         }
+
+        Ok(KeyRef::from_validated_str(
+            self.parse_non_empty_str(utils::is_allowed_inner_key_char),
+        ))
     }
 
     fn consume_ows_chars(&mut self) {
