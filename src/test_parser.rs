@@ -860,6 +860,13 @@ fn parse_date() -> Result<(), Error> {
 }
 
 #[test]
+#[should_panic]
+#[cfg(debug_assertions)]
+fn parse_invalid_date_start() {
+    let _ = Parser::new("7").parse_date();
+}
+
+#[test]
 #[cfg(feature = "parsed-types")]
 fn parse_display_string() -> Result<(), Error> {
     let input = r#"%"This is intended for display to %c3%bcsers.""#;
@@ -916,6 +923,13 @@ fn parse_display_string_errors() {
         Parser::new(r#" %"x%aa""#).parse::<Item>(),
         Err(error::Repr::InvalidUtf8InDisplayString(4).into())
     );
+}
+
+#[test]
+#[should_panic]
+#[cfg(debug_assertions)]
+fn parse_invalid_display_string_start() {
+    let _ = Parser::new(r#"""#).parse_display_string();
 }
 
 /// A simple struct used for the complex tests.
