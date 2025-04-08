@@ -891,3 +891,42 @@ fn parse_display_string() -> Result<(), Error> {
 
     Ok(())
 }
+
+#[test]
+#[cfg(feature = "parsed-types")]
+fn parse_display_string_errors() {
+    assert_eq!(
+        Parser::new(" %").parse_item(),
+        Err(Error::with_index(r#"expected '"'"#, 2))
+    );
+
+    assert_eq!(
+        Parser::new(r#" %""#).parse_item(),
+        Err(Error::with_index("unterminated display string", 3))
+    );
+
+    assert_eq!(
+        Parser::new(r#" %"%"#).parse_item(),
+        Err(Error::with_index("unterminated escape sequence", 4))
+    );
+
+    assert_eq!(
+        Parser::new(r#" %"%a"#).parse_item(),
+        Err(Error::with_index("unterminated escape sequence", 5))
+    );
+
+    assert_eq!(
+        Parser::new(r#" %"%A"#).parse_item(),
+        Err(Error::with_index("invalid escape sequence", 4))
+    );
+
+    assert_eq!(
+        Parser::new(r#" %"%aA"#).parse_item(),
+        Err(Error::with_index("invalid escape sequence", 5))
+    );
+
+    assert_eq!(
+        Parser::new(r#" %"x%aa""#).parse_item(),
+        Err(Error::with_index("invalid UTF-8 in display string", 4))
+    );
+}
