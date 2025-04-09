@@ -19,15 +19,12 @@ fn parse_item<'a>(parser: &mut Parser<'a>, visitor: impl ItemVisitor<'a>) -> SFV
     parser.parse_parameters(param_visitor)
 }
 
-fn parse_list<'a>(
+fn parse_comma_separated<'a>(
     parser: &mut Parser<'a>,
-    visitor: &mut (impl ?Sized + ListVisitor<'a>),
+    mut parse_member: impl FnMut(&mut Parser<'a>) -> SFVResult<()>,
 ) -> SFVResult<()> {
-    // https://httpwg.org/specs/rfc9651.html#parse-list
-    // List represents an array of (item_or_inner_list, parameters)
-
     while parser.peek().is_some() {
-        parser.parse_list_entry(visitor.entry().map_err(Error::custom)?)?;
+        parse_member(parser)?;
 
         parser.consume_ows_chars();
 
@@ -39,7 +36,7 @@ fn parse_list<'a>(
 
         if let Some(c) = parser.peek() {
             if c != b',' {
-                return parser.error("trailing characters after list member");
+                return parser.error("trailing characters after member");
             }
             parser.next();
         }
@@ -53,50 +50,6 @@ fn parse_list<'a>(
         }
     }
 
-    Ok(())
-}
-
-fn parse_dictionary<'a>(
-    parser: &mut Parser<'a>,
-    visitor: &mut (impl ?Sized + DictionaryVisitor<'a>),
-) -> SFVResult<()> {
-    while parser.peek().is_some() {
-        // Note: It is up to the visitor to properly handle duplicate keys.
-        let entry_visitor = visitor.entry(parser.parse_key()?).map_err(Error::custom)?;
-
-        if let Some(b'=') = parser.peek() {
-            parser.next();
-            parser.parse_list_entry(entry_visitor)?;
-        } else {
-            let param_visitor = entry_visitor
-                .bare_item(BareItemFromInput::from(true))
-                .map_err(Error::custom)?;
-            parser.parse_parameters(param_visitor)?;
-        }
-
-        parser.consume_ows_chars();
-
-        if parser.peek().is_none() {
-            return Ok(());
-        }
-
-        let comma_index = parser.index;
-
-        if let Some(c) = parser.peek() {
-            if c != b',' {
-                return parser.error("trailing characters after dictionary member");
-            }
-            parser.next();
-        }
-
-        parser.consume_ows_chars();
-
-        if parser.peek().is_none() {
-            // Report the error at the position of the comma itself, rather
-            // than at the end of input.
-            return Err(Error::with_index("trailing comma", comma_index));
-        }
-    }
     Ok(())
 }
 
@@ -159,7 +112,23 @@ assert_eq!(
         self,
         visitor: &mut (impl ?Sized + DictionaryVisitor<'a>),
     ) -> SFVResult<()> {
-        self.parse(|parser| parse_dictionary(parser, visitor))
+        // https://httpwg.org/specs/rfc9651.html#parse-dictionary
+        self.parse(|parser| {
+            parse_comma_separated(parser, |parser| {
+                // Note: It is up to the visitor to properly handle duplicate keys.
+                let entry_visitor = visitor.entry(parser.parse_key()?).map_err(Error::custom)?;
+
+                if let Some(b'=') = parser.peek() {
+                    parser.next();
+                    parser.parse_list_entry(entry_visitor)
+                } else {
+                    let param_visitor = entry_visitor
+                        .bare_item(BareItemFromInput::from(true))
+                        .map_err(Error::custom)?;
+                    parser.parse_parameters(param_visitor)
+                }
+            })
+        })
     }
 
     /// Parses input into a structured field value of `List` type.
@@ -198,7 +167,12 @@ assert_eq!(
         self,
         visitor: &mut (impl ?Sized + ListVisitor<'a>),
     ) -> SFVResult<()> {
-        self.parse(|parser| parse_list(parser, visitor))
+        // https://httpwg.org/specs/rfc9651.html#parse-list
+        self.parse(|parser| {
+            parse_comma_separated(parser, |parser| {
+                parser.parse_list_entry(visitor.entry().map_err(Error::custom)?)
+            })
+        })
     }
 
     /// Parses input into a structured field value of `Item` type.
