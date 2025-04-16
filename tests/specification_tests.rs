@@ -5,7 +5,7 @@ use sfv::{
 };
 use std::error::Error;
 use std::path::Path;
-use std::{env, fmt, fs};
+use std::{env, fmt, fs, io};
 
 #[derive(Debug, Deserialize)]
 struct TestData {
@@ -271,7 +271,8 @@ fn run_tests<T: TestCase>(dir_path: impl AsRef<Path>) -> Result<(), Box<dyn Erro
 
         println!("\n## Test suite file: {:?}\n", entry.file_name());
 
-        let test_cases: Vec<T> = serde_json::from_reader(fs::File::open(entry.path())?)?;
+        let test_cases: Vec<T> =
+            serde_json::from_reader(io::BufReader::new(fs::File::open(entry.path())?))?;
 
         for test_case in test_cases {
             test_case.run();
