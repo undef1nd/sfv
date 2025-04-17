@@ -180,6 +180,8 @@ mod test_key;
 #[cfg(test)]
 mod test_parser;
 #[cfg(test)]
+mod test_ref_serializer;
+#[cfg(test)]
 mod test_serializer;
 #[cfg(test)]
 mod test_string;
