@@ -405,6 +405,7 @@ fn parse_bare_item_errors() {
 }
 
 #[test]
+#[allow(clippy::bool_assert_comparison)]
 fn parse_bool() -> Result<(), Error> {
     let mut parser = Parser::new("?0gk");
     assert_eq!(false, parser.parse_bool()?);
@@ -617,12 +618,12 @@ fn parse_number_decimal() -> Result<(), Error> {
         Parser::new("1.7.0").parse_number()?
     );
     assert_eq!(
-        Num::Decimal(Decimal::try_from(3.14)?),
-        Parser::new("3.14").parse_number()?
+        Num::Decimal(Decimal::try_from(2.14)?),
+        Parser::new("2.14").parse_number()?
     );
     assert_eq!(
-        Num::Decimal(Decimal::try_from(-3.14)?),
-        Parser::new("-3.14").parse_number()?
+        Num::Decimal(Decimal::try_from(-2.14)?),
+        Parser::new("-2.14").parse_number()?
     );
     assert_eq!(
         Num::Decimal(Decimal::try_from(123456789012.1)?),
