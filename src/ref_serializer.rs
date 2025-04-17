@@ -411,7 +411,7 @@ impl<'a> InnerListSerializer<'a> {
         bare_item: impl Into<RefBareItem<'b>>,
     ) -> ParameterSerializer<&mut String> {
         let buffer = self.buffer.as_mut().unwrap();
-        if !buffer.is_empty() & !buffer.ends_with('(') {
+        if !buffer.is_empty() && !buffer.ends_with('(') {
             buffer.push(' ');
         }
         Serializer::serialize_bare_item(bare_item, buffer);
