@@ -147,10 +147,7 @@ fn parse_list_errors() {
 
     let input = "a, b c";
     assert_eq!(
-        Err(Error::with_index(
-            "trailing characters after list member",
-            5
-        )),
+        Err(Error::with_index("trailing characters after member", 5)),
         Parser::new(input).parse_list_with_visitor(&mut Ignored)
     );
 
@@ -269,10 +266,7 @@ fn parse_dict_empty() -> Result<(), Error> {
 fn parse_dict_errors() {
     let input = "abc=123;a=1;b=2 def";
     assert_eq!(
-        Err(Error::with_index(
-            "trailing characters after dictionary member",
-            16
-        )),
+        Err(Error::with_index("trailing characters after member", 16)),
         Parser::new(input).parse_dictionary_with_visitor(&mut Ignored)
     );
     let input = "abc=123;a=1,";
