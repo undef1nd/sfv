@@ -624,3 +624,7 @@ impl fmt::Display for Version {
         })
     }
 }
+
+mod private {
+    pub trait Sealed {}
+}

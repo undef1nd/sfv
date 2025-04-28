@@ -3,7 +3,7 @@ use crate::{Date, Decimal, Integer, KeyRef, RefBareItem, StringRef, TokenRef};
 use std::fmt::Write as _;
 
 #[cfg(feature = "parsed-types")]
-use crate::{Dictionary, Item, List};
+use crate::{private::Sealed, Dictionary, Item, List};
 
 /// Serializes a structured field value into a string.
 ///
@@ -16,7 +16,7 @@ use crate::{Dictionary, Item, List};
 /// [RFC 8941]: <https://httpwg.org/specs/rfc8941.html>
 /// [RFC 9651]: <https://httpwg.org/specs/rfc9651.html>
 #[cfg(feature = "parsed-types")]
-pub trait SerializeValue {
+pub trait SerializeValue: Sealed {
     /// The result of serializing the value into a string.
     ///
     /// [`Item`] serialization is infallible; [`List`] and [`Dictionary`]
@@ -42,6 +42,9 @@ pub trait SerializeValue {
 }
 
 #[cfg(feature = "parsed-types")]
+impl Sealed for Dictionary {}
+
+#[cfg(feature = "parsed-types")]
 impl SerializeValue for Dictionary {
     type Result = Option<String>;
 
@@ -53,6 +56,9 @@ impl SerializeValue for Dictionary {
 }
 
 #[cfg(feature = "parsed-types")]
+impl Sealed for List {}
+
+#[cfg(feature = "parsed-types")]
 impl SerializeValue for List {
     type Result = Option<String>;
 
@@ -62,6 +68,9 @@ impl SerializeValue for List {
         ser.finish()
     }
 }
+
+#[cfg(feature = "parsed-types")]
+impl Sealed for Item {}
 
 #[cfg(feature = "parsed-types")]
 impl SerializeValue for Item {
