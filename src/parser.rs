@@ -101,8 +101,8 @@ let mut dict = Parser::new("a=1").parse_dictionary()?;
 Parser::new("b=2").parse_dictionary_with_visitor(&mut dict)?;
 
 assert_eq!(
-    dict.serialize_value()?,
-    "a=1, b=2",
+    dict.serialize_value().as_deref(),
+    Some("a=1, b=2"),
 );
 # Ok(())
 # }
@@ -155,8 +155,8 @@ let mut list = Parser::new("11, (12 13)").parse_list()?;
 Parser::new(r#""foo",        "bar""#).parse_list_with_visitor(&mut list)?;
 
 assert_eq!(
-    list.serialize_value()?,
-    r#"11, (12 13), "foo", "bar""#,
+    list.serialize_value().as_deref(),
+    Some(r#"11, (12 13), "foo", "bar""#),
 );
 # Ok(())
 # }

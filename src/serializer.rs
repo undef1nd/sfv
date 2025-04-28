@@ -3,7 +3,7 @@ use crate::{Date, Decimal, Integer, KeyRef, RefBareItem, StringRef, TokenRef};
 use std::fmt::Write as _;
 
 #[cfg(feature = "parsed-types")]
-use crate::{Dictionary, Item, List, SFVResult};
+use crate::{Dictionary, Item, List};
 
 /// Serializes a structured field value into a string.
 ///
@@ -26,18 +26,18 @@ pub trait SerializeValue {
     /// let parsed_list_field = Parser::new(r#" "london",   "berlin" "#).parse_list()?;
     ///
     /// assert_eq!(
-    ///     parsed_list_field.serialize_value()?,
-    ///     r#""london", "berlin""#
+    ///     parsed_list_field.serialize_value().as_deref(),
+    ///     Some(r#""london", "berlin""#),
     /// );
     /// # Ok(())
     /// # }
     /// ```
-    fn serialize_value(&self) -> SFVResult<String>;
+    fn serialize_value(&self) -> Option<String>;
 }
 
 #[cfg(feature = "parsed-types")]
 impl SerializeValue for Dictionary {
-    fn serialize_value(&self) -> SFVResult<String> {
+    fn serialize_value(&self) -> Option<String> {
         let mut ser = crate::DictSerializer::new();
         ser.members(self);
         ser.finish()
@@ -46,7 +46,7 @@ impl SerializeValue for Dictionary {
 
 #[cfg(feature = "parsed-types")]
 impl SerializeValue for List {
-    fn serialize_value(&self) -> SFVResult<String> {
+    fn serialize_value(&self) -> Option<String> {
         let mut ser = crate::ListSerializer::new();
         ser.members(self);
         ser.finish()
@@ -55,11 +55,13 @@ impl SerializeValue for List {
 
 #[cfg(feature = "parsed-types")]
 impl SerializeValue for Item {
-    fn serialize_value(&self) -> SFVResult<String> {
-        Ok(crate::ItemSerializer::new()
-            .bare_item(&self.bare_item)
-            .parameters(&self.params)
-            .finish())
+    fn serialize_value(&self) -> Option<String> {
+        Some(
+            crate::ItemSerializer::new()
+                .bare_item(&self.bare_item)
+                .parameters(&self.params)
+                .finish(),
+        )
     }
 }
 

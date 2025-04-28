@@ -107,7 +107,7 @@ impl TestCase for ParseTestData {
                             // If the canonical field is an empty list, the serialization
                             // should be omitted, which corresponds to an error from `serialize_value`.
                             if canonical.is_empty() {
-                                assert!(serialized.is_err());
+                                assert!(serialized.is_none());
                             } else {
                                 assert_eq!(
                                     serialized.expect("serialization should succeed"),
@@ -144,7 +144,7 @@ impl TestCase for TestData {
             println!("- {}", test_case.name);
             match value.expect("expected value should be present").build() {
                 Ok(value) => match value.serialize_value() {
-                    Ok(serialized) => {
+                    Some(serialized) => {
                         assert!(!test_case.must_fail);
                         assert_eq!(
                             serialized,
@@ -154,7 +154,7 @@ impl TestCase for TestData {
                                 .expect("canonical serialization should be present")[0]
                         )
                     }
-                    Err(_) => assert!(test_case.must_fail),
+                    None => assert!(test_case.must_fail),
                 },
                 Err(_) => assert!(test_case.must_fail),
             }
