@@ -15,6 +15,10 @@ use crate::{private::Sealed, Dictionary, Item, List};
 ///
 /// [RFC 8941]: <https://httpwg.org/specs/rfc8941.html>
 /// [RFC 9651]: <https://httpwg.org/specs/rfc9651.html>
+///
+/// Use [`crate::ItemSerializer`], [`crate::ListSerializer`], or
+/// [`crate::DictSerializer`] to serialize components incrementally without
+/// having to create an [`Item`], [`List`], or [`Dictionary`].
 #[cfg(feature = "parsed-types")]
 pub trait SerializeValue: Sealed {
     /// The result of serializing the value into a string.
