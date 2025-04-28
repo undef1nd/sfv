@@ -64,17 +64,14 @@ fn serialize_item_byteseq_with_param() {
     );
     let item_param = Parameters::from_iter(vec![item_param]);
     let item = Item::with_params(b"parser".to_vec(), item_param);
-    assert_eq!(
-        Some(":cGFyc2Vy:;a=*ab_1"),
-        item.serialize_value().as_deref(),
-    );
+    assert_eq!(":cGFyc2Vy:;a=*ab_1", item.serialize_value());
 }
 
 #[test]
 #[cfg(feature = "parsed-types")]
 fn serialize_item_without_params() {
     let item = Item::new(1);
-    assert_eq!(Some("1"), item.serialize_value().as_deref());
+    assert_eq!("1", item.serialize_value());
 }
 
 #[test]
@@ -82,7 +79,7 @@ fn serialize_item_without_params() {
 fn serialize_item_with_bool_true_param() -> Result<(), Error> {
     let param = Parameters::from_iter(vec![(key_ref("a").to_owned(), BareItem::Boolean(true))]);
     let item = Item::with_params(Decimal::try_from(12.35)?, param);
-    assert_eq!(Some("12.35;a"), item.serialize_value().as_deref());
+    assert_eq!("12.35;a", item.serialize_value());
     Ok(())
 }
 
@@ -94,10 +91,7 @@ fn serialize_item_with_token_param() {
         BareItem::Token(token_ref("*tok").to_owned()),
     )]);
     let item = Item::with_params(string_ref("12.35"), param);
-    assert_eq!(
-        Some(r#""12.35";a1=*tok"#),
-        item.serialize_value().as_deref(),
-    );
+    assert_eq!(r#""12.35";a1=*tok"#, item.serialize_value());
 }
 
 #[test]

@@ -96,7 +96,7 @@ impl TestCase for ParseTestData {
                             .expect("build should succeed")
                     );
 
-                    let serialized = actual.serialize_value();
+                    let serialized: Option<String> = actual.serialize_value().into();
 
                     match test_case.data.canonical {
                         // If the canonical field is omitted, the canonical form is the input.
@@ -143,7 +143,7 @@ impl TestCase for TestData {
         fn check<T: SerializeValue>(test_case: &TestData, value: Option<impl Build<T>>) {
             println!("- {}", test_case.name);
             match value.expect("expected value should be present").build() {
-                Ok(value) => match value.serialize_value() {
+                Ok(value) => match value.serialize_value().into() {
                     Some(serialized) => {
                         assert!(!test_case.must_fail);
                         assert_eq!(

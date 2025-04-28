@@ -17,6 +17,12 @@ use crate::{Dictionary, Item, List};
 /// [RFC 9651]: <https://httpwg.org/specs/rfc9651.html>
 #[cfg(feature = "parsed-types")]
 pub trait SerializeValue {
+    /// The result of serializing the value into a string.
+    ///
+    /// [`Item`] serialization is infallible; [`List`] and [`Dictionary`]
+    /// serialization is not.
+    type Result: Into<Option<String>>;
+
     /// Serializes a structured field value into a string.
     ///
     /// # Examples
@@ -32,11 +38,13 @@ pub trait SerializeValue {
     /// # Ok(())
     /// # }
     /// ```
-    fn serialize_value(&self) -> Option<String>;
+    fn serialize_value(&self) -> Self::Result;
 }
 
 #[cfg(feature = "parsed-types")]
 impl SerializeValue for Dictionary {
+    type Result = Option<String>;
+
     fn serialize_value(&self) -> Option<String> {
         let mut ser = crate::DictSerializer::new();
         ser.members(self);
@@ -46,6 +54,8 @@ impl SerializeValue for Dictionary {
 
 #[cfg(feature = "parsed-types")]
 impl SerializeValue for List {
+    type Result = Option<String>;
+
     fn serialize_value(&self) -> Option<String> {
         let mut ser = crate::ListSerializer::new();
         ser.members(self);
@@ -55,13 +65,13 @@ impl SerializeValue for List {
 
 #[cfg(feature = "parsed-types")]
 impl SerializeValue for Item {
-    fn serialize_value(&self) -> Option<String> {
-        Some(
-            crate::ItemSerializer::new()
-                .bare_item(&self.bare_item)
-                .parameters(&self.params)
-                .finish(),
-        )
+    type Result = String;
+
+    fn serialize_value(&self) -> String {
+        crate::ItemSerializer::new()
+            .bare_item(&self.bare_item)
+            .parameters(&self.params)
+            .finish()
     }
 }
 
