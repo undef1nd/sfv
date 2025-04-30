@@ -1,6 +1,6 @@
-use crate::{Error, Integer};
-
 use std::fmt;
+
+use crate::{Error, Integer};
 
 /// A structured field value [decimal].
 ///

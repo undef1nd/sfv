@@ -1,9 +1,9 @@
-use crate::utils;
-use crate::{Date, Decimal, Integer, KeyRef, RefBareItem, StringRef, TokenRef};
 use std::fmt::Write as _;
 
+use crate::utils;
 #[cfg(feature = "parsed-types")]
 use crate::{private::Sealed, Dictionary, Item, List};
+use crate::{Date, Decimal, Integer, KeyRef, RefBareItem, StringRef, TokenRef};
 
 /// Serializes a structured field value into a string.
 ///

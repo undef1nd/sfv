@@ -1,8 +1,8 @@
-use crate::error::{Error, NonEmptyStringError};
-use crate::utils;
-
 use std::borrow::Borrow;
 use std::fmt;
+
+use crate::error::{Error, NonEmptyStringError};
+use crate::utils;
 
 /// An owned structured field value [key].
 ///

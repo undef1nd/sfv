@@ -1,6 +1,6 @@
-use crate::{Error, GenericBareItem};
-
 use std::fmt;
+
+use crate::{Error, GenericBareItem};
 
 const RANGE_I64: std::ops::RangeInclusive<i64> = -999_999_999_999_999..=999_999_999_999_999;
 

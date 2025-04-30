@@ -1,5 +1,6 @@
-use sfv::{ListEntry, Parser};
 use std::error::Error;
+
+use sfv::{ListEntry, Parser};
 
 #[test]
 fn test_report_to_header() -> Result<(), Box<dyn Error>> {

@@ -1,11 +1,12 @@
+use std::error::Error;
+use std::path::Path;
+use std::{env, fmt, fs, io};
+
 use serde::Deserialize;
 use sfv::{
     BareItem, Date, Dictionary, InnerList, Item, Key, List, ListEntry, Parameters, Parser,
     SerializeValue,
 };
-use std::error::Error;
-use std::path::Path;
-use std::{env, fmt, fs, io};
 
 #[derive(Debug, Deserialize)]
 struct TestData {

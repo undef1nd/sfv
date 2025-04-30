@@ -1,8 +1,8 @@
-use crate::Error;
-
 use std::borrow::{Borrow, Cow};
 use std::fmt;
 use std::string::String as StdString;
+
+use crate::Error;
 
 /// An owned structured field value [string].
 ///

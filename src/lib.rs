@@ -193,18 +193,16 @@ pub use decimal::Decimal;
 pub use error::Error;
 pub use integer::{integer, Integer};
 pub use key::{key_ref, Key, KeyRef};
+#[cfg(feature = "parsed-types")]
+pub use parsed::{Dictionary, InnerList, Item, List, ListEntry, Parameters};
 pub use parser::Parser;
 pub use ref_serializer::{
     DictSerializer, InnerListSerializer, ItemSerializer, ListSerializer, ParameterSerializer,
 };
-pub use string::{string_ref, String, StringRef};
-pub use token::{token_ref, Token, TokenRef};
-
-#[cfg(feature = "parsed-types")]
-pub use parsed::{Dictionary, InnerList, Item, List, ListEntry, Parameters};
-
 #[cfg(feature = "parsed-types")]
 pub use serializer::SerializeValue;
+pub use string::{string_ref, String, StringRef};
+pub use token::{token_ref, Token, TokenRef};
 
 type SFVResult<T> = std::result::Result<T, Error>;
 

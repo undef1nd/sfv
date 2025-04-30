@@ -1,6 +1,6 @@
-use crate::Integer;
-
 use std::fmt;
+
+use crate::Integer;
 
 /// A structured field value [date].
 ///
