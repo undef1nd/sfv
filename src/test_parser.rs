@@ -983,16 +983,16 @@ impl<'input> DictionaryVisitor<'input> for PointVisitor<'_> {
         'dv: 'ev,
     {
         let coord = match key.as_str() {
-            "x" => Some(&mut self.point.x),
-            "y" => Some(&mut self.point.y),
-            _ => None,
+            "x" => &mut self.point.x,
+            "y" => &mut self.point.y,
+            _ => return Ok(None),
         };
-        Ok(CoordVisitor { coord })
+        Ok(Some(CoordVisitor { coord }))
     }
 }
 
 struct CoordVisitor<'a> {
-    coord: Option<&'a mut i64>,
+    coord: &'a mut i64,
 }
 
 impl<'input> ItemVisitor<'input> for CoordVisitor<'_> {
@@ -1002,10 +1002,8 @@ impl<'input> ItemVisitor<'input> for CoordVisitor<'_> {
         self,
         bare_item: BareItemFromInput<'input>,
     ) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
-        if let Some(coord) = self.coord {
-            if let Some(v) = bare_item.as_integer() {
-                *coord = i64::from(v);
-            }
+        if let Some(v) = bare_item.as_integer() {
+            *self.coord = i64::from(v);
         }
         Ok(Ignored)
     }

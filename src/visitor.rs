@@ -266,3 +266,59 @@ impl ListVisitor<'_> for Ignored {
         Ok(Ignored)
     }
 }
+
+impl<'input, V: ParameterVisitor<'input>> ParameterVisitor<'input> for Option<V> {
+    type Error = V::Error;
+
+    fn parameter(
+        &mut self,
+        key: &'input KeyRef,
+        value: BareItemFromInput<'input>,
+    ) -> Result<(), Self::Error> {
+        match self {
+            None => Ok(()),
+            Some(visitor) => visitor.parameter(key, value),
+        }
+    }
+}
+
+impl<'input, V: ItemVisitor<'input>> ItemVisitor<'input> for Option<V> {
+    type Error = V::Error;
+
+    fn bare_item<'pv>(
+        self,
+        bare_item: BareItemFromInput<'input>,
+    ) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
+        match self {
+            None => Ok(None),
+            Some(visitor) => visitor.bare_item(bare_item).map(Some),
+        }
+    }
+}
+
+impl<'input, V: EntryVisitor<'input>> EntryVisitor<'input> for Option<V> {
+    fn inner_list<'ilv>(self) -> Result<impl InnerListVisitor<'ilv>, Self::Error> {
+        match self {
+            None => Ok(None),
+            Some(visitor) => visitor.inner_list().map(Some),
+        }
+    }
+}
+
+impl<'input, V: InnerListVisitor<'input>> InnerListVisitor<'input> for Option<V> {
+    type Error = V::Error;
+
+    fn item<'iv>(&mut self) -> Result<impl ItemVisitor<'iv>, Self::Error> {
+        match self {
+            None => Ok(None),
+            Some(visitor) => visitor.item().map(Some),
+        }
+    }
+
+    fn finish<'pv>(self) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
+        match self {
+            None => Ok(None),
+            Some(visitor) => visitor.finish().map(Some),
+        }
+    }
+}
