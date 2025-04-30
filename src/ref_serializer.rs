@@ -1,5 +1,5 @@
 use crate::serializer::Serializer;
-use crate::{Error, KeyRef, RefBareItem, SFVResult};
+use crate::{KeyRef, RefBareItem};
 
 #[cfg(feature = "parsed-types")]
 use crate::{Item, ListEntry};
@@ -146,8 +146,8 @@ fn maybe_write_separator(buffer: &mut String, first: &mut bool) {
 /// }
 ///
 /// assert_eq!(
-///     ser.finish()?,
-///     r#"11;foo, (abc;abc_param=?0 def);bar="val""#
+///     ser.finish().as_deref(),
+///     Some(r#"11;foo, (abc;abc_param=?0 def);bar="val""#),
 /// );
 /// # Ok(())
 /// # }
@@ -229,14 +229,15 @@ impl<W: BorrowMut<String>> ListSerializer<W> {
 
     /// Finishes serialization of the list and returns the underlying output.
     ///
-    /// This can only fail if no members were serialized, as [empty lists are
-    /// not meant to be serialized at
+    /// Returns `None` if and only if no members were serialized, as [empty
+    /// lists are not meant to be serialized at
     /// all](https://httpwg.org/specs/rfc9651.html#text-serialize).
-    pub fn finish(self) -> SFVResult<W> {
+    pub fn finish(self) -> Option<W> {
         if self.first {
-            return Err(Error::new("serializing empty list is not allowed"));
+            None
+        } else {
+            Some(self.buffer)
         }
-        Ok(self.buffer)
     }
 }
 
@@ -275,8 +276,8 @@ impl<W: BorrowMut<String>> ListSerializer<W> {
 /// ser.bare_item(KeyRef::from_str("member3")?, Decimal::try_from(12.34566)?);
 ///
 /// assert_eq!(
-///     ser.finish()?,
-///     r#"member1=11;foo, member2=(abc;abc_param=?0 def);bar="val", member3=12.346"#
+///     ser.finish().as_deref(),
+///     Some(r#"member1=11;foo, member2=(abc;abc_param=?0 def);bar="val", member3=12.346"#),
 /// );
 /// # Ok(())
 /// # }
@@ -370,14 +371,15 @@ impl<W: BorrowMut<String>> DictSerializer<W> {
 
     /// Finishes serialization of the dictionary and returns the underlying output.
     ///
-    /// This can only fail if no members were serialized, as [empty dictionaries
-    /// are not meant to be serialized at
+    /// Returns `None` if and only if no members were serialized, as [empty
+    /// dictionaries are not meant to be serialized at
     /// all](https://httpwg.org/specs/rfc9651.html#text-serialize).
-    pub fn finish(self) -> SFVResult<W> {
+    pub fn finish(self) -> Option<W> {
         if self.first {
-            return Err(Error::new("serializing empty dictionary is not allowed"));
+            None
+        } else {
+            Some(self.buffer)
         }
-        Ok(self.buffer)
     }
 }
 

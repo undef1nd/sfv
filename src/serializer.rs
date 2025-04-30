@@ -3,7 +3,7 @@ use crate::{Date, Decimal, Integer, KeyRef, RefBareItem, StringRef, TokenRef};
 use std::fmt::Write as _;
 
 #[cfg(feature = "parsed-types")]
-use crate::{Dictionary, Item, List, SFVResult};
+use crate::{private::Sealed, Dictionary, Item, List};
 
 /// Serializes a structured field value into a string.
 ///
@@ -15,8 +15,18 @@ use crate::{Dictionary, Item, List, SFVResult};
 ///
 /// [RFC 8941]: <https://httpwg.org/specs/rfc8941.html>
 /// [RFC 9651]: <https://httpwg.org/specs/rfc9651.html>
+///
+/// Use [`crate::ItemSerializer`], [`crate::ListSerializer`], or
+/// [`crate::DictSerializer`] to serialize components incrementally without
+/// having to create an [`Item`], [`List`], or [`Dictionary`].
 #[cfg(feature = "parsed-types")]
-pub trait SerializeValue {
+pub trait SerializeValue: Sealed {
+    /// The result of serializing the value into a string.
+    ///
+    /// [`Item`] serialization is infallible; [`List`] and [`Dictionary`]
+    /// serialization is not.
+    type Result: Into<Option<String>>;
+
     /// Serializes a structured field value into a string.
     ///
     /// # Examples
@@ -26,18 +36,23 @@ pub trait SerializeValue {
     /// let parsed_list_field = Parser::new(r#" "london",   "berlin" "#).parse_list()?;
     ///
     /// assert_eq!(
-    ///     parsed_list_field.serialize_value()?,
-    ///     r#""london", "berlin""#
+    ///     parsed_list_field.serialize_value().as_deref(),
+    ///     Some(r#""london", "berlin""#),
     /// );
     /// # Ok(())
     /// # }
     /// ```
-    fn serialize_value(&self) -> SFVResult<String>;
+    fn serialize_value(&self) -> Self::Result;
 }
 
 #[cfg(feature = "parsed-types")]
+impl Sealed for Dictionary {}
+
+#[cfg(feature = "parsed-types")]
 impl SerializeValue for Dictionary {
-    fn serialize_value(&self) -> SFVResult<String> {
+    type Result = Option<String>;
+
+    fn serialize_value(&self) -> Option<String> {
         let mut ser = crate::DictSerializer::new();
         ser.members(self);
         ser.finish()
@@ -45,8 +60,13 @@ impl SerializeValue for Dictionary {
 }
 
 #[cfg(feature = "parsed-types")]
+impl Sealed for List {}
+
+#[cfg(feature = "parsed-types")]
 impl SerializeValue for List {
-    fn serialize_value(&self) -> SFVResult<String> {
+    type Result = Option<String>;
+
+    fn serialize_value(&self) -> Option<String> {
         let mut ser = crate::ListSerializer::new();
         ser.members(self);
         ser.finish()
@@ -54,12 +74,17 @@ impl SerializeValue for List {
 }
 
 #[cfg(feature = "parsed-types")]
+impl Sealed for Item {}
+
+#[cfg(feature = "parsed-types")]
 impl SerializeValue for Item {
-    fn serialize_value(&self) -> SFVResult<String> {
-        Ok(crate::ItemSerializer::new()
+    type Result = String;
+
+    fn serialize_value(&self) -> String {
+        crate::ItemSerializer::new()
             .bare_item(&self.bare_item)
             .parameters(&self.params)
-            .finish())
+            .finish()
     }
 }
 

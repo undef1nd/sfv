@@ -60,7 +60,7 @@ fn serializing_item(c: &mut Criterion) {
         &fixture,
         move |bench, &input| {
             let parsed_item = Parser::new(input).parse_item().unwrap();
-            bench.iter(|| parsed_item.serialize_value().unwrap());
+            bench.iter(|| parsed_item.serialize_value());
         },
     );
 }

@@ -96,7 +96,7 @@ impl TestCase for ParseTestData {
                             .expect("build should succeed")
                     );
 
-                    let serialized = actual.serialize_value();
+                    let serialized: Option<String> = actual.serialize_value().into();
 
                     match test_case.data.canonical {
                         // If the canonical field is omitted, the canonical form is the input.
@@ -107,7 +107,7 @@ impl TestCase for ParseTestData {
                             // If the canonical field is an empty list, the serialization
                             // should be omitted, which corresponds to an error from `serialize_value`.
                             if canonical.is_empty() {
-                                assert!(serialized.is_err());
+                                assert!(serialized.is_none());
                             } else {
                                 assert_eq!(
                                     serialized.expect("serialization should succeed"),
@@ -143,8 +143,8 @@ impl TestCase for TestData {
         fn check<T: SerializeValue>(test_case: &TestData, value: Option<impl Build<T>>) {
             println!("- {}", test_case.name);
             match value.expect("expected value should be present").build() {
-                Ok(value) => match value.serialize_value() {
-                    Ok(serialized) => {
+                Ok(value) => match value.serialize_value().into() {
+                    Some(serialized) => {
                         assert!(!test_case.must_fail);
                         assert_eq!(
                             serialized,
@@ -154,7 +154,7 @@ impl TestCase for TestData {
                                 .expect("canonical serialization should be present")[0]
                         )
                     }
-                    Err(_) => assert!(test_case.must_fail),
+                    None => assert!(test_case.must_fail),
                 },
                 Err(_) => assert!(test_case.must_fail),
             }

@@ -107,11 +107,9 @@ ser.bare_item(TokenRef::from_str("tok")?);
     ser.finish().parameter(KeyRef::from_str("bar")?, true);
 }
 
-let serialized_list = ser.finish()?;
-
 assert_eq!(
-    serialized_list,
-    r#"tok, (99;key=?0 "foo");bar"#
+    ser.finish().as_deref(),
+    Some(r#"tok, (99;key=?0 "foo");bar"#),
 );
 # Ok(())
 # }
@@ -130,11 +128,9 @@ ser.bare_item(KeyRef::from_str("key2")?, true);
 
 ser.bare_item(KeyRef::from_str("key3")?, false);
 
-let serialized_dict = ser.finish()?;
-
 assert_eq!(
-    serialized_dict,
-    r#"key1="apple", key2, key3=?0"#
+    ser.finish().as_deref(),
+    Some(r#"key1="apple", key2, key3=?0"#),
 );
 # Ok(())
 # }
@@ -627,4 +623,8 @@ impl fmt::Display for Version {
             Self::Rfc9651 => "RFC 9651",
         })
     }
+}
+
+mod private {
+    pub trait Sealed {}
 }

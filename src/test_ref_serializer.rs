@@ -20,8 +20,8 @@ fn test_fast_serialize_item() {
 }
 
 #[test]
-fn test_fast_serialize_list() -> SFVResult<()> {
-    fn check(mut ser: ListSerializer<impl BorrowMut<String>>) -> SFVResult<()> {
+fn test_fast_serialize_list() {
+    fn check(mut ser: ListSerializer<impl BorrowMut<String>>) {
         ser.bare_item(token_ref("hello"))
             .parameter(key_ref("key1"), true)
             .parameter(key_ref("key2"), false);
@@ -35,22 +35,19 @@ fn test_fast_serialize_list() -> SFVResult<()> {
                 .parameter(key_ref("inner-list-param"), token_ref("*"));
         }
 
-        let output = ser.finish()?;
         assert_eq!(
-            r#"hello;key1;key2=?0, ("some_string" 12;inner-member-key);inner-list-param=*"#,
-            output.borrow()
+            Some(r#"hello;key1;key2=?0, ("some_string" 12;inner-member-key);inner-list-param=*"#),
+            ser.finish().as_ref().map(|output| output.borrow().as_str()),
         );
-        Ok(())
     }
 
-    check(ListSerializer::new())?;
-    check(ListSerializer::with_buffer(&mut String::new()))?;
-    Ok(())
+    check(ListSerializer::new());
+    check(ListSerializer::with_buffer(&mut String::new()));
 }
 
 #[test]
-fn test_fast_serialize_dict() -> SFVResult<()> {
-    fn check(mut ser: DictSerializer<impl BorrowMut<String>>) -> SFVResult<()> {
+fn test_fast_serialize_dict() {
+    fn check(mut ser: DictSerializer<impl BorrowMut<String>>) {
         ser.bare_item(key_ref("member1"), token_ref("hello"))
             .parameter(key_ref("key1"), true)
             .parameter(key_ref("key2"), false);
@@ -76,29 +73,28 @@ fn test_fast_serialize_dict() -> SFVResult<()> {
 
         ser.bare_item(key_ref("key8"), true);
 
-        let output = ser.finish()?;
         assert_eq!(
-            r#"member1=hello;key1;key2=?0, member2;key3=45.459;key4="str", key5=(45 0), key6="foo", key7=(:c29tZV9zdHJpbmc=: :b3RoZXJfc3RyaW5n:);lparam=10, key8"#,
-            output.borrow()
+            Some(
+                r#"member1=hello;key1;key2=?0, member2;key3=45.459;key4="str", key5=(45 0), key6="foo", key7=(:c29tZV9zdHJpbmc=: :b3RoZXJfc3RyaW5n:);lparam=10, key8"#
+            ),
+            ser.finish().as_ref().map(|output| output.borrow().as_str()),
         );
-        Ok(())
     }
 
-    check(DictSerializer::new())?;
-    check(DictSerializer::with_buffer(&mut String::new()))?;
-    Ok(())
+    check(DictSerializer::new());
+    check(DictSerializer::with_buffer(&mut String::new()));
 }
 
 #[test]
 fn test_serialize_empty() {
-    assert!(ListSerializer::new().finish().is_err());
-    assert!(DictSerializer::new().finish().is_err());
+    assert_eq!(None, ListSerializer::new().finish());
+    assert_eq!(None, DictSerializer::new().finish());
 
     let mut output = String::from(" ");
-    assert!(ListSerializer::with_buffer(&mut output).finish().is_err());
+    assert_eq!(None, ListSerializer::with_buffer(&mut output).finish());
 
     let mut output = String::from(" ");
-    assert!(DictSerializer::with_buffer(&mut output).finish().is_err());
+    assert_eq!(None, DictSerializer::with_buffer(&mut output).finish());
 }
 
 // Regression test for https://github.com/undef1nd/sfv/issues/131.
