@@ -37,7 +37,7 @@ fn test_fast_serialize_list() -> SFVResult<()> {
 
         let output = ser.finish()?;
         assert_eq!(
-            "hello;key1;key2=?0, (\"some_string\" 12;inner-member-key);inner-list-param=*",
+            r#"hello;key1;key2=?0, ("some_string" 12;inner-member-key);inner-list-param=*"#,
             output.borrow()
         );
         Ok(())
@@ -78,7 +78,7 @@ fn test_fast_serialize_dict() -> SFVResult<()> {
 
         let output = ser.finish()?;
         assert_eq!(
-            "member1=hello;key1;key2=?0, member2;key3=45.459;key4=\"str\", key5=(45 0), key6=\"foo\", key7=(:c29tZV9zdHJpbmc=: :b3RoZXJfc3RyaW5n:);lparam=10, key8",
+            r#"member1=hello;key1;key2=?0, member2;key3=45.459;key4="str", key5=(45 0), key6="foo", key7=(:c29tZV9zdHJpbmc=: :b3RoZXJfc3RyaW5n:);lparam=10, key8"#,
             output.borrow()
         );
         Ok(())
