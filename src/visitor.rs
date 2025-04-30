@@ -18,14 +18,14 @@ relevant state in its fields, before using that state to perform the operation
 # use sfv::visitor::{Ignored, ItemVisitor, ParameterVisitor};
 # use sfv::{BareItemFromInput, TokenRef};
 # fn main() -> Result<(), sfv::Error> {
-struct Visitor<'a> {
-    token: Option<&'a TokenRef>,
+struct Visitor<'v> {
+    token: Option<&'v TokenRef>,
 }
 
-impl<'a> ItemVisitor<'a> for &mut Visitor<'a> {
+impl<'a, 'v> ItemVisitor<'a> for &mut Visitor<'v> where 'a: 'v {
   type Error = std::convert::Infallible;
 
-  fn bare_item(self, bare_item: BareItemFromInput<'a>) -> Result<impl ParameterVisitor<'a>, Self::Error> {
+  fn bare_item<'p>(self, bare_item: BareItemFromInput<'a>) -> Result<impl ParameterVisitor<'p>, Self::Error> {
       self.token =
           if let BareItemFromInput::Token(token) = bare_item {
               Some(token)
