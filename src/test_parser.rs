@@ -934,24 +934,24 @@ fn parse_display_string_errors() {
 }
 
 /// A simple struct used for the complex tests.
-#[derive(Default, Debug)]
+#[derive(Default, Debug, PartialEq)]
 struct Point {
     x: i64,
     y: i64,
 }
 
-impl PartialEq<(i64, i64)> for Point {
-    fn eq(&self, other: &(i64, i64)) -> bool {
-        self.x == other.0 && self.y == other.1
+impl Point {
+    fn new(x: i64, y: i64) -> Self {
+        Self { x, y }
     }
 }
 
-/// For when a `Point` is a parameter somewhere.
-struct PointParameterHolder<'a> {
+struct PointVisitor<'a> {
     point: &'a mut Point,
 }
 
-impl<'input> ParameterVisitor<'input> for PointParameterHolder<'_> {
+/// For when a `Point` is a parameter somewhere.
+impl<'input> ParameterVisitor<'input> for PointVisitor<'_> {
     type Error = Infallible;
 
     fn parameter(
@@ -959,78 +959,77 @@ impl<'input> ParameterVisitor<'input> for PointParameterHolder<'_> {
         key: &'input KeyRef,
         value: BareItemFromInput<'input>,
     ) -> Result<(), Self::Error> {
+        let Some(v) = value.as_integer() else {
+            return Ok(());
+        };
         let ptr = match key.as_str() {
             "x" => &mut self.point.x,
             "y" => &mut self.point.y,
-            _ => panic!("unknown attribute"),
+            _ => return Ok(()),
         };
-        *ptr = i64::from(value.as_integer().expect("needs to be an integer"));
+        *ptr = i64::from(v);
         Ok(())
+    }
+}
+
+impl<'input> DictionaryVisitor<'input> for PointVisitor<'_> {
+    type Error = Infallible;
+
+    fn entry<'dv, 'ev>(
+        &'dv mut self,
+        key: &'input KeyRef,
+    ) -> Result<impl EntryVisitor<'ev>, Self::Error>
+    where
+        'dv: 'ev,
+    {
+        let coord = match key.as_str() {
+            "x" => Some(&mut self.point.x),
+            "y" => Some(&mut self.point.y),
+            _ => None,
+        };
+        Ok(CoordVisitor { coord })
+    }
+}
+
+struct CoordVisitor<'a> {
+    coord: Option<&'a mut i64>,
+}
+
+impl<'input> ItemVisitor<'input> for CoordVisitor<'_> {
+    type Error = Infallible;
+
+    fn bare_item<'pv>(
+        self,
+        bare_item: BareItemFromInput<'input>,
+    ) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
+        if let Some(coord) = self.coord {
+            if let Some(v) = bare_item.as_integer() {
+                *coord = i64::from(v);
+            }
+        }
+        Ok(Ignored)
+    }
+}
+
+impl EntryVisitor<'_> for CoordVisitor<'_> {
+    fn inner_list<'ilv>(self) -> Result<impl InnerListVisitor<'ilv>, Self::Error> {
+        Ok(Ignored)
     }
 }
 
 #[test]
 fn complex_dict_visitor() {
-    struct PointVisitor<'a> {
-        point: &'a mut Point,
-    }
-
-    impl<'input> DictionaryVisitor<'input> for PointVisitor<'_> {
-        type Error = Infallible;
-
-        fn entry<'dv, 'ev>(
-            &'dv mut self,
-            key: &'input KeyRef,
-        ) -> Result<impl EntryVisitor<'ev>, Self::Error>
-        where
-            'dv: 'ev,
-        {
-            let coord = match key.as_str() {
-                "x" => Some(&mut self.point.x),
-                "y" => Some(&mut self.point.y),
-                _ => None,
-            };
-            Ok(CoordVisitor { coord })
-        }
-    }
-
-    struct CoordVisitor<'a> {
-        coord: Option<&'a mut i64>,
-    }
-
-    impl<'input> ItemVisitor<'input> for CoordVisitor<'_> {
-        type Error = Infallible;
-
-        fn bare_item<'pv>(
-            self,
-            bare_item: BareItemFromInput<'input>,
-        ) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
-            if let Some(coord) = self.coord {
-                if let Some(v) = bare_item.as_integer() {
-                    *coord = i64::from(v);
-                }
-            }
-            Ok(Ignored)
-        }
-    }
-
-    impl EntryVisitor<'_> for CoordVisitor<'_> {
-        fn inner_list<'ilv>(self) -> Result<impl InnerListVisitor<'ilv>, Self::Error> {
-            Ok(Ignored)
-        }
-    }
-
     let mut point = Point::default();
     let parser = Parser::new("x=10, y=3");
     let mut visit = PointVisitor { point: &mut point };
     parser
         .parse_dictionary_with_visitor(&mut visit)
         .expect("successful parse");
-    assert_eq!(point, (10, 3));
+    assert_eq!(point, Point::new(10, 3));
 }
 
 /// An item with parameters.
-#[derive(Default, Debug)]
+#[derive(Default, Debug, PartialEq)]
 struct Holder {
     v: i64,
     point: Point,
@@ -1047,8 +1046,12 @@ impl<'input> ItemVisitor<'input> for HolderVisitor<'_> {
         self,
         bare_item: BareItemFromInput<'input>,
     ) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
-        self.holder.v = i64::from(bare_item.as_integer().expect("should be an integer"));
-        Ok(PointParameterHolder {
+        if let Some(v) = bare_item.as_integer() {
+            self.holder.v = i64::from(v);
+        }
+        // Note that this updates parameters, even if the value isn't an integer.
+        // That's probably not what a real application would seek to do.
+        Ok(PointVisitor {
             point: &mut self.holder.point,
         })
     }
@@ -1064,12 +1067,12 @@ fn complex_item_visitor() {
     parser
         .parse_item_with_visitor(visit)
         .expect("successful parse");
-    assert_eq!(holder.point, (7, -5));
+    assert_eq!(holder.point, Point::new(7, -5));
 }
 
 #[test]
 fn complex_list_visitor() {
-    #[derive(Default, Debug)]
+    #[derive(Default, Debug, PartialEq)]
     struct ListHolder {
         list: Vec<Holder>,
         point: Point,
@@ -1083,7 +1086,7 @@ fn complex_list_visitor() {
         type Error = Infallible;
         fn entry<'ev>(&mut self) -> Result<impl EntryVisitor<'ev>, Self::Error> {
             self.list.push(ListHolder::default());
-            let list = self.list.last_mut().unwrap();
+            let list = self.list.last_mut().unwrap(); // cannot fail
             Ok(HolderListVisitor { list })
         }
     }
@@ -1098,8 +1101,6 @@ fn complex_list_visitor() {
             self,
             _bare_item: BareItemFromInput<'input>,
         ) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
-            panic!("expecting an inner list");
-            #[allow(unreachable_code)] // We need a concrete type here.
             Ok(Ignored)
         }
     }
@@ -1115,13 +1116,13 @@ fn complex_list_visitor() {
 
         fn item<'iv>(&mut self) -> Result<impl ItemVisitor<'iv>, Self::Error> {
             self.list.list.push(Holder::default());
-            let holder = self.list.list.last_mut().unwrap();
+            let holder = self.list.list.last_mut().unwrap(); // cannot fail
             Ok(HolderVisitor { holder })
         }
 
         fn finish<'pv>(self) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
             let point = &mut self.list.point;
-            Ok(PointParameterHolder { point })
+            Ok(PointVisitor { point })
         }
     }
 
@@ -1132,20 +1133,36 @@ fn complex_list_visitor() {
         .parse_list_with_visitor(&mut visit)
         .expect("successful parse");
 
-    assert_eq!(list.len(), 3);
-    assert_eq!(list[0].list.len(), 3);
-    assert_eq!(list[0].list[0].v, 1);
-    assert_eq!(list[0].list[0].point, (4, 0));
-    assert_eq!(list[0].list[1].v, 2);
-    assert_eq!(list[0].list[1].point, (0, 5));
-    assert_eq!(list[0].list[2].v, 3);
-    assert_eq!(list[0].list[2].point, (0, 0));
-    assert_eq!(list[0].point, (1, 2));
+    let expected = vec![
+        ListHolder {
+            list: vec![
+                Holder {
+                    v: 1,
+                    point: Point::new(4, 0),
+                },
+                Holder {
+                    v: 2,
+                    point: Point::new(0, 5),
+                },
+                Holder {
+                    v: 3,
+                    point: Point::default(),
+                },
+            ],
+            point: Point::new(1, 2),
+        },
+        ListHolder {
+            list: vec![Holder {
+                v: 4,
+                point: Point::new(12, 33),
+            }],
+            point: Point::default(),
+        },
+        ListHolder {
+            list: Vec::new(),
+            point: Point::default(),
+        },
+    ];
 
-    assert_eq!(list[1].list.len(), 1);
-    assert_eq!(list[1].list[0].v, 4);
-    assert_eq!(list[1].list[0].point, (12, 33));
-    assert_eq!(list[1].point, (0, 0));
-
-    assert!(list[2].list.is_empty());
+    assert_eq!(list, expected);
 }
