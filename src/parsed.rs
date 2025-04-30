@@ -137,9 +137,9 @@ impl<'a> ItemVisitor<'a> for &mut Item {
     fn bare_item<'pv>(
         self,
         bare_item: BareItemFromInput<'a>,
-    ) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
+    ) -> Result<Option<impl ParameterVisitor<'pv>>, Self::Error> {
         self.bare_item = bare_item.into();
-        Ok(&mut self.params)
+        Ok(Some(&mut self.params))
     }
 }
 
@@ -148,10 +148,10 @@ impl<'a> ItemVisitor<'a> for &mut InnerList {
     fn bare_item<'pv>(
         self,
         bare_item: BareItemFromInput<'a>,
-    ) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
+    ) -> Result<Option<impl ParameterVisitor<'pv>>, Self::Error> {
         self.items.push(Item::new(bare_item));
         match self.items.last_mut() {
-            Some(item) => Ok(&mut item.params),
+            Some(item) => Ok(Some(&mut item.params)),
             None => unreachable!(),
         }
     }
@@ -164,8 +164,8 @@ impl<'a> InnerListVisitor<'a> for &mut InnerList {
         Ok(&mut **self)
     }
 
-    fn finish<'pv>(self) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
-        Ok(&mut self.params)
+    fn finish<'pv>(self) -> Result<Option<impl ParameterVisitor<'pv>>, Self::Error> {
+        Ok(Some(&mut self.params))
     }
 }
 
@@ -175,11 +175,11 @@ impl<'a> DictionaryVisitor<'a> for Dictionary {
     fn entry<'dv, 'ev>(
         &'dv mut self,
         key: &'a KeyRef,
-    ) -> Result<impl EntryVisitor<'ev>, Self::Error>
+    ) -> Result<Option<impl EntryVisitor<'ev>>, Self::Error>
     where
         'dv: 'ev,
     {
-        Ok(self.entry(key.to_owned()))
+        Ok(Some(self.entry(key.to_owned())))
     }
 }
 
@@ -191,9 +191,9 @@ impl<'a> ItemVisitor<'a> for Entry<'_> {
     fn bare_item<'pv>(
         self,
         bare_item: BareItemFromInput<'a>,
-    ) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
+    ) -> Result<Option<impl ParameterVisitor<'pv>>, Self::Error> {
         match self.insert_entry(Item::new(bare_item).into()).into_mut() {
-            ListEntry::Item(item) => Ok(&mut item.params),
+            ListEntry::Item(item) => Ok(Some(&mut item.params)),
             ListEntry::InnerList(_) => unreachable!(),
         }
     }
@@ -214,10 +214,10 @@ impl<'a> ItemVisitor<'a> for &mut List {
     fn bare_item<'pv>(
         self,
         bare_item: BareItemFromInput<'a>,
-    ) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
+    ) -> Result<Option<impl ParameterVisitor<'pv>>, Self::Error> {
         self.push(Item::new(bare_item).into());
         match self.last_mut() {
-            Some(ListEntry::Item(item)) => Ok(&mut item.params),
+            Some(ListEntry::Item(item)) => Ok(Some(&mut item.params)),
             _ => unreachable!(),
         }
     }

@@ -12,10 +12,14 @@ fn parse_item<'a: 'iv, 'iv>(
     visitor: impl ItemVisitor<'iv>,
 ) -> SFVResult<()> {
     // https://httpwg.org/specs/rfc9651.html#parse-item
-    let param_visitor = visitor
+    if let Some(param_visitor) = visitor
         .bare_item(parser.parse_bare_item()?)
-        .map_err(Error::custom)?;
-    parser.parse_parameters(param_visitor)
+        .map_err(Error::custom)?
+    {
+        parser.parse_parameters(param_visitor)
+    } else {
+        parser.parse_parameters(Ignored)
+    }
 }
 
 fn parse_comma_separated<'a>(
@@ -119,12 +123,24 @@ assert_eq!(
 
                 if let Some(b'=') = parser.peek() {
                     parser.next();
-                    parser.parse_list_entry(entry_visitor)
+                    if let Some(entry_visitor) = entry_visitor {
+                        parser.parse_list_entry(entry_visitor)
+                    } else {
+                        parser.parse_list_entry(Ignored)
+                    }
                 } else {
-                    let param_visitor = entry_visitor
-                        .bare_item(BareItemFromInput::from(true))
-                        .map_err(Error::custom)?;
-                    parser.parse_parameters(param_visitor)
+                    let item = BareItemFromInput::from(true);
+                    if let Some(ev) = entry_visitor {
+                        if let Some(pv) = ev.bare_item(item).map_err(Error::custom)? {
+                            parser.parse_parameters(pv)
+                        } else {
+                            parser.parse_parameters(Ignored)
+                        }
+                    } else {
+                        let param_visitor = Ignored.bare_item(item).map_err(Error::custom)?;
+                        debug_assert!(param_visitor.is_none());
+                        parser.parse_parameters(Ignored)
+                    }
                 }
             })
         })
@@ -243,13 +259,13 @@ assert_eq!(
 
         self.next();
 
-        while self.peek().is_some() {
+        loop {
             self.consume_sp_chars();
 
-            if Some(b')') == self.peek() {
-                self.next();
-                let param_visitor = visitor.finish().map_err(Error::custom)?;
-                return self.parse_parameters(param_visitor);
+            match self.peek() {
+                Some(b')') => break, // end of list
+                None => return self.error("unterminated inner list"),
+                _ => {}
             }
 
             parse_item(self, visitor.item().map_err(Error::custom)?)?;
@@ -261,7 +277,12 @@ assert_eq!(
             }
         }
 
-        self.error("unterminated inner list")
+        self.next();
+        if let Some(param_visitor) = visitor.finish().map_err(Error::custom)? {
+            self.parse_parameters(param_visitor)
+        } else {
+            self.parse_parameters(Ignored)
+        }
     }
 
     pub(crate) fn parse_bare_item(&mut self) -> SFVResult<BareItemFromInput<'a>> {

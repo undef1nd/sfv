@@ -978,16 +978,16 @@ impl<'input> DictionaryVisitor<'input> for PointVisitor<'_> {
     fn entry<'dv, 'ev>(
         &'dv mut self,
         key: &'input KeyRef,
-    ) -> Result<impl EntryVisitor<'ev>, Self::Error>
+    ) -> Result<Option<impl EntryVisitor<'ev>>, Self::Error>
     where
         'dv: 'ev,
     {
         let coord = match key.as_str() {
             "x" => Some(&mut self.point.x),
             "y" => Some(&mut self.point.y),
-            _ => None,
+            _ => return Ok(None),
         };
-        Ok(CoordVisitor { coord })
+        Ok(Some(CoordVisitor { coord }))
     }
 }
 
@@ -1001,13 +1001,13 @@ impl<'input> ItemVisitor<'input> for CoordVisitor<'_> {
     fn bare_item<'pv>(
         self,
         bare_item: BareItemFromInput<'input>,
-    ) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
+    ) -> Result<Option<impl ParameterVisitor<'pv>>, Self::Error> {
         if let Some(coord) = self.coord {
             if let Some(v) = bare_item.as_integer() {
                 *coord = i64::from(v);
             }
         }
-        Ok(Ignored)
+        Ok(None::<Ignored>)
     }
 }
 
@@ -1045,15 +1045,15 @@ impl<'input> ItemVisitor<'input> for HolderVisitor<'_> {
     fn bare_item<'pv>(
         self,
         bare_item: BareItemFromInput<'input>,
-    ) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
+    ) -> Result<Option<impl ParameterVisitor<'pv>>, Self::Error> {
         if let Some(v) = bare_item.as_integer() {
             self.holder.v = i64::from(v);
+            Ok(Some(PointVisitor {
+                point: &mut self.holder.point,
+            }))
+        } else {
+            Ok(None)
         }
-        // Note that this updates parameters, even if the value isn't an integer.
-        // That's probably not what a real application would seek to do.
-        Ok(PointVisitor {
-            point: &mut self.holder.point,
-        })
     }
 }
 
@@ -1100,8 +1100,8 @@ fn complex_list_visitor() {
         fn bare_item<'pv>(
             self,
             _bare_item: BareItemFromInput<'input>,
-        ) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
-            Ok(Ignored)
+        ) -> Result<Option<impl ParameterVisitor<'pv>>, Self::Error> {
+            Ok(None::<Ignored>)
         }
     }
 
@@ -1120,9 +1120,9 @@ fn complex_list_visitor() {
             Ok(HolderVisitor { holder })
         }
 
-        fn finish<'pv>(self) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
+        fn finish<'pv>(self) -> Result<Option<impl ParameterVisitor<'pv>>, Self::Error> {
             let point = &mut self.list.point;
-            Ok(PointVisitor { point })
+            Ok(Some(PointVisitor { point }))
         }
     }
 

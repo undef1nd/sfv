@@ -25,7 +25,7 @@ struct Visitor<'v> {
 impl<'a, 'v> ItemVisitor<'a> for &mut Visitor<'v> where 'a: 'v {
   type Error = std::convert::Infallible;
 
-  fn bare_item<'p>(self, bare_item: BareItemFromInput<'a>) -> Result<impl ParameterVisitor<'p>, Self::Error> {
+  fn bare_item<'p>(self, bare_item: BareItemFromInput<'a>) -> Result<Option<impl ParameterVisitor<'p>>, Self::Error> {
       self.token =
           if let BareItemFromInput::Token(token) = bare_item {
               Some(token)
@@ -33,7 +33,7 @@ impl<'a, 'v> ItemVisitor<'a> for &mut Visitor<'v> where 'a: 'v {
               None
           };
 
-      Ok(Ignored)
+      Ok(None::<Ignored>)
   }
 }
 
@@ -49,6 +49,18 @@ sfv::Parser::new(input).parse_item_with_visitor(&mut visitor)?;
 # Ok(())
 # }
 ```
+
+# Ignoring Unsupported Entries and Parameters
+
+Some visitor methods have an [`Option`] return argument, where returning `None`
+results in entries or parameters being ignored.
+This is approximately equivalent to returning `Some(Ignored)`.
+However, the return type in a more complex example will match
+the type used when values are not ignored.
+
+The example above needs to specify `None::<Ignored>` to establish a
+concrete type for the method, because no `Some` value is returned.
+Any other concrete implementation of the trait could be used.
 */
 
 use std::{convert::Infallible, error::Error};
@@ -103,13 +115,13 @@ pub trait ItemVisitor<'input> {
     /// Called after a bare item has been parsed.
     ///
     /// The returned visitor is used to handle the bare item's parameters.
-    /// Return [`Ignored`] to silently discard all parameters.
+    /// Return `None` to silently discard all parameters.
     ///
     /// Parsing will be terminated early if an error is returned.
     fn bare_item<'pv>(
         self,
         bare_item: BareItemFromInput<'input>,
-    ) -> Result<impl ParameterVisitor<'pv>, Self::Error>;
+    ) -> Result<Option<impl ParameterVisitor<'pv>>, Self::Error>;
 }
 
 /// A visitor whose methods are called during inner-list parsing.
@@ -129,10 +141,10 @@ pub trait InnerListVisitor<'input> {
     /// Called after all inner-list items have been parsed.
     ///
     /// The returned visitor is used to handle the inner list's parameters.
-    /// Return [`Ignored`] to silently discard all parameters.
+    /// Return `None` to silently discard all parameters.
     ///
     /// Parsing will be terminated early if an error is returned.
-    fn finish<'pv>(self) -> Result<impl ParameterVisitor<'pv>, Self::Error>;
+    fn finish<'pv>(self) -> Result<Option<impl ParameterVisitor<'pv>>, Self::Error>;
 }
 
 /// A visitor whose methods are called during entry parsing.
@@ -160,6 +172,7 @@ pub trait DictionaryVisitor<'input> {
     /// Called after a dictionary key has been parsed.
     ///
     /// The returned visitor is used to handle the associated value.
+    /// Return `None` to ignore this key and any parameters.
     ///
     /// Parsing will be terminated early if an error is returned.
     ///
@@ -174,7 +187,7 @@ pub trait DictionaryVisitor<'input> {
     fn entry<'dv, 'ev>(
         &'dv mut self,
         key: &'input KeyRef,
-    ) -> Result<impl EntryVisitor<'ev>, Self::Error>
+    ) -> Result<Option<impl EntryVisitor<'ev>>, Self::Error>
     where
         'dv: 'ev;
 }
@@ -222,8 +235,8 @@ impl<'input> ItemVisitor<'input> for Ignored {
     fn bare_item<'pv>(
         self,
         _bare_item: BareItemFromInput<'input>,
-    ) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
-        Ok(Ignored)
+    ) -> Result<Option<impl ParameterVisitor<'pv>>, Self::Error> {
+        Ok(None::<Ignored>)
     }
 }
 
@@ -240,8 +253,8 @@ impl InnerListVisitor<'_> for Ignored {
         Ok(Ignored)
     }
 
-    fn finish<'pv>(self) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
-        Ok(Ignored)
+    fn finish<'pv>(self) -> Result<Option<impl ParameterVisitor<'pv>>, Self::Error> {
+        Ok(None::<Ignored>)
     }
 }
 
@@ -251,11 +264,11 @@ impl<'input> DictionaryVisitor<'input> for Ignored {
     fn entry<'dv, 'ev>(
         &'dv mut self,
         _key: &'input KeyRef,
-    ) -> Result<impl EntryVisitor<'ev>, Self::Error>
+    ) -> Result<Option<impl EntryVisitor<'ev>>, Self::Error>
     where
         'dv: 'ev,
     {
-        Ok(Ignored)
+        Ok(None::<Ignored>)
     }
 }
 
