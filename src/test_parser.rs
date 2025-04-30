@@ -1,6 +1,13 @@
-use crate::visitor::Ignored;
-use crate::{integer, key_ref, string_ref, token_ref, Decimal, Error, Num, Parser, RefBareItem};
+use std::convert::Infallible;
 
+use crate::{
+    integer, key_ref, string_ref, token_ref,
+    visitor::{
+        DictionaryVisitor, EntryVisitor, Ignored, InnerListVisitor, ItemVisitor, ListVisitor,
+        ParameterVisitor,
+    },
+    BareItemFromInput, Decimal, Error, KeyRef, Num, Parser, RefBareItem,
+};
 #[cfg(feature = "parsed-types")]
 use crate::{BareItem, Date, Dictionary, InnerList, Item, List, Parameters, Version};
 
@@ -924,4 +931,238 @@ fn parse_display_string_errors() {
         Parser::new(r#" %"x%aa""#).parse_item(),
         Err(Error::with_index("invalid UTF-8 in display string", 4))
     );
+}
+
+/// A simple struct used for the complex tests.
+#[derive(Default, Debug, PartialEq)]
+struct Point {
+    x: i64,
+    y: i64,
+}
+
+impl Point {
+    fn new(x: i64, y: i64) -> Self {
+        Self { x, y }
+    }
+}
+
+struct PointVisitor<'a> {
+    point: &'a mut Point,
+}
+
+/// For when a `Point` is a parameter somewhere.
+impl<'input> ParameterVisitor<'input> for PointVisitor<'_> {
+    type Error = Infallible;
+
+    fn parameter(
+        &mut self,
+        key: &'input KeyRef,
+        value: BareItemFromInput<'input>,
+    ) -> Result<(), Self::Error> {
+        let Some(v) = value.as_integer() else {
+            return Ok(());
+        };
+        let ptr = match key.as_str() {
+            "x" => &mut self.point.x,
+            "y" => &mut self.point.y,
+            _ => return Ok(()),
+        };
+        *ptr = i64::from(v);
+        Ok(())
+    }
+}
+
+impl<'input> DictionaryVisitor<'input> for PointVisitor<'_> {
+    type Error = Infallible;
+
+    fn entry<'dv, 'ev>(
+        &'dv mut self,
+        key: &'input KeyRef,
+    ) -> Result<impl EntryVisitor<'ev>, Self::Error>
+    where
+        'dv: 'ev,
+    {
+        let coord = match key.as_str() {
+            "x" => Some(&mut self.point.x),
+            "y" => Some(&mut self.point.y),
+            _ => None,
+        };
+        Ok(CoordVisitor { coord })
+    }
+}
+
+struct CoordVisitor<'a> {
+    coord: Option<&'a mut i64>,
+}
+
+impl<'input> ItemVisitor<'input> for CoordVisitor<'_> {
+    type Error = Infallible;
+
+    fn bare_item<'pv>(
+        self,
+        bare_item: BareItemFromInput<'input>,
+    ) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
+        if let Some(coord) = self.coord {
+            if let Some(v) = bare_item.as_integer() {
+                *coord = i64::from(v);
+            }
+        }
+        Ok(Ignored)
+    }
+}
+
+impl EntryVisitor<'_> for CoordVisitor<'_> {
+    fn inner_list<'ilv>(self) -> Result<impl InnerListVisitor<'ilv>, Self::Error> {
+        Ok(Ignored)
+    }
+}
+
+#[test]
+fn complex_dict_visitor() {
+    let mut point = Point::default();
+    let parser = Parser::new("x=10, y=3");
+    let mut visit = PointVisitor { point: &mut point };
+    parser
+        .parse_dictionary_with_visitor(&mut visit)
+        .expect("successful parse");
+    assert_eq!(point, Point::new(10, 3));
+}
+
+/// An item with parameters.
+#[derive(Default, Debug, PartialEq)]
+struct Holder {
+    v: i64,
+    point: Point,
+}
+
+/// A visitor for an item that is an integer, with optional `x` and `y` parameters.
+struct HolderVisitor<'a> {
+    holder: &'a mut Holder,
+}
+
+impl<'input> ItemVisitor<'input> for HolderVisitor<'_> {
+    type Error = Infallible;
+    fn bare_item<'pv>(
+        self,
+        bare_item: BareItemFromInput<'input>,
+    ) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
+        if let Some(v) = bare_item.as_integer() {
+            self.holder.v = i64::from(v);
+        }
+        // Note that this updates parameters, even if the value isn't an integer.
+        // That's probably not what a real application would seek to do.
+        Ok(PointVisitor {
+            point: &mut self.holder.point,
+        })
+    }
+}
+
+#[test]
+fn complex_item_visitor() {
+    let mut holder = Holder::default();
+    let parser = Parser::new("12;x=7;y=-5");
+    let visit = HolderVisitor {
+        holder: &mut holder,
+    };
+    parser
+        .parse_item_with_visitor(visit)
+        .expect("successful parse");
+    assert_eq!(holder.point, Point::new(7, -5));
+}
+
+#[test]
+fn complex_list_visitor() {
+    #[derive(Default, Debug, PartialEq)]
+    struct ListHolder {
+        list: Vec<Holder>,
+        point: Point,
+    }
+
+    struct OuterListVisitor<'a> {
+        list: &'a mut Vec<ListHolder>,
+    }
+
+    impl ListVisitor<'_> for OuterListVisitor<'_> {
+        type Error = Infallible;
+        fn entry<'ev>(&mut self) -> Result<impl EntryVisitor<'ev>, Self::Error> {
+            self.list.push(ListHolder::default());
+            let list = self.list.last_mut().unwrap(); // cannot fail
+            Ok(HolderListVisitor { list })
+        }
+    }
+
+    struct HolderListVisitor<'a> {
+        list: &'a mut ListHolder,
+    }
+
+    impl<'input> ItemVisitor<'input> for HolderListVisitor<'_> {
+        type Error = Infallible;
+        fn bare_item<'pv>(
+            self,
+            _bare_item: BareItemFromInput<'input>,
+        ) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
+            Ok(Ignored)
+        }
+    }
+
+    impl EntryVisitor<'_> for HolderListVisitor<'_> {
+        fn inner_list<'ilv>(self) -> Result<impl InnerListVisitor<'ilv>, Self::Error> {
+            Ok(self)
+        }
+    }
+
+    impl InnerListVisitor<'_> for HolderListVisitor<'_> {
+        type Error = Infallible;
+
+        fn item<'iv>(&mut self) -> Result<impl ItemVisitor<'iv>, Self::Error> {
+            self.list.list.push(Holder::default());
+            let holder = self.list.list.last_mut().unwrap(); // cannot fail
+            Ok(HolderVisitor { holder })
+        }
+
+        fn finish<'pv>(self) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
+            let point = &mut self.list.point;
+            Ok(PointVisitor { point })
+        }
+    }
+
+    let mut list = Vec::default();
+    let parser = Parser::new("(1;x=4 2;y=5 3);x=1;y=2,(4;x=12;y=33), ()");
+    let mut visit = OuterListVisitor { list: &mut list };
+    parser
+        .parse_list_with_visitor(&mut visit)
+        .expect("successful parse");
+
+    let expected = vec![
+        ListHolder {
+            list: vec![
+                Holder {
+                    v: 1,
+                    point: Point::new(4, 0),
+                },
+                Holder {
+                    v: 2,
+                    point: Point::new(0, 5),
+                },
+                Holder {
+                    v: 3,
+                    point: Point::default(),
+                },
+            ],
+            point: Point::new(1, 2),
+        },
+        ListHolder {
+            list: vec![Holder {
+                v: 4,
+                point: Point::new(12, 33),
+            }],
+            point: Point::default(),
+        },
+        ListHolder {
+            list: Vec::new(),
+            point: Point::default(),
+        },
+    ];
+
+    assert_eq!(list, expected);
 }

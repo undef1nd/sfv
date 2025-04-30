@@ -18,14 +18,14 @@ relevant state in its fields, before using that state to perform the operation
 # use sfv::visitor::{Ignored, ItemVisitor, ParameterVisitor};
 # use sfv::{BareItemFromInput, TokenRef};
 # fn main() -> Result<(), sfv::Error> {
-struct Visitor<'a> {
-    token: Option<&'a TokenRef>,
+struct Visitor<'v> {
+    token: Option<&'v TokenRef>,
 }
 
-impl<'a> ItemVisitor<'a> for &mut Visitor<'a> {
+impl<'a, 'v> ItemVisitor<'a> for &mut Visitor<'v> where 'a: 'v {
   type Error = std::convert::Infallible;
 
-  fn bare_item(self, bare_item: BareItemFromInput<'a>) -> Result<impl ParameterVisitor<'a>, Self::Error> {
+  fn bare_item<'p>(self, bare_item: BareItemFromInput<'a>) -> Result<impl ParameterVisitor<'p>, Self::Error> {
       self.token =
           if let BareItemFromInput::Token(token) = bare_item {
               Some(token)
@@ -51,14 +51,14 @@ sfv::Parser::new(input).parse_item_with_visitor(&mut visitor)?;
 ```
 */
 
+use std::{convert::Infallible, error::Error};
+
 use crate::{BareItemFromInput, KeyRef};
-use std::convert::Infallible;
-use std::error::Error;
 
 /// A visitor whose methods are called during parameter parsing.
 ///
-/// The lifetime `'a` is the lifetime of the input.
-pub trait ParameterVisitor<'a> {
+/// The lifetime `'input` is the lifetime of the input.
+pub trait ParameterVisitor<'input> {
     /// The error type that can be returned if some error occurs during parsing.
     type Error: Error;
 
@@ -75,8 +75,8 @@ pub trait ParameterVisitor<'a> {
     /// [RFC 9651]: <https://httpwg.org/specs/rfc9651.html#parse-param>
     fn parameter(
         &mut self,
-        key: &'a KeyRef,
-        value: BareItemFromInput<'a>,
+        key: &'input KeyRef,
+        value: BareItemFromInput<'input>,
     ) -> Result<(), Self::Error>;
 
     /// Called after all parameters have been parsed.
@@ -92,11 +92,11 @@ pub trait ParameterVisitor<'a> {
 
 /// A visitor whose methods are called during item parsing.
 ///
-/// The lifetime `'a` is the lifetime of the input.
+/// The lifetime `'input` is the lifetime of the input.
 ///
 /// Use this trait with
 /// [`Parser::parse_item_with_visitor`][crate::Parser::parse_item_with_visitor].
-pub trait ItemVisitor<'a> {
+pub trait ItemVisitor<'input> {
     /// The error type that can be returned if some error occurs during parsing.
     type Error: Error;
 
@@ -106,16 +106,16 @@ pub trait ItemVisitor<'a> {
     /// Return [`Ignored`] to silently discard all parameters.
     ///
     /// Parsing will be terminated early if an error is returned.
-    fn bare_item(
+    fn bare_item<'pv>(
         self,
-        bare_item: BareItemFromInput<'a>,
-    ) -> Result<impl ParameterVisitor<'a>, Self::Error>;
+        bare_item: BareItemFromInput<'input>,
+    ) -> Result<impl ParameterVisitor<'pv>, Self::Error>;
 }
 
 /// A visitor whose methods are called during inner-list parsing.
 ///
-/// The lifetime `'a` is the lifetime of the input.
-pub trait InnerListVisitor<'a> {
+/// The lifetime `'input` is the lifetime of the input.
+pub trait InnerListVisitor<'input> {
     /// The error type that can be returned if some error occurs during parsing.
     type Error: Error;
 
@@ -124,7 +124,7 @@ pub trait InnerListVisitor<'a> {
     /// The returned visitor is used to handle the bare item.
     ///
     /// Parsing will be terminated early if an error is returned.
-    fn item(&mut self) -> Result<impl ItemVisitor<'a>, Self::Error>;
+    fn item<'iv>(&mut self) -> Result<impl ItemVisitor<'iv>, Self::Error>;
 
     /// Called after all inner-list items have been parsed.
     ///
@@ -132,28 +132,28 @@ pub trait InnerListVisitor<'a> {
     /// Return [`Ignored`] to silently discard all parameters.
     ///
     /// Parsing will be terminated early if an error is returned.
-    fn finish(self) -> Result<impl ParameterVisitor<'a>, Self::Error>;
+    fn finish<'pv>(self) -> Result<impl ParameterVisitor<'pv>, Self::Error>;
 }
 
 /// A visitor whose methods are called during entry parsing.
 ///
-/// The lifetime `'a` is the lifetime of the input.
-pub trait EntryVisitor<'a>: ItemVisitor<'a> {
+/// The lifetime `'input` is the lifetime of the input.
+pub trait EntryVisitor<'input>: ItemVisitor<'input> {
     /// Called before an inner list has been parsed.
     ///
     /// The returned visitor is used to handle the inner list.
     ///
     /// Parsing will be terminated early if an error is returned.
-    fn inner_list(self) -> Result<impl InnerListVisitor<'a>, Self::Error>;
+    fn inner_list<'ilv>(self) -> Result<impl InnerListVisitor<'ilv>, Self::Error>;
 }
 
 /// A visitor whose methods are called during dictionary parsing.
 ///
-/// The lifetime `'a` is the lifetime of the input.
+/// The lifetime `'input` is the lifetime of the input.
 ///
 /// Use this trait with
 /// [`Parser::parse_dictionary_with_visitor`][crate::Parser::parse_dictionary_with_visitor].
-pub trait DictionaryVisitor<'a> {
+pub trait DictionaryVisitor<'input> {
     /// The error type that can be returned if some error occurs during parsing.
     type Error: Error;
 
@@ -171,16 +171,21 @@ pub trait DictionaryVisitor<'a> {
     /// ones.
     ///
     /// [RFC 9651]: <https://httpwg.org/specs/rfc9651.html#parse-dictionary>
-    fn entry(&mut self, key: &'a KeyRef) -> Result<impl EntryVisitor<'a>, Self::Error>;
+    fn entry<'dv, 'ev>(
+        &'dv mut self,
+        key: &'input KeyRef,
+    ) -> Result<impl EntryVisitor<'ev>, Self::Error>
+    where
+        'dv: 'ev;
 }
 
 /// A visitor whose methods are called during list parsing.
 ///
-/// The lifetime `'a` is the lifetime of the input.
+/// The lifetime `'input` is the lifetime of the input.
 ///
 /// Use this trait with
 /// [`Parser::parse_list_with_visitor`][crate::Parser::parse_list_with_visitor].
-pub trait ListVisitor<'a> {
+pub trait ListVisitor<'input> {
     /// The error type that can be returned if some error occurs during parsing.
     type Error: Error;
 
@@ -189,7 +194,7 @@ pub trait ListVisitor<'a> {
     /// The returned visitor is used to handle the entry.
     ///
     /// Parsing will be terminated early if an error is returned.
-    fn entry(&mut self) -> Result<impl EntryVisitor<'a>, Self::Error>;
+    fn entry<'ev>(&mut self) -> Result<impl EntryVisitor<'ev>, Self::Error>;
 }
 
 /// A visitor that can be used to silently discard structured-field parts.
@@ -199,59 +204,65 @@ pub trait ListVisitor<'a> {
 #[derive(Default)]
 pub struct Ignored;
 
-impl<'a> ParameterVisitor<'a> for Ignored {
+impl<'input> ParameterVisitor<'input> for Ignored {
     type Error = Infallible;
 
     fn parameter(
         &mut self,
-        _key: &'a KeyRef,
-        _value: BareItemFromInput<'a>,
+        _key: &'input KeyRef,
+        _value: BareItemFromInput<'input>,
     ) -> Result<(), Self::Error> {
         Ok(())
     }
 }
 
-impl<'a> ItemVisitor<'a> for Ignored {
+impl<'input> ItemVisitor<'input> for Ignored {
     type Error = Infallible;
 
-    fn bare_item(
+    fn bare_item<'pv>(
         self,
-        _bare_item: BareItemFromInput<'a>,
-    ) -> Result<impl ParameterVisitor<'a>, Self::Error> {
+        _bare_item: BareItemFromInput<'input>,
+    ) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
         Ok(Ignored)
     }
 }
 
-impl<'a> EntryVisitor<'a> for Ignored {
-    fn inner_list(self) -> Result<impl InnerListVisitor<'a>, Self::Error> {
+impl EntryVisitor<'_> for Ignored {
+    fn inner_list<'ilv>(self) -> Result<impl InnerListVisitor<'ilv>, Self::Error> {
         Ok(Ignored)
     }
 }
 
-impl<'a> InnerListVisitor<'a> for Ignored {
+impl InnerListVisitor<'_> for Ignored {
     type Error = Infallible;
 
-    fn item(&mut self) -> Result<impl ItemVisitor<'a>, Self::Error> {
+    fn item<'iv>(&mut self) -> Result<impl ItemVisitor<'iv>, Self::Error> {
         Ok(Ignored)
     }
 
-    fn finish(self) -> Result<impl ParameterVisitor<'a>, Self::Error> {
-        Ok(Ignored)
-    }
-}
-
-impl<'a> DictionaryVisitor<'a> for Ignored {
-    type Error = Infallible;
-
-    fn entry(&mut self, _key: &'a KeyRef) -> Result<impl EntryVisitor<'a>, Self::Error> {
+    fn finish<'pv>(self) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
         Ok(Ignored)
     }
 }
 
-impl<'a> ListVisitor<'a> for Ignored {
+impl<'input> DictionaryVisitor<'input> for Ignored {
     type Error = Infallible;
 
-    fn entry(&mut self) -> Result<impl EntryVisitor<'a>, Self::Error> {
+    fn entry<'dv, 'ev>(
+        &'dv mut self,
+        _key: &'input KeyRef,
+    ) -> Result<impl EntryVisitor<'ev>, Self::Error>
+    where
+        'dv: 'ev,
+    {
+        Ok(Ignored)
+    }
+}
+
+impl ListVisitor<'_> for Ignored {
+    type Error = Infallible;
+
+    fn entry<'ev>(&mut self) -> Result<impl EntryVisitor<'ev>, Self::Error> {
         Ok(Ignored)
     }
 }

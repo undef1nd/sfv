@@ -1,17 +1,16 @@
-use crate::utils;
-use crate::visitor::*;
-use crate::{
-    BareItemFromInput, Date, Decimal, Error, Integer, KeyRef, Num, SFVResult, String, StringRef,
-    TokenRef, Version,
-};
+use std::{borrow::Cow, string::String as StdString};
 
+use crate::{
+    utils, visitor::*, BareItemFromInput, Date, Decimal, Error, Integer, KeyRef, Num, SFVResult,
+    String, StringRef, TokenRef, Version,
+};
 #[cfg(feature = "parsed-types")]
 use crate::{Dictionary, Item, List};
 
-use std::borrow::Cow;
-use std::string::String as StdString;
-
-fn parse_item<'a>(parser: &mut Parser<'a>, visitor: impl ItemVisitor<'a>) -> SFVResult<()> {
+fn parse_item<'a: 'iv, 'iv>(
+    parser: &mut Parser<'a>,
+    visitor: impl ItemVisitor<'iv>,
+) -> SFVResult<()> {
     // https://httpwg.org/specs/rfc9651.html#parse-item
     let param_visitor = visitor
         .bare_item(parser.parse_bare_item()?)
@@ -108,12 +107,12 @@ assert_eq!(
 # }
 "##
     )]
-    pub fn parse_dictionary_with_visitor(
+    pub fn parse_dictionary_with_visitor<'v: 'a>(
         self,
-        visitor: &mut (impl ?Sized + DictionaryVisitor<'a>),
+        visitor: &'v mut (impl ?Sized + DictionaryVisitor<'a>),
     ) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc9651.html#parse-dictionary
-        self.parse(|parser| {
+        self.parse(move |parser| {
             parse_comma_separated(parser, |parser| {
                 // Note: It is up to the visitor to properly handle duplicate keys.
                 let entry_visitor = visitor.entry(parser.parse_key()?).map_err(Error::custom)?;
@@ -219,7 +218,10 @@ assert_eq!(
         }
     }
 
-    fn parse_list_entry(&mut self, visitor: impl EntryVisitor<'a>) -> SFVResult<()> {
+    fn parse_list_entry<'ev>(&mut self, visitor: impl EntryVisitor<'ev>) -> SFVResult<()>
+    where
+        'a: 'ev,
+    {
         // https://httpwg.org/specs/rfc9651.html#parse-item-or-list
         // ListEntry represents a tuple (item_or_inner_list, parameters)
 
@@ -229,9 +231,9 @@ assert_eq!(
         }
     }
 
-    pub(crate) fn parse_inner_list(
+    pub(crate) fn parse_inner_list<'ilv>(
         &mut self,
-        mut visitor: impl InnerListVisitor<'a>,
+        mut visitor: impl InnerListVisitor<'ilv>,
     ) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc9651.html#parse-innerlist
 
