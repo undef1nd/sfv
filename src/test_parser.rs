@@ -192,13 +192,14 @@ fn parse_list_errors() {
 }
 
 #[test]
-fn parse_inner_list_errors() {
-    let input = "c b); a=1";
-    assert_eq!(
-        Err(Error::with_index("expected start of inner list", 0)),
-        Parser::new(input).parse_inner_list(Ignored)
-    );
+#[should_panic]
+#[cfg(debug_assertions)]
+fn parse_invalid_inner_list_start() {
+    let _ = Parser::new("c b); a=1").parse_inner_list(Ignored);
+}
 
+#[test]
+fn parse_inner_list_errors() {
     let input = "(";
     assert_eq!(
         Err(Error::with_index("unterminated inner list", 1)),
@@ -411,11 +412,14 @@ fn parse_bool() -> Result<(), Error> {
 }
 
 #[test]
+#[should_panic]
+#[cfg(debug_assertions)]
+fn parse_invalid_bool_start() {
+    let _ = Parser::new("").parse_bool();
+}
+
+#[test]
 fn parse_bool_errors() {
-    assert_eq!(
-        Err(Error::with_index("expected start of boolean ('?')", 0)),
-        Parser::new("").parse_bool()
-    );
     assert_eq!(
         Err(Error::with_index("expected boolean ('0' or '1')", 1)),
         Parser::new("?").parse_bool()
@@ -442,11 +446,14 @@ fn parse_string() -> Result<(), Error> {
 }
 
 #[test]
+#[should_panic]
+#[cfg(debug_assertions)]
+fn parse_invalid_string_start() {
+    let _ = Parser::new("test").parse_string();
+}
+
+#[test]
 fn parse_string_errors() {
-    assert_eq!(
-        Err(Error::with_index(r#"expected start of string ('"')"#, 0)),
-        Parser::new("test").parse_string()
-    );
     assert_eq!(
         Err(Error::with_index("unterminated escape sequence", 2)),
         Parser::new(r#""\"#).parse_string()
@@ -466,48 +473,41 @@ fn parse_string_errors() {
 }
 
 #[test]
-fn parse_token() -> Result<(), Error> {
+fn parse_token() {
     let mut parser = Parser::new("*some:token}not token");
-    assert_eq!(token_ref("*some:token"), parser.parse_token()?);
+    assert_eq!(token_ref("*some:token"), parser.parse_token());
     assert_eq!(parser.remaining(), b"}not token");
 
-    assert_eq!(token_ref("token"), Parser::new("token").parse_token()?);
+    assert_eq!(token_ref("token"), Parser::new("token").parse_token());
     assert_eq!(
         token_ref("a_b-c.d3:f%00/*"),
-        Parser::new("a_b-c.d3:f%00/*").parse_token()?
+        Parser::new("a_b-c.d3:f%00/*").parse_token()
     );
     assert_eq!(
         token_ref("TestToken"),
-        Parser::new("TestToken").parse_token()?
+        Parser::new("TestToken").parse_token()
     );
-    assert_eq!(token_ref("some"), Parser::new("some@token").parse_token()?);
+    assert_eq!(token_ref("some"), Parser::new("some@token").parse_token());
     assert_eq!(
         token_ref("*TestToken*"),
-        Parser::new("*TestToken*").parse_token()?
+        Parser::new("*TestToken*").parse_token()
     );
-    assert_eq!(token_ref("*"), Parser::new("*[@:token").parse_token()?);
-    assert_eq!(token_ref("test"), Parser::new("test token").parse_token()?);
-
-    Ok(())
+    assert_eq!(token_ref("*"), Parser::new("*[@:token").parse_token());
+    assert_eq!(token_ref("test"), Parser::new("test token").parse_token());
 }
 
 #[test]
-fn parse_token_errors() {
-    let mut parser = Parser::new("765token");
-    assert_eq!(
-        Err(Error::with_index("expected start of token", 0)),
-        parser.parse_token()
-    );
-    assert_eq!(parser.remaining(), b"765token");
+#[should_panic]
+#[cfg(debug_assertions)]
+fn parse_invalid_token_start() {
+    let _ = Parser::new("7").parse_token();
+}
 
-    assert_eq!(
-        Err(Error::with_index("expected start of token", 0)),
-        Parser::new("7token").parse_token()
-    );
-    assert_eq!(
-        Err(Error::with_index("expected start of token", 0)),
-        Parser::new("").parse_token()
-    );
+#[test]
+#[should_panic]
+#[cfg(debug_assertions)]
+fn parse_empty_token_start() {
+    let _ = Parser::new("").parse_token();
 }
 
 #[test]
@@ -533,14 +533,14 @@ fn parse_byte_sequence() -> Result<(), Error> {
 }
 
 #[test]
+#[should_panic]
+#[cfg(debug_assertions)]
+fn parse_invalid_byte_sequence_start() {
+    let _ = Parser::new("aGVsbG8").parse_byte_sequence();
+}
+
+#[test]
 fn parse_byte_sequence_errors() {
-    assert_eq!(
-        Err(Error::with_index(
-            "expected start of byte sequence (':')",
-            0
-        )),
-        Parser::new("aGVsbG8").parse_byte_sequence()
-    );
     assert_eq!(
         Err(Error::with_index("invalid byte sequence", 6)),
         Parser::new(":aGVsb G8=:").parse_byte_sequence()
@@ -868,6 +868,13 @@ fn parse_date() -> Result<(), Error> {
 }
 
 #[test]
+#[should_panic]
+#[cfg(debug_assertions)]
+fn parse_invalid_date_start() {
+    let _ = Parser::new("7").parse_date();
+}
+
+#[test]
 #[cfg(feature = "parsed-types")]
 fn parse_display_string() -> Result<(), Error> {
     let input = r#"%"This is intended for display to %c3%bcsers.""#;
@@ -924,4 +931,11 @@ fn parse_display_string_errors() {
         Parser::new(r#" %"x%aa""#).parse_item(),
         Err(Error::with_index("invalid UTF-8 in display string", 4))
     );
+}
+
+#[test]
+#[should_panic]
+#[cfg(debug_assertions)]
+fn parse_invalid_display_string_start() {
+    let _ = Parser::new(r#"""#).parse_display_string();
 }
