@@ -68,7 +68,7 @@ impl fmt::Display for Decimal {
         } else if f_part % 10 == 0 {
             write!(f, "{}{}.{:02}", sign, i_part, f_part / 10)
         } else {
-            write!(f, "{}{}.{:03}", sign, i_part, f_part)
+            write!(f, "{sign}{i_part}.{f_part:03}")
         }
     }
 }
