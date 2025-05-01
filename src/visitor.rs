@@ -401,9 +401,11 @@ impl<'input, V: InnerListVisitor<'input>> InnerListVisitor<'input> for Option<V>
     }
 }
 
-/// A visitor that cannot be instantiated, but can be useds a type in situations
-/// guaranteed to return an error `Result`, analogous to
+/// A visitor that cannot be instantiated, but can be used as a type in
+/// situations guaranteed to return an error `Result`, analogous to
 /// [`std::convert::Infallible`].
+///
+/// When [`!`] is stabilized, this type will be replaced with an alias for it.
 #[derive(Clone, Copy)]
 pub enum Never {}
 
