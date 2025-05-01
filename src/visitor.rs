@@ -49,6 +49,85 @@ sfv::Parser::new(input).parse_item_with_visitor(&mut visitor)?;
 # Ok(())
 # }
 ```
+
+Blanket implementations of [`ParameterVisitor`], [`ItemVisitor`],
+[`EntryVisitor`] and [`InnerListVisitor`] are provided for the corresponding
+`Option<V>` as a dynamic analogue of [`Ignored`]:
+
+```
+# use sfv::{BareItemFromInput, KeyRef, Parser, visitor::*};
+
+#[derive(Debug, Default, PartialEq)]
+struct Point {
+    x: i64,
+    y: i64,
+}
+
+struct CoordVisitor<'a> {
+    coord: &'a mut i64,
+}
+
+impl<'input> DictionaryVisitor<'input> for Point {
+    type Error = std::convert::Infallible;
+
+    fn entry<'dv, 'ev>(
+        &'dv mut self,
+        key: &'input KeyRef,
+    ) -> Result<impl EntryVisitor<'ev>, Self::Error>
+    where
+        'dv: 'ev,
+    {
+        let coord = match key.as_str() {
+            "x" => &mut self.x,
+            "y" => &mut self.y,
+            // Ignore all other keys
+            _ => return Ok(None),
+        };
+        Ok(Some(CoordVisitor { coord }))
+    }
+}
+
+#[derive(Debug)]
+struct NotAnInteger;
+
+impl std::fmt::Display for NotAnInteger {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_str("must be an integer")
+    }
+}
+
+impl std::error::Error for NotAnInteger {}
+
+impl<'input> ItemVisitor<'input> for CoordVisitor<'_> {
+    type Error = NotAnInteger;
+
+    fn bare_item<'pv>(
+        self,
+        bare_item: BareItemFromInput<'input>,
+    ) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
+        if let BareItemFromInput::Integer(v) = bare_item {
+            *self.coord = i64::from(v);
+            Ok(Ignored)
+        } else {
+            Err(NotAnInteger)
+        }
+    }
+}
+
+impl EntryVisitor<'_> for CoordVisitor<'_> {
+    fn inner_list<'ilv>(self) -> Result<impl InnerListVisitor<'ilv>, Self::Error> {
+# // TODO: Consider adding a NeverVisitor that cannot be instantiated for cases that are guaranteed to return an error.
+        Err::<Ignored, _>(NotAnInteger)
+    }
+}
+
+# fn main() -> Result<(), sfv::Error> {
+let mut point = Point::default();
+Parser::new("x=10, z=abc, y=3").parse_dictionary_with_visitor(&mut point)?;
+assert_eq!(point, Point { x: 10, y: 3 });
+# Ok(())
+# }
+```
 */
 
 use std::{convert::Infallible, error::Error};
