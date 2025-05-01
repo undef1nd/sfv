@@ -116,8 +116,7 @@ impl<'input> ItemVisitor<'input> for CoordVisitor<'_> {
 
 impl EntryVisitor<'_> for CoordVisitor<'_> {
     fn inner_list<'ilv>(self) -> Result<impl InnerListVisitor<'ilv>, Self::Error> {
-# // TODO: Consider adding a NeverVisitor that cannot be instantiated for cases that are guaranteed to return an error.
-        Err::<Ignored, _>(NotAnInteger)
+        Err::<Never, _>(NotAnInteger)
     }
 }
 
@@ -399,5 +398,74 @@ impl<'input, V: InnerListVisitor<'input>> InnerListVisitor<'input> for Option<V>
             None => Ok(None),
             Some(visitor) => visitor.finish().map(Some),
         }
+    }
+}
+
+/// A visitor that cannot be instantiated, but can be useds a type in situations
+/// guaranteed to return an error `Result`, analogous to
+/// [`std::convert::Infallible`].
+#[derive(Clone, Copy)]
+pub enum Never {}
+
+impl<'input> ParameterVisitor<'input> for Never {
+    type Error = Infallible;
+
+    fn parameter(
+        &mut self,
+        _key: &'input KeyRef,
+        _value: BareItemFromInput<'input>,
+    ) -> Result<(), Self::Error> {
+        match *self {}
+    }
+}
+
+impl<'input> ItemVisitor<'input> for Never {
+    type Error = Infallible;
+
+    fn bare_item<'pv>(
+        self,
+        _bare_item: BareItemFromInput<'input>,
+    ) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
+        Ok(self)
+    }
+}
+
+impl EntryVisitor<'_> for Never {
+    fn inner_list<'ilv>(self) -> Result<impl InnerListVisitor<'ilv>, Self::Error> {
+        Ok(self)
+    }
+}
+
+impl InnerListVisitor<'_> for Never {
+    type Error = Infallible;
+
+    fn item<'iv>(&mut self) -> Result<impl ItemVisitor<'iv>, Self::Error> {
+        Ok(*self)
+    }
+
+    fn finish<'pv>(self) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
+        Ok(self)
+    }
+}
+
+impl<'input> DictionaryVisitor<'input> for Never {
+    type Error = Infallible;
+
+    fn entry<'dv, 'ev>(
+        &'dv mut self,
+        _key: &'input KeyRef,
+    ) -> Result<impl EntryVisitor<'ev>, Self::Error>
+    where
+        'dv: 'ev,
+    {
+        Ok(*self)
+    }
+}
+
+impl ListVisitor<'_> for Never {
+    type Error = Infallible;
+
+    fn entry<'ev>(&mut self) -> Result<impl EntryVisitor<'ev>, Self::Error> {
+        Ok(*self)
     }
 }
