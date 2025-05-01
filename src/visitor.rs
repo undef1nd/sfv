@@ -50,13 +50,33 @@ sfv::Parser::new(input).parse_item_with_visitor(&mut visitor)?;
 # }
 ```
 
-Blanket implementations of [`ParameterVisitor`], [`ItemVisitor`],
-[`EntryVisitor`] and [`InnerListVisitor`] are provided for the corresponding
-`Option<V>` as a dynamic analogue of [`Ignored`]:
+# Discarding irrelevant parts
+
+Two kinds of helpers are provided for silently discarding structured-field
+parts:
+
+- [`Ignored`]: This type implements all of the visitor traits as no-ops, and can
+  be used when a visitor implementation would unconditionally do nothing. An
+  example of this is when an item's bare item needs to be validated, but its
+  parameters do not (e.g. because the relevant field definition prescribes
+  none and permits unknown ones).
+
+- Blanket implementations of [`ParameterVisitor`], [`ItemVisitor`],
+  [`EntryVisitor`], and [`InnerListVisitor`] for [`Option<V>`] where `V`
+  implements that trait: These implementations act like `Ignored` when `self` is
+  [`None`], and forward to `V`'s implementation when `self` is [`Some`]. These
+  can be used when the visitor dynamically handles or ignores field parts. An
+  example of this is when a field definition prescribes the format of certain
+  dictionary keys, but ignores unknown ones.
+
+Note that the discarded parts are still validated during parsing: syntactic
+errors in the input still cause parsing to fail even when these helpers are
+used, [as required by RFC 9651](https://httpwg.org/specs/rfc9651.html#strict).
+
+The following example demonstrates usage of both kinds of helpers:
 
 ```
 # use sfv::{BareItemFromInput, KeyRef, Parser, visitor::*};
-
 #[derive(Debug, Default, PartialEq)]
 struct Point {
     x: i64,
@@ -80,9 +100,12 @@ impl<'input> DictionaryVisitor<'input> for Point {
         let coord = match key.as_str() {
             "x" => &mut self.x,
             "y" => &mut self.y,
-            // Ignore all other keys
+            // Ignore this key by returning `None`. Its value will still be
+            // validated syntactically during parsing, but we don't need to
+            // visit it.
             _ => return Ok(None),
         };
+        // Visit this key's value by returning `Some`.
         Ok(Some(CoordVisitor { coord }))
     }
 }
@@ -107,6 +130,12 @@ impl<'input> ItemVisitor<'input> for CoordVisitor<'_> {
     ) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
         if let BareItemFromInput::Integer(v) = bare_item {
             *self.coord = i64::from(v);
+            // Ignore the item's parameters by returning `Ignored`. The
+            // parameters will still be validated syntactically during parsing,
+            // but we don't need to visit them.
+            //
+            // We could return `None` instead to ignore the parameters only
+            // some of the time, returning `Some(visitor)` otherwise.
             Ok(Ignored)
         } else {
             Err(NotAnInteger)
@@ -116,6 +145,9 @@ impl<'input> ItemVisitor<'input> for CoordVisitor<'_> {
 
 impl EntryVisitor<'_> for CoordVisitor<'_> {
     fn inner_list<'ilv>(self) -> Result<impl InnerListVisitor<'ilv>, Self::Error> {
+        // Use `Never` to enforce at the type level that this method will only
+        // return `Err`, as our coordinate must be a single integer, not an
+        // inner list.
         Err::<Never, _>(NotAnInteger)
     }
 }
@@ -181,7 +213,8 @@ pub trait ItemVisitor<'input> {
     /// Called after a bare item has been parsed.
     ///
     /// The returned visitor is used to handle the bare item's parameters.
-    /// Return [`Ignored`] to silently discard all parameters.
+    /// See [the module documentation](crate::visitor#discarding-irrelevant-parts)
+    /// for guidance on discarding parameters.
     ///
     /// Parsing will be terminated early if an error is returned.
     fn bare_item<'pv>(
@@ -207,7 +240,8 @@ pub trait InnerListVisitor<'input> {
     /// Called after all inner-list items have been parsed.
     ///
     /// The returned visitor is used to handle the inner list's parameters.
-    /// Return [`Ignored`] to silently discard all parameters.
+    /// See [the module documentation](crate::visitor#discarding-irrelevant-parts)
+    /// for guidance on discarding parameters.
     ///
     /// Parsing will be terminated early if an error is returned.
     fn finish<'pv>(self) -> Result<impl ParameterVisitor<'pv>, Self::Error>;
@@ -238,6 +272,8 @@ pub trait DictionaryVisitor<'input> {
     /// Called after a dictionary key has been parsed.
     ///
     /// The returned visitor is used to handle the associated value.
+    /// See [the module documentation](crate::visitor#discarding-irrelevant-parts)
+    /// for guidance on discarding entries.
     ///
     /// Parsing will be terminated early if an error is returned.
     ///
@@ -278,7 +314,11 @@ pub trait ListVisitor<'input> {
 /// A visitor that can be used to silently discard structured-field parts.
 ///
 /// Note that the discarded parts are still validated during parsing: syntactic
-/// errors in the input still cause parsing to fail even when this type is used.
+/// errors in the input still cause parsing to fail even when this type is used,
+/// [as required by RFC 9651](https://httpwg.org/specs/rfc9651.html#strict).
+///
+/// See [the module documentation](crate::visitor#discarding-irrelevant-parts)
+/// for example usage.
 #[derive(Default)]
 pub struct Ignored;
 
