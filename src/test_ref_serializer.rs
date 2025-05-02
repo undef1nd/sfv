@@ -1,9 +1,9 @@
+use std::borrow::BorrowMut;
+
 use crate::{
     key_ref, string_ref, token_ref, Decimal, DictSerializer, ItemSerializer, ListSerializer,
     SFVResult,
 };
-
-use std::borrow::BorrowMut;
 
 #[test]
 fn test_fast_serialize_item() {

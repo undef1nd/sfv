@@ -1,6 +1,5 @@
 use crate::serializer::Serializer;
 use crate::{integer, key_ref, string_ref, token_ref, Date, Decimal, Error};
-
 #[cfg(feature = "parsed-types")]
 use crate::{BareItem, Dictionary, InnerList, Item, List, Parameters, SerializeValue};
 

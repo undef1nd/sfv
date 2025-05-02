@@ -1,10 +1,9 @@
-use crate::serializer::Serializer;
-use crate::{KeyRef, RefBareItem};
+use std::borrow::BorrowMut;
 
+use crate::serializer::Serializer;
 #[cfg(feature = "parsed-types")]
 use crate::{Item, ListEntry};
-
-use std::borrow::BorrowMut;
+use crate::{KeyRef, RefBareItem};
 
 /// Serializes `Item` field value components incrementally.
 ///
