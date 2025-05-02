@@ -49,6 +49,116 @@ sfv::Parser::new(input).parse_item_with_visitor(&mut visitor)?;
 # Ok(())
 # }
 ```
+
+# Discarding irrelevant parts
+
+Two kinds of helpers are provided for silently discarding structured-field
+parts:
+
+- [`Ignored`]: This type implements all of the visitor traits as no-ops, and can
+  be used when a visitor implementation would unconditionally do nothing. An
+  example of this is when an item's bare item needs to be validated, but its
+  parameters do not (e.g. because the relevant field definition prescribes
+  none and permits unknown ones).
+
+- Blanket implementations of [`ParameterVisitor`], [`ItemVisitor`],
+  [`EntryVisitor`], and [`InnerListVisitor`] for [`Option<V>`] where `V`
+  implements that trait: These implementations act like `Ignored` when `self` is
+  [`None`], and forward to `V`'s implementation when `self` is [`Some`]. These
+  can be used when the visitor dynamically handles or ignores field parts. An
+  example of this is when a field definition prescribes the format of certain
+  dictionary keys, but ignores unknown ones.
+
+Note that the discarded parts are still validated during parsing: syntactic
+errors in the input still cause parsing to fail even when these helpers are
+used, [as required by RFC 9651](https://httpwg.org/specs/rfc9651.html#strict).
+
+The following example demonstrates usage of both kinds of helpers:
+
+```
+# use sfv::{BareItemFromInput, KeyRef, Parser, visitor::*};
+#[derive(Debug, Default, PartialEq)]
+struct Point {
+    x: i64,
+    y: i64,
+}
+
+struct CoordVisitor<'a> {
+    coord: &'a mut i64,
+}
+
+impl<'input> DictionaryVisitor<'input> for Point {
+    type Error = std::convert::Infallible;
+
+    fn entry<'dv, 'ev>(
+        &'dv mut self,
+        key: &'input KeyRef,
+    ) -> Result<impl EntryVisitor<'ev>, Self::Error>
+    where
+        'dv: 'ev,
+    {
+        let coord = match key.as_str() {
+            "x" => &mut self.x,
+            "y" => &mut self.y,
+            // Ignore this key by returning `None`. Its value will still be
+            // validated syntactically during parsing, but we don't need to
+            // visit it.
+            _ => return Ok(None),
+        };
+        // Visit this key's value by returning `Some`.
+        Ok(Some(CoordVisitor { coord }))
+    }
+}
+
+#[derive(Debug)]
+struct NotAnInteger;
+
+impl std::fmt::Display for NotAnInteger {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_str("must be an integer")
+    }
+}
+
+impl std::error::Error for NotAnInteger {}
+
+impl<'input> ItemVisitor<'input> for CoordVisitor<'_> {
+    type Error = NotAnInteger;
+
+    fn bare_item<'pv>(
+        self,
+        bare_item: BareItemFromInput<'input>,
+    ) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
+        if let BareItemFromInput::Integer(v) = bare_item {
+            *self.coord = i64::from(v);
+            // Ignore the item's parameters by returning `Ignored`. The
+            // parameters will still be validated syntactically during parsing,
+            // but we don't need to visit them.
+            //
+            // We could return `None` instead to ignore the parameters only
+            // some of the time, returning `Some(visitor)` otherwise.
+            Ok(Ignored)
+        } else {
+            Err(NotAnInteger)
+        }
+    }
+}
+
+impl EntryVisitor<'_> for CoordVisitor<'_> {
+    fn inner_list<'ilv>(self) -> Result<impl InnerListVisitor<'ilv>, Self::Error> {
+        // Use `Never` to enforce at the type level that this method will only
+        // return `Err`, as our coordinate must be a single integer, not an
+        // inner list.
+        Err::<Never, _>(NotAnInteger)
+    }
+}
+
+# fn main() -> Result<(), sfv::Error> {
+let mut point = Point::default();
+Parser::new("x=10, z=abc, y=3").parse_dictionary_with_visitor(&mut point)?;
+assert_eq!(point, Point { x: 10, y: 3 });
+# Ok(())
+# }
+```
 */
 
 use std::{convert::Infallible, error::Error};
@@ -103,7 +213,8 @@ pub trait ItemVisitor<'input> {
     /// Called after a bare item has been parsed.
     ///
     /// The returned visitor is used to handle the bare item's parameters.
-    /// Return [`Ignored`] to silently discard all parameters.
+    /// See [the module documentation](crate::visitor#discarding-irrelevant-parts)
+    /// for guidance on discarding parameters.
     ///
     /// Parsing will be terminated early if an error is returned.
     fn bare_item<'pv>(
@@ -129,7 +240,8 @@ pub trait InnerListVisitor<'input> {
     /// Called after all inner-list items have been parsed.
     ///
     /// The returned visitor is used to handle the inner list's parameters.
-    /// Return [`Ignored`] to silently discard all parameters.
+    /// See [the module documentation](crate::visitor#discarding-irrelevant-parts)
+    /// for guidance on discarding parameters.
     ///
     /// Parsing will be terminated early if an error is returned.
     fn finish<'pv>(self) -> Result<impl ParameterVisitor<'pv>, Self::Error>;
@@ -160,6 +272,8 @@ pub trait DictionaryVisitor<'input> {
     /// Called after a dictionary key has been parsed.
     ///
     /// The returned visitor is used to handle the associated value.
+    /// See [the module documentation](crate::visitor#discarding-irrelevant-parts)
+    /// for guidance on discarding entries.
     ///
     /// Parsing will be terminated early if an error is returned.
     ///
@@ -200,7 +314,11 @@ pub trait ListVisitor<'input> {
 /// A visitor that can be used to silently discard structured-field parts.
 ///
 /// Note that the discarded parts are still validated during parsing: syntactic
-/// errors in the input still cause parsing to fail even when this type is used.
+/// errors in the input still cause parsing to fail even when this type is used,
+/// [as required by RFC 9651](https://httpwg.org/specs/rfc9651.html#strict).
+///
+/// See [the module documentation](crate::visitor#discarding-irrelevant-parts)
+/// for example usage.
 #[derive(Default)]
 pub struct Ignored;
 
@@ -264,5 +382,132 @@ impl ListVisitor<'_> for Ignored {
 
     fn entry<'ev>(&mut self) -> Result<impl EntryVisitor<'ev>, Self::Error> {
         Ok(Ignored)
+    }
+}
+
+impl<'input, V: ParameterVisitor<'input>> ParameterVisitor<'input> for Option<V> {
+    type Error = V::Error;
+
+    fn parameter(
+        &mut self,
+        key: &'input KeyRef,
+        value: BareItemFromInput<'input>,
+    ) -> Result<(), Self::Error> {
+        match self {
+            None => Ok(()),
+            Some(visitor) => visitor.parameter(key, value),
+        }
+    }
+}
+
+impl<'input, V: ItemVisitor<'input>> ItemVisitor<'input> for Option<V> {
+    type Error = V::Error;
+
+    fn bare_item<'pv>(
+        self,
+        bare_item: BareItemFromInput<'input>,
+    ) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
+        match self {
+            None => Ok(None),
+            Some(visitor) => visitor.bare_item(bare_item).map(Some),
+        }
+    }
+}
+
+impl<'input, V: EntryVisitor<'input>> EntryVisitor<'input> for Option<V> {
+    fn inner_list<'ilv>(self) -> Result<impl InnerListVisitor<'ilv>, Self::Error> {
+        match self {
+            None => Ok(None),
+            Some(visitor) => visitor.inner_list().map(Some),
+        }
+    }
+}
+
+impl<'input, V: InnerListVisitor<'input>> InnerListVisitor<'input> for Option<V> {
+    type Error = V::Error;
+
+    fn item<'iv>(&mut self) -> Result<impl ItemVisitor<'iv>, Self::Error> {
+        match self {
+            None => Ok(None),
+            Some(visitor) => visitor.item().map(Some),
+        }
+    }
+
+    fn finish<'pv>(self) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
+        match self {
+            None => Ok(None),
+            Some(visitor) => visitor.finish().map(Some),
+        }
+    }
+}
+
+/// A visitor that cannot be instantiated, but can be used as a type in
+/// situations guaranteed to return an error `Result`, analogous to
+/// [`std::convert::Infallible`].
+///
+/// When [`!`] is stabilized, this type will be replaced with an alias for it.
+#[derive(Clone, Copy)]
+pub enum Never {}
+
+impl<'input> ParameterVisitor<'input> for Never {
+    type Error = Infallible;
+
+    fn parameter(
+        &mut self,
+        _key: &'input KeyRef,
+        _value: BareItemFromInput<'input>,
+    ) -> Result<(), Self::Error> {
+        match *self {}
+    }
+}
+
+impl<'input> ItemVisitor<'input> for Never {
+    type Error = Infallible;
+
+    fn bare_item<'pv>(
+        self,
+        _bare_item: BareItemFromInput<'input>,
+    ) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
+        Ok(self)
+    }
+}
+
+impl EntryVisitor<'_> for Never {
+    fn inner_list<'ilv>(self) -> Result<impl InnerListVisitor<'ilv>, Self::Error> {
+        Ok(self)
+    }
+}
+
+impl InnerListVisitor<'_> for Never {
+    type Error = Infallible;
+
+    fn item<'iv>(&mut self) -> Result<impl ItemVisitor<'iv>, Self::Error> {
+        Ok(*self)
+    }
+
+    fn finish<'pv>(self) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
+        Ok(self)
+    }
+}
+
+impl<'input> DictionaryVisitor<'input> for Never {
+    type Error = Infallible;
+
+    fn entry<'dv, 'ev>(
+        &'dv mut self,
+        _key: &'input KeyRef,
+    ) -> Result<impl EntryVisitor<'ev>, Self::Error>
+    where
+        'dv: 'ev,
+    {
+        Ok(*self)
+    }
+}
+
+impl ListVisitor<'_> for Never {
+    type Error = Infallible;
+
+    fn entry<'ev>(&mut self) -> Result<impl EntryVisitor<'ev>, Self::Error> {
+        Ok(*self)
     }
 }

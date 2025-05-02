@@ -983,16 +983,16 @@ impl<'input> DictionaryVisitor<'input> for PointVisitor<'_> {
         'dv: 'ev,
     {
         let coord = match key.as_str() {
-            "x" => Some(&mut self.point.x),
-            "y" => Some(&mut self.point.y),
-            _ => None,
+            "x" => &mut self.point.x,
+            "y" => &mut self.point.y,
+            _ => return Ok(None),
         };
-        Ok(CoordVisitor { coord })
+        Ok(Some(CoordVisitor { coord }))
     }
 }
 
 struct CoordVisitor<'a> {
-    coord: Option<&'a mut i64>,
+    coord: &'a mut i64,
 }
 
 impl<'input> ItemVisitor<'input> for CoordVisitor<'_> {
@@ -1002,12 +1002,10 @@ impl<'input> ItemVisitor<'input> for CoordVisitor<'_> {
         self,
         bare_item: BareItemFromInput<'input>,
     ) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
-        if let Some(coord) = self.coord {
-            if let Some(v) = bare_item.as_integer() {
-                *coord = i64::from(v);
-            }
+        if let Some(v) = bare_item.as_integer() {
+            *self.coord = i64::from(v);
         }
-        Ok(Ignored)
+        Ok(None::<Ignored>)
     }
 }
 
@@ -1046,13 +1044,13 @@ impl<'input> ItemVisitor<'input> for HolderVisitor<'_> {
         self,
         bare_item: BareItemFromInput<'input>,
     ) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
-        if let Some(v) = bare_item.as_integer() {
+        Ok(if let Some(v) = bare_item.as_integer() {
             self.holder.v = i64::from(v);
-        }
-        // Note that this updates parameters, even if the value isn't an integer.
-        // That's probably not what a real application would seek to do.
-        Ok(PointVisitor {
-            point: &mut self.holder.point,
+            Some(PointVisitor {
+                point: &mut self.holder.point,
+            })
+        } else {
+            None
         })
     }
 }
@@ -1101,7 +1099,7 @@ fn complex_list_visitor() {
             self,
             _bare_item: BareItemFromInput<'input>,
         ) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
-            Ok(Ignored)
+            Ok(None::<Ignored>)
         }
     }
 
@@ -1122,7 +1120,7 @@ fn complex_list_visitor() {
 
         fn finish<'pv>(self) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
             let point = &mut self.list.point;
-            Ok(PointVisitor { point })
+            Ok(Some(PointVisitor { point }))
         }
     }
 
