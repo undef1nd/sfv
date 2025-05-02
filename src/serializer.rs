@@ -131,13 +131,13 @@ impl Serializer {
     pub(crate) fn serialize_integer(value: Integer, output: &mut String) {
         //https://httpwg.org/specs/rfc9651.html#ser-integer
 
-        write!(output, "{}", value).unwrap();
+        write!(output, "{value}").unwrap();
     }
 
     pub(crate) fn serialize_decimal(value: Decimal, output: &mut String) {
         // https://httpwg.org/specs/rfc9651.html#ser-decimal
 
-        write!(output, "{}", value).unwrap();
+        write!(output, "{value}").unwrap();
     }
 
     pub(crate) fn serialize_string(value: &StringRef, output: &mut String) {
@@ -176,7 +176,7 @@ impl Serializer {
     pub(crate) fn serialize_date(value: Date, output: &mut String) {
         // https://httpwg.org/specs/rfc9651.html#ser-date
 
-        write!(output, "{}", value).unwrap();
+        write!(output, "{value}").unwrap();
     }
 
     pub(crate) fn serialize_display_string(value: &str, output: &mut String) {
