@@ -1,19 +1,19 @@
 use crate::TokenRef;
 
 #[test]
-#[should_panic]
+#[should_panic = "cannot be empty"]
 fn test_constant_empty() {
     let _ = TokenRef::constant("");
 }
 
 #[test]
-#[should_panic]
+#[should_panic = "invalid character"]
 fn test_constant_invalid_start_char() {
     let _ = TokenRef::constant("#some");
 }
 
 #[test]
-#[should_panic]
+#[should_panic = "invalid character"]
 fn test_constant_invalid_inner_char() {
     let _ = TokenRef::constant("s ");
 }

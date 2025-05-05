@@ -1,6 +1,4 @@
-use std::error::Error;
-use std::path::Path;
-use std::{env, fmt, fs, io};
+use std::{env, error::Error, fmt, fs, io, path::Path};
 
 use serde::Deserialize;
 use sfv::{
@@ -102,7 +100,7 @@ impl TestCase for ParseTestData {
                     match test_case.data.canonical {
                         // If the canonical field is omitted, the canonical form is the input.
                         None => {
-                            assert_eq!(serialized.expect("serialization should succeed"), input)
+                            assert_eq!(serialized.expect("serialization should succeed"), input);
                         }
                         Some(ref canonical) => {
                             // If the canonical field is an empty list, the serialization
@@ -122,6 +120,7 @@ impl TestCase for ParseTestData {
             }
         }
 
+        #[allow(clippy::redundant_closure_for_method_calls)] // HRTB issue
         match self.data.header_type {
             ExpectedHeaderType::Item(ref mut expected) => {
                 let expected = expected.take();
@@ -153,7 +152,7 @@ impl TestCase for TestData {
                                 .canonical
                                 .as_ref()
                                 .expect("canonical serialization should be present")[0]
-                        )
+                        );
                     }
                     None => assert!(test_case.must_fail),
                 },
@@ -164,15 +163,15 @@ impl TestCase for TestData {
         match self.header_type {
             ExpectedHeaderType::Item(ref mut expected) => {
                 let expected = expected.take();
-                check(&self, expected)
+                check(&self, expected);
             }
             ExpectedHeaderType::List(ref mut expected) => {
                 let expected = expected.take();
-                check(&self, expected)
+                check(&self, expected);
             }
             ExpectedHeaderType::Dictionary(ref mut expected) => {
                 let expected = expected.take();
-                check(&self, expected)
+                check(&self, expected);
             }
         }
     }

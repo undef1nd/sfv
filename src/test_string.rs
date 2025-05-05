@@ -1,7 +1,7 @@
 use crate::StringRef;
 
 #[test]
-#[should_panic]
+#[should_panic = "invalid character"]
 fn test_constant_invalid_char() {
     let _ = StringRef::constant("text \x00");
 }

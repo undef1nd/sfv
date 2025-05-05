@@ -1,5 +1,8 @@
 use crate::{Decimal, Error, Integer};
 
+// Expect a floating point error less than the smallest allowed value of 0.001
+const ABSERR: f64 = 0.000_1_f64;
+
 #[test]
 fn test_display() {
     for (expected, input) in [
@@ -44,15 +47,13 @@ fn test_into_f64() {
         (-10.0, -10000),
         (-0.123, -123),
     ] {
-        assert_eq!(
-            expected,
-            f64::from(Decimal::from_integer_scaled_1000(input.into()))
+        assert!(
+            (expected - f64::from(Decimal::from_integer_scaled_1000(input.into()))).abs() < ABSERR
         );
     }
 
-    assert_eq!(-999_999_999_999.999, f64::from(Decimal::MIN));
-
-    assert_eq!(999_999_999_999.999, f64::from(Decimal::MAX));
+    assert!((-999_999_999_999.999 - f64::from(Decimal::MIN)).abs() < ABSERR);
+    assert!((999_999_999_999.999 - f64::from(Decimal::MAX)).abs() < ABSERR);
 }
 
 #[test]
@@ -61,6 +62,8 @@ fn test_try_from_f64() {
         (Err(Error::new("NaN")), f64::NAN),
         (Err(Error::out_of_range()), f64::INFINITY),
         (Err(Error::out_of_range()), f64::NEG_INFINITY),
+        (Err(Error::out_of_range()), 2_f64.powi(65)),
+        (Err(Error::out_of_range()), -(2_f64.powi(65))),
         (Err(Error::out_of_range()), -1_000_000_000_000.0),
         (Err(Error::out_of_range()), 1_000_000_000_000.0),
         (Ok(Decimal::MIN), -999_999_999_999.999),

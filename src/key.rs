@@ -1,8 +1,9 @@
-use std::borrow::Borrow;
-use std::fmt;
+use std::{borrow::Borrow, fmt};
 
-use crate::error::{Error, NonEmptyStringError};
-use crate::utils;
+use crate::{
+    error::{Error, NonEmptyStringError},
+    utils,
+};
 
 /// An owned structured field value [key].
 ///
@@ -57,6 +58,9 @@ impl KeyRef {
     const fn cast(v: &str) -> &Self;
 
     /// Creates a `&KeyRef` from a `&str`.
+    ///
+    /// # Errors
+    /// If the input string validation fails.
     #[allow(clippy::should_implement_trait)]
     pub fn from_str(v: &str) -> Result<&Self, Error> {
         validate(v.as_bytes())?;
@@ -75,14 +79,19 @@ impl KeyRef {
     /// This method is intended to be called from `const` contexts in which the
     /// value is known to be valid. Use [`KeyRef::from_str`] for non-panicking
     /// conversions.
+    ///
+    /// # Errors
+    /// If the input string validation fails.
+    #[must_use]
     pub const fn constant(v: &str) -> &Self {
         match validate(v.as_bytes()) {
-            Ok(_) => Self::cast(v),
+            Ok(()) => Self::cast(v),
             Err(err) => panic!("{}", err.msg()),
         }
     }
 
     /// Returns the key as a `&str`.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -133,9 +142,12 @@ impl Key {
     /// Creates a `Key` from a `String`.
     ///
     /// Returns the original value if the conversion failed.
+    ///
+    /// # Errors
+    /// If the input string validation fails.
     pub fn from_string(v: String) -> Result<Self, (Error, String)> {
         match validate(v.as_bytes()) {
-            Ok(_) => Ok(Self(v)),
+            Ok(()) => Ok(Self(v)),
             Err(err) => Err((err.into(), v)),
         }
     }
@@ -148,6 +160,7 @@ impl Key {
 /// This method is intended to be called from `const` contexts in which the
 /// value is known to be valid. Use [`KeyRef::from_str`] for non-panicking
 /// conversions.
+#[must_use]
 pub const fn key_ref(v: &str) -> &KeyRef {
     KeyRef::constant(v)
 }

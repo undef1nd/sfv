@@ -1,8 +1,13 @@
 use std::{borrow::Cow, string::String as StdString};
 
 use crate::{
-    utils, visitor::*, BareItemFromInput, Date, Decimal, Error, Integer, KeyRef, Num, SFVResult,
-    String, StringRef, TokenRef, Version,
+    utils,
+    visitor::{
+        DictionaryVisitor, EntryVisitor, InnerListVisitor, ItemVisitor, ListVisitor,
+        ParameterVisitor,
+    },
+    BareItemFromInput, Date, Decimal, Error, Integer, KeyRef, Num, SFVResult, String, StringRef,
+    TokenRef, Version,
 };
 #[cfg(feature = "parsed-types")]
 use crate::{Dictionary, Item, List};
@@ -70,12 +75,16 @@ impl<'a> Parser<'a> {
     }
 
     /// Sets the parser's version and returns it.
+    #[must_use]
     pub fn with_version(mut self, version: Version) -> Self {
         self.version = version;
         self
     }
 
     /// Parses input into a structured field value of `Dictionary` type.
+    ///
+    /// # Errors
+    /// When the parsing process is unsuccessful.
     #[cfg(feature = "parsed-types")]
     pub fn parse_dictionary(self) -> SFVResult<Dictionary> {
         let mut dict = Dictionary::new();
@@ -87,7 +96,7 @@ impl<'a> Parser<'a> {
     /// the given visitor.
     #[cfg_attr(
         feature = "parsed-types",
-        doc = r##"
+        doc = r#"
 
 This can also be used to parse a dictionary that is split into multiple lines by merging
 them into an existing structure:
@@ -105,8 +114,12 @@ assert_eq!(
 );
 # Ok(())
 # }
-"##
+```
+"#
     )]
+    ///
+    /// # Errors
+    /// When the parsing process is unsuccessful, including any error raised by a visitor.
     pub fn parse_dictionary_with_visitor<'v: 'a>(
         self,
         visitor: &'v mut (impl ?Sized + DictionaryVisitor<'a>),
@@ -131,6 +144,9 @@ assert_eq!(
     }
 
     /// Parses input into a structured field value of `List` type.
+    ///
+    /// # Errors
+    /// When the parsing process is unsuccessful.
     #[cfg(feature = "parsed-types")]
     pub fn parse_list(self) -> SFVResult<List> {
         let mut list = List::new();
@@ -140,6 +156,7 @@ assert_eq!(
 
     /// Parses input into a structured field value of `List` type, using the
     /// given visitor.
+    #[allow(clippy::needless_raw_string_hashes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/11737
     #[cfg_attr(
         feature = "parsed-types",
         doc = r##"
@@ -162,6 +179,9 @@ assert_eq!(
 ```
 "##
     )]
+    ///
+    /// # Errors
+    /// When the parsing process is unsuccessful, including any error raised by a visitor.
     pub fn parse_list_with_visitor(
         self,
         visitor: &mut (impl ?Sized + ListVisitor<'a>),
@@ -175,6 +195,9 @@ assert_eq!(
     }
 
     /// Parses input into a structured field value of `Item` type.
+    ///
+    /// # Errors
+    /// When the parsing process is unsuccessful.
     #[cfg(feature = "parsed-types")]
     pub fn parse_item(self) -> SFVResult<Item> {
         let mut item = Item::new(false);
@@ -184,6 +207,9 @@ assert_eq!(
 
     /// Parses input into a structured field value of `Item` type, using the
     /// given visitor.
+    ///
+    /// # Errors
+    /// When the parsing process is unsuccessful, including any error raised by a visitor.
     pub fn parse_item_with_visitor(self, visitor: impl ItemVisitor<'a>) -> SFVResult<()> {
         self.parse(|parser| parse_item(parser, visitor))
     }
@@ -343,7 +369,7 @@ assert_eq!(
                 b'\\' => {
                     self.next();
                     match self.peek() {
-                        Some(c @ b'\\' | c @ b'"') => {
+                        Some(c @ (b'\\' | b'"')) => {
                             self.next();
                             output.to_mut().push(c);
                         }
@@ -444,7 +470,7 @@ assert_eq!(
         // https://httpwg.org/specs/rfc9651.html#parse-number
 
         fn char_to_i64(c: u8) -> i64 {
-            (c - b'0') as i64
+            i64::from(c - b'0')
         }
 
         let sign = if let Some(b'-') = self.peek() {
