@@ -22,18 +22,9 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: check
-          args: --all-targets
-      - uses: actions-rs/cargo@v1
-        with:
-          command: check
-          args: --all-targets --no-default-features
-      - uses: actions-rs/cargo@v1
-        with:
-          command: check
-          args: --all-targets --all-features
+      - run: cargo check --all-targets
+      - run: cargo check --all-targets --no-default-features
+      - run: cargo check --all-targets --all-features
 
   msrv:
     name: Check MSRV
@@ -61,9 +52,7 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: test
+      - run: cargo test
 
   format:
     name: Run fmt
@@ -77,11 +66,7 @@ jobs:
           profile: minimal
           toolchain: nightly
           components: rustfmt
-      - uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          toolchain: nightly
-          args: -- --check
+      - run: cargo fmt -- --check
 
   fuzz-check:
     name: Run fuzz check
@@ -94,7 +79,4 @@ jobs:
           toolchain: nightly
           override: true
       - run: cargo install cargo-fuzz
-      - uses: actions-rs/cargo@v1
-        with:
-          command: fuzz
-          args: check
+      - run: cargo fuzz check
