@@ -1,13 +1,13 @@
 use crate::{Error, Integer};
 
 #[test]
-#[should_panic]
+#[should_panic = "out of range"]
 fn test_constant_too_small() {
     let _ = Integer::constant(-1_000_000_000_000_000);
 }
 
 #[test]
-#[should_panic]
+#[should_panic = "out of range"]
 fn test_constant_too_large() {
     let _ = Integer::constant(1_000_000_000_000_000);
 }

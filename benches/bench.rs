@@ -117,18 +117,19 @@ fn serializing_ref_list(c: &mut Criterion) {
             let mut ser = ListSerializer::new();
             ser.bare_item(token_ref("a"));
             ser.bare_item(token_ref("abcdefghigklmnoprst"));
-            ser.bare_item(integer(123456785686457));
-            ser.bare_item(Decimal::try_from(99999999999.999).unwrap());
+            ser.bare_item(integer(123_456_785_686_457));
+            ser.bare_item(Decimal::try_from(99_999_999_999.999).unwrap());
             ser.inner_list();
             {
                 let mut ser = ser.inner_list();
-                ser.bare_item(string_ref("somelongstringvalue"));
-                ser.bare_item(string_ref("anotherlongstringvalue"))
+                _ = ser.bare_item(string_ref("somelongstringvalue"));
+                _ = ser
+                    .bare_item(string_ref("anotherlongstringvalue"))
                     .parameter(
                         key_ref("key"),
                         "somever longstringvaluerepresentedasbytes".as_bytes(),
                     );
-                ser.bare_item(145);
+                _ = ser.bare_item(145);
             }
             ser.finish()
         });
@@ -141,12 +142,13 @@ fn serializing_ref_dict(c: &mut Criterion) {
             let mut ser = DictSerializer::new();
             ser.bare_item(key_ref("a"), true);
             ser.bare_item(key_ref("dict_key2"), token_ref("abcdefghigklmnoprst"));
-            ser.bare_item(key_ref("dict_key3"), integer(123456785686457));
+            ser.bare_item(key_ref("dict_key3"), integer(123_456_785_686_457));
             {
                 let mut ser = ser.inner_list(key_ref("dict_key4"));
-                ser.bare_item(string_ref("inner-list-member"));
-                ser.bare_item("inner-list-member".as_bytes());
-                ser.finish()
+                _ = ser.bare_item(string_ref("inner-list-member"));
+                _ = ser.bare_item("inner-list-member".as_bytes());
+                _ = ser
+                    .finish()
                     .parameter(key_ref("key"), token_ref("aW5uZXItbGlzdC1wYXJhbWV0ZXJz"));
             }
             ser.finish()

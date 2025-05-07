@@ -1,6 +1,8 @@
-use std::borrow::{Borrow, Cow};
-use std::fmt;
-use std::string::String as StdString;
+use std::{
+    borrow::{Borrow, Cow},
+    fmt,
+    string::String as StdString,
+};
 
 use crate::Error;
 
@@ -53,11 +55,15 @@ impl StringRef {
     const fn cast(v: &str) -> &Self;
 
     /// Creates an empty `&StringRef`.
+    #[must_use]
     pub const fn empty() -> &'static Self {
         Self::cast("")
     }
 
     /// Creates a `&StringRef` from a `&str`.
+    ///
+    /// # Errors
+    /// The error reports the cause of any failed string validation.
     #[allow(clippy::should_implement_trait)]
     pub fn from_str(v: &str) -> Result<&Self, Error> {
         validate(v.as_bytes())?;
@@ -69,14 +75,16 @@ impl StringRef {
     /// This method is intended to be called from `const` contexts in which the
     /// value is known to be valid. Use [`StringRef::from_str`] for non-panicking
     /// conversions.
+    #[must_use]
     pub const fn constant(v: &str) -> &Self {
         match validate(v.as_bytes()) {
-            Ok(_) => Self::cast(v),
+            Ok(()) => Self::cast(v),
             Err(_) => panic!("invalid character for string"),
         }
     }
 
     /// Returns the string as a `&str`.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -127,9 +135,12 @@ impl String {
     /// Creates a `String` from a `std::string::String`.
     ///
     /// Returns the original value if the conversion failed.
+    ///
+    /// # Errors
+    /// The error reports any problems from failed validation.
     pub fn from_string(v: StdString) -> Result<Self, (Error, StdString)> {
         match validate(v.as_bytes()) {
-            Ok(_) => Ok(Self(v)),
+            Ok(()) => Ok(Self(v)),
             Err(err) => Err((err.into(), v)),
         }
     }
@@ -142,6 +153,7 @@ impl String {
 /// This method is intended to be called from `const` contexts in which the
 /// value is known to be valid. Use [`StringRef::from_str`] for non-panicking
 /// conversions.
+#[must_use]
 pub const fn string_ref(v: &str) -> &StringRef {
     StringRef::constant(v)
 }

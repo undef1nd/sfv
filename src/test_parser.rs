@@ -437,7 +437,7 @@ fn parse_string() -> Result<(), Error> {
 
     assert_eq!(string_ref("test"), Parser::new(r#""test""#).parse_string()?);
     assert_eq!(
-        string_ref(r#"te\st"#),
+        string_ref("te\\st"),
         Parser::new(r#""te\\st""#).parse_string()?
     );
     assert_eq!(string_ref(""), Parser::new(r#""""#).parse_string()?);
@@ -561,7 +561,10 @@ fn parse_byte_sequence_errors() {
 #[test]
 fn parse_number_int() -> Result<(), Error> {
     let mut parser = Parser::new("-733333333332d.14");
-    assert_eq!(Num::Integer(integer(-733333333332)), parser.parse_number()?);
+    assert_eq!(
+        Num::Integer(integer(-733_333_333_332)),
+        parser.parse_number()?
+    );
     assert_eq!(parser.remaining(), b"d.14");
 
     assert_eq!(Num::Integer(integer(42)), Parser::new("42").parse_number()?);
@@ -576,21 +579,21 @@ fn parse_number_int() -> Result<(), Error> {
     assert_eq!(Num::Integer(integer(0)), Parser::new("0").parse_number()?);
     assert_eq!(Num::Integer(integer(0)), Parser::new("00").parse_number()?);
     assert_eq!(
-        Num::Integer(integer(123456789012345)),
+        Num::Integer(integer(123_456_789_012_345)),
         Parser::new("123456789012345").parse_number()?
     );
     assert_eq!(
-        Num::Integer(integer(-123456789012345)),
+        Num::Integer(integer(-123_456_789_012_345)),
         Parser::new("-123456789012345").parse_number()?
     );
     assert_eq!(Num::Integer(integer(2)), Parser::new("2,3").parse_number()?);
     assert_eq!(Num::Integer(integer(4)), Parser::new("4-2").parse_number()?);
     assert_eq!(
-        Num::Integer(integer(-999999999999999)),
+        Num::Integer(integer(-999_999_999_999_999)),
         Parser::new("-999999999999999").parse_number()?
     );
     assert_eq!(
-        Num::Integer(integer(999999999999999)),
+        Num::Integer(integer(999_999_999_999_999)),
         Parser::new("999999999999999").parse_number()?
     );
 
@@ -627,11 +630,11 @@ fn parse_number_decimal() -> Result<(), Error> {
         Parser::new("-2.14").parse_number()?
     );
     assert_eq!(
-        Num::Decimal(Decimal::try_from(123456789012.1)?),
+        Num::Decimal(Decimal::try_from(123_456_789_012.1)?),
         Parser::new("123456789012.1").parse_number()?
     );
     assert_eq!(
-        Num::Decimal(Decimal::try_from(1234567890.112)?),
+        Num::Decimal(Decimal::try_from(1_234_567_890.112)?),
         Parser::new("1234567890.112").parse_number()?
     );
 

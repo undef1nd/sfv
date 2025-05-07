@@ -34,6 +34,7 @@ impl Integer {
     /// This method is intended to be called from `const` contexts in which the
     /// value is known to be valid. Use [`TryFrom::try_from`] for non-panicking
     /// conversions.
+    #[must_use]
     pub const fn constant(v: i64) -> Self {
         if v >= Self::MIN.0 && v <= Self::MAX.0 {
             Self(v)
@@ -131,6 +132,7 @@ impl_conversions! {
 /// This method is intended to be called from `const` contexts in which the
 /// value is known to be valid. Use [`TryFrom::try_from`] for non-panicking
 /// conversions.
+#[must_use]
 pub const fn integer(v: i64) -> Integer {
     Integer::constant(v)
 }

@@ -1,5 +1,6 @@
-use crate::serializer::Serializer;
-use crate::{integer, key_ref, string_ref, token_ref, Date, Decimal, Error};
+use crate::{
+    integer, key_ref, serializer::Serializer, string_ref, token_ref, Date, Decimal, Error,
+};
 #[cfg(feature = "parsed-types")]
 use crate::{BareItem, Dictionary, InnerList, Item, List, Parameters, SerializeValue};
 
@@ -34,7 +35,7 @@ fn serialize_value_list_mixed_members_with_params() -> Result<(), Error> {
     let inner_list_item1 = Item::with_params(string_ref("str1"), inner_list_item1_param);
     let inner_list_item2_param = Parameters::from_iter(vec![(
         key_ref("in2_p").to_owned(),
-        BareItem::String(string_ref(r#"valu\e"#).to_owned()),
+        BareItem::String(string_ref("valu\\e").to_owned()),
     )]);
     let inner_list_item2 = Item::with_params(token_ref("str2"), inner_list_item2_param);
     let inner_list_param = Parameters::from_iter(vec![(
@@ -115,7 +116,7 @@ fn serialize_integer() {
 #[test]
 fn serialize_decimal() -> Result<(), Error> {
     let mut buf = String::new();
-    Serializer::serialize_decimal(Decimal::try_from(-99.1346897)?, &mut buf);
+    Serializer::serialize_decimal(Decimal::try_from(-99.134_689_7)?, &mut buf);
     assert_eq!("-99.135", &buf);
 
     buf.clear();
@@ -123,7 +124,7 @@ fn serialize_decimal() -> Result<(), Error> {
     assert_eq!("-1.0", &buf);
 
     buf.clear();
-    Serializer::serialize_decimal(Decimal::try_from(-99.1346897)?, &mut buf);
+    Serializer::serialize_decimal(Decimal::try_from(-99.134_689_7)?, &mut buf);
     assert_eq!("-99.135", &buf);
 
     buf.clear();
@@ -143,11 +144,11 @@ fn serialize_decimal() -> Result<(), Error> {
     assert_eq!("-137.0", &buf);
 
     buf.clear();
-    Serializer::serialize_decimal(Decimal::try_from(137121212112.123)?, &mut buf);
+    Serializer::serialize_decimal(Decimal::try_from(137_121_212_112.123)?, &mut buf);
     assert_eq!("137121212112.123", &buf);
 
     buf.clear();
-    Serializer::serialize_decimal(Decimal::try_from(137121212112.1238)?, &mut buf);
+    Serializer::serialize_decimal(Decimal::try_from(137_121_212_112.123_8)?, &mut buf);
     assert_eq!("137121212112.124", &buf);
     Ok(())
 }
@@ -163,7 +164,7 @@ fn serialize_string() {
     assert_eq!(r#""hello \"name\"""#, &buf);
 
     buf.clear();
-    Serializer::serialize_string(string_ref(r#"something\nothing"#), &mut buf);
+    Serializer::serialize_string(string_ref("something\\nothing"), &mut buf);
     assert_eq!(r#""something\\nothing""#, &buf);
 
     buf.clear();

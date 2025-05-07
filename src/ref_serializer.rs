@@ -1,9 +1,8 @@
 use std::borrow::BorrowMut;
 
-use crate::serializer::Serializer;
+use crate::{serializer::Serializer, KeyRef, RefBareItem};
 #[cfg(feature = "parsed-types")]
 use crate::{Item, ListEntry};
-use crate::{KeyRef, RefBareItem};
 
 /// Serializes `Item` field value components incrementally.
 ///
@@ -42,6 +41,7 @@ impl Default for ItemSerializer<String> {
 
 impl ItemSerializer<String> {
     /// Creates a serializer that writes into a new string.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             buffer: String::new(),
@@ -81,6 +81,7 @@ impl<W: BorrowMut<String>> ParameterSerializer<W> {
     /// Serializes a parameter with the given name and value.
     ///
     /// Returns the serializer.
+    #[must_use]
     pub fn parameter<'b>(mut self, name: &KeyRef, value: impl Into<RefBareItem<'b>>) -> Self {
         Serializer::serialize_parameter(name, value, self.buffer.borrow_mut());
         self
@@ -89,6 +90,7 @@ impl<W: BorrowMut<String>> ParameterSerializer<W> {
     /// Serializes the given parameters.
     ///
     /// Returns the serializer.
+    #[must_use]
     pub fn parameters<'b>(
         mut self,
         params: impl IntoIterator<Item = (impl AsRef<KeyRef>, impl Into<RefBareItem<'b>>)>,
@@ -166,6 +168,7 @@ impl Default for ListSerializer<String> {
 
 impl ListSerializer<String> {
     /// Creates a serializer that writes into a new string.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             buffer: String::new(),
@@ -215,12 +218,12 @@ impl<W: BorrowMut<String>> ListSerializer<W> {
         for value in members {
             match value {
                 ListEntry::Item(value) => {
-                    self.bare_item(&value.bare_item).parameters(&value.params);
+                    _ = self.bare_item(&value.bare_item).parameters(&value.params);
                 }
                 ListEntry::InnerList(value) => {
                     let mut ser = self.inner_list();
                     ser.items(&value.items);
-                    ser.finish().parameters(&value.params);
+                    _ = ser.finish().parameters(&value.params);
                 }
             }
         }
@@ -296,6 +299,7 @@ impl Default for DictSerializer<String> {
 
 impl DictSerializer<String> {
     /// Creates a serializer that writes into a new string.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             buffer: String::new(),
@@ -356,13 +360,14 @@ impl<W: BorrowMut<String>> DictSerializer<W> {
         for (name, value) in members {
             match value {
                 ListEntry::Item(value) => {
-                    self.bare_item(name.as_ref(), &value.bare_item)
+                    _ = self
+                        .bare_item(name.as_ref(), &value.bare_item)
                         .parameters(&value.params);
                 }
                 ListEntry::InnerList(value) => {
                     let mut ser = self.inner_list(name.as_ref());
                     ser.items(&value.items);
-                    ser.finish().parameters(&value.params);
+                    _ = ser.finish().parameters(&value.params);
                 }
             }
         }
@@ -407,6 +412,8 @@ impl<'a> InnerListSerializer<'a> {
     /// Serializes the given bare item as a member of the inner list.
     ///
     /// Returns a serializer for the item's parameters.
+    #[must_use]
+    #[allow(clippy::missing_panics_doc)] // The unwrap is safe by construction.
     pub fn bare_item<'b>(
         &mut self,
         bare_item: impl Into<RefBareItem<'b>>,
@@ -423,11 +430,13 @@ impl<'a> InnerListSerializer<'a> {
     #[cfg(feature = "parsed-types")]
     pub fn items<'b>(&mut self, items: impl IntoIterator<Item = &'b Item>) {
         for item in items {
-            self.bare_item(&item.bare_item).parameters(&item.params);
+            _ = self.bare_item(&item.bare_item).parameters(&item.params);
         }
     }
 
     /// Closes the inner list and returns a serializer for its parameters.
+    #[must_use]
+    #[allow(clippy::missing_panics_doc)]
     pub fn finish(mut self) -> ParameterSerializer<&'a mut String> {
         let buffer = self.buffer.take().unwrap();
         buffer.push(')');

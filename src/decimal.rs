@@ -13,10 +13,10 @@ pub struct Decimal(Integer);
 
 impl Decimal {
     /// The minimum value for a parsed or serialized decimal: `-999_999_999_999.999`.
-    pub const MIN: Self = Self(Integer::MIN);
+    pub const MIN: Self = Self::from_integer_scaled_1000(Integer::MIN);
 
     /// The maximum value for a parsed or serialized decimal: `999_999_999_999.999`.
-    pub const MAX: Self = Self(Integer::MAX);
+    pub const MAX: Self = Self::from_integer_scaled_1000(Integer::MAX);
 
     /// `0.0`.
     pub const ZERO: Self = Self(Integer::ZERO);
@@ -29,8 +29,9 @@ impl Decimal {
     ///
     /// ```
     /// let decimal = sfv::Decimal::try_from(1.234).unwrap();
-    /// assert_eq!(i64::from(decimal.as_integer_scaled_1000()), 1234);
-    /// ````
+    /// assert_eq!(i64::try_from(decimal.as_integer_scaled_1000()).unwrap(), 1234);
+    /// ```
+    #[must_use]
     pub fn as_integer_scaled_1000(&self) -> Integer {
         self.0
     }
@@ -43,8 +44,10 @@ impl Decimal {
     ///
     /// ```
     /// let decimal = sfv::Decimal::from_integer_scaled_1000(sfv::integer(1234));
-    /// assert_eq!(f64::from(decimal), 1.234);
-    /// ````
+    /// #[allow(clippy::float_cmp)]
+    /// assert_eq!(f64::try_from(decimal).unwrap(), 1.234);
+    /// ```
+    #[must_use]
     pub const fn from_integer_scaled_1000(v: Integer) -> Self {
         Self(v)
     }
@@ -75,19 +78,19 @@ impl fmt::Display for Decimal {
 
 impl From<i8> for Decimal {
     fn from(v: i8) -> Decimal {
-        Self(Integer::from(v as i16 * 1000))
+        Self(Integer::from(i16::from(v) * 1000))
     }
 }
 
 impl From<i16> for Decimal {
     fn from(v: i16) -> Decimal {
-        Self(Integer::from(v as i32 * 1000))
+        Self(Integer::from(i32::from(v) * 1000))
     }
 }
 
 impl From<i32> for Decimal {
     fn from(v: i32) -> Decimal {
-        Self(Integer::try_from(v as i64 * 1000).unwrap())
+        Self(Integer::try_from(i64::from(v) * 1000).unwrap())
     }
 }
 
@@ -122,24 +125,25 @@ impl_try_from_integer! {
 
 impl From<u8> for Decimal {
     fn from(v: u8) -> Decimal {
-        Self(Integer::from(v as u16 * 1000))
+        Self(Integer::from(u16::from(v) * 1000))
     }
 }
 
 impl From<u16> for Decimal {
     fn from(v: u16) -> Decimal {
-        Self(Integer::from(v as u32 * 1000))
+        Self(Integer::from(u32::from(v) * 1000))
     }
 }
 
 impl From<u32> for Decimal {
     fn from(v: u32) -> Decimal {
-        Self(Integer::try_from(v as u64 * 1000).unwrap())
+        Self(Integer::try_from(u64::from(v) * 1000).unwrap())
     }
 }
 
 impl From<Decimal> for f64 {
-    fn from(v: Decimal) -> f64 {
+    #[allow(clippy::cast_precision_loss)]
+    fn from(v: Decimal) -> Self {
         let v = i64::from(v.as_integer_scaled_1000());
         (v as f64) / 1000.0
     }
@@ -148,8 +152,8 @@ impl From<Decimal> for f64 {
 impl TryFrom<f32> for Decimal {
     type Error = Error;
 
-    fn try_from(v: f32) -> Result<Decimal, Error> {
-        (v as f64).try_into()
+    fn try_from(v: f32) -> Result<Decimal, Self::Error> {
+        Self::try_from(f64::from(v))
     }
 }
 
@@ -161,7 +165,12 @@ impl TryFrom<f64> for Decimal {
             return Err(Error::new("NaN"));
         }
 
-        match Integer::try_from((v * 1000.0).round_ties_even() as i64) {
+        let v = (v * 1000.0).round_ties_even();
+        // Only excessively clever options exist for this conversion, so use "as"
+        // Note that this relies on saturating casts for values > i64::MAX
+        // See https://github.com/rust-lang/rust/issues/10184
+        #[allow(clippy::cast_possible_truncation)]
+        match Integer::try_from(v as i64) {
             Ok(v) => Ok(Decimal(v)),
             Err(_) => Err(Error::out_of_range()),
         }

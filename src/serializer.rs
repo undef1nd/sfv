@@ -1,9 +1,8 @@
 use std::fmt::Write as _;
 
-use crate::utils;
 #[cfg(feature = "parsed-types")]
 use crate::{private::Sealed, Dictionary, Item, List};
-use crate::{Date, Decimal, Integer, KeyRef, RefBareItem, StringRef, TokenRef};
+use crate::{utils, Date, Decimal, Integer, KeyRef, RefBareItem, StringRef, TokenRef};
 
 /// Serializes a structured field value into a string.
 ///
@@ -187,8 +186,8 @@ impl Serializer {
             match c {
                 b'%' | b'"' | 0x00..=0x1f | 0x7f..=0xff => {
                     output.push('%');
-                    output.push(char::from_digit((c as u32 >> 4) & 0xf, 16).unwrap());
-                    output.push(char::from_digit(c as u32 & 0xf, 16).unwrap());
+                    output.push(char::from_digit((u32::from(c) >> 4) & 0xf, 16).unwrap());
+                    output.push(char::from_digit(u32::from(c) & 0xf, 16).unwrap());
                 }
                 _ => output.push(c as char),
             }

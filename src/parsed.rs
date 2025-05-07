@@ -2,7 +2,13 @@ use std::convert::Infallible;
 
 use indexmap::IndexMap;
 
-use crate::{visitor::*, BareItem, BareItemFromInput, Key, KeyRef};
+use crate::{
+    visitor::{
+        DictionaryVisitor, EntryVisitor, InnerListVisitor, ItemVisitor, ListVisitor,
+        ParameterVisitor,
+    },
+    BareItem, BareItemFromInput, Key, KeyRef,
+};
 
 /// An [item]-type structured field value.
 ///
@@ -105,6 +111,7 @@ pub struct InnerList {
 
 impl InnerList {
     /// Returns a new `InnerList` with empty `Parameters`.
+    #[must_use]
     pub fn new(items: Vec<Item>) -> Self {
         Self {
             items,
@@ -113,6 +120,7 @@ impl InnerList {
     }
 
     /// Returns a new `InnerList` with the given `Parameters`.
+    #[must_use]
     pub fn with_params(items: Vec<Item>, params: Parameters) -> Self {
         Self { items, params }
     }

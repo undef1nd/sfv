@@ -27,11 +27,13 @@ impl Date {
     pub const UNIX_EPOCH: Self = Self::from_unix_seconds(Integer::ZERO);
 
     /// Returns the date as an integer number of seconds from the Unix epoch.
+    #[must_use]
     pub fn unix_seconds(&self) -> Integer {
         self.0
     }
 
     /// Creates a date from an integer number of seconds from the Unix epoch.
+    #[must_use]
     pub const fn from_unix_seconds(v: Integer) -> Self {
         Self(v)
     }
