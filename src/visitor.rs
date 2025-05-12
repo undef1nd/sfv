@@ -185,7 +185,7 @@ pub trait ParameterVisitor<'input> {
     /// [RFC 9651]: <https://httpwg.org/specs/rfc9651.html#parse-param>
     ///
     /// # Errors
-    /// The error result should reports the reason for any failed validation.
+    /// The error result should report the reason for any failed validation.
     fn parameter(
         &mut self,
         key: &'input KeyRef,
@@ -197,7 +197,7 @@ pub trait ParameterVisitor<'input> {
     /// Parsing will be terminated early if an error is returned.
     ///
     /// # Errors
-    /// The error result should reports the reason for any failed validation.
+    /// The error result should report the reason for any failed validation.
     fn finish(self) -> Result<(), Self::Error>
     where
         Self: Sized,
@@ -225,7 +225,7 @@ pub trait ItemVisitor<'input> {
     /// Parsing will be terminated early if an error is returned.
     ///
     /// # Errors
-    /// The error result should reports the reason for any failed validation.
+    /// The error result should report the reason for any failed validation.
     fn bare_item<'pv>(
         self,
         bare_item: BareItemFromInput<'input>,
@@ -246,7 +246,7 @@ pub trait InnerListVisitor<'input> {
     /// Parsing will be terminated early if an error is returned.
     ///
     /// # Errors
-    /// The error result should reports the reason for any failed validation.
+    /// The error result should report the reason for any failed validation.
     fn item<'iv>(&mut self) -> Result<impl ItemVisitor<'iv>, Self::Error>;
 
     /// Called after all inner-list items have been parsed.
@@ -258,7 +258,7 @@ pub trait InnerListVisitor<'input> {
     /// Parsing will be terminated early if an error is returned.
     ///
     /// # Errors
-    /// The error result should reports the reason for any failed validation.
+    /// The error result should report the reason for any failed validation.
     fn finish<'pv>(self) -> Result<impl ParameterVisitor<'pv>, Self::Error>;
 }
 
@@ -273,7 +273,7 @@ pub trait EntryVisitor<'input>: ItemVisitor<'input> {
     /// Parsing will be terminated early if an error is returned.
     ///
     /// # Errors
-    /// The error result should reports the reason for any failed validation.
+    /// The error result should report the reason for any failed validation.
     fn inner_list<'ilv>(self) -> Result<impl InnerListVisitor<'ilv>, Self::Error>;
 }
 
@@ -305,7 +305,7 @@ pub trait DictionaryVisitor<'input> {
     /// [RFC 9651]: <https://httpwg.org/specs/rfc9651.html#parse-dictionary>
     ///
     /// # Errors
-    /// The error result should reports the reason for any failed validation.
+    /// The error result should report the reason for any failed validation.
     fn entry<'dv, 'ev>(
         &'dv mut self,
         key: &'input KeyRef,
@@ -331,7 +331,7 @@ pub trait ListVisitor<'input> {
     /// Parsing will be terminated early if an error is returned.
     ///
     /// # Errors
-    /// The error result should reports the reason for any failed validation.
+    /// The error result should report the reason for any failed validation.
     fn entry<'ev>(&mut self) -> Result<impl EntryVisitor<'ev>, Self::Error>;
 }
 
