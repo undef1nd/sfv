@@ -199,7 +199,7 @@ fn parse_list_errors() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic = "expected start of inner list"]
 #[cfg(debug_assertions)]
 fn parse_invalid_inner_list_start() {
     let _ = Parser::new("c b); a=1").parse_inner_list(Ignored);
@@ -419,7 +419,7 @@ fn parse_bool() -> Result<(), Error> {
 }
 
 #[test]
-#[should_panic]
+#[should_panic = "expected start of boolean"]
 #[cfg(debug_assertions)]
 fn parse_invalid_bool_start() {
     let _ = Parser::new("").parse_bool();
@@ -453,7 +453,7 @@ fn parse_string() -> Result<(), Error> {
 }
 
 #[test]
-#[should_panic]
+#[should_panic = "expected start of string"]
 #[cfg(debug_assertions)]
 fn parse_invalid_string_start() {
     let _ = Parser::new("test").parse_string();
@@ -504,14 +504,14 @@ fn parse_token() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic = "expected start of token"]
 #[cfg(debug_assertions)]
 fn parse_invalid_token_start() {
     let _ = Parser::new("7").parse_token();
 }
 
 #[test]
-#[should_panic]
+#[should_panic = "expected start of token"]
 #[cfg(debug_assertions)]
 fn parse_empty_token_start() {
     let _ = Parser::new("").parse_token();
@@ -540,7 +540,7 @@ fn parse_byte_sequence() -> Result<(), Error> {
 }
 
 #[test]
-#[should_panic]
+#[should_panic = "expected start of byte sequence"]
 #[cfg(debug_assertions)]
 fn parse_invalid_byte_sequence_start() {
     let _ = Parser::new("aGVsbG8").parse_byte_sequence();
@@ -878,7 +878,7 @@ fn parse_date() -> Result<(), Error> {
 }
 
 #[test]
-#[should_panic]
+#[should_panic = "expected start of date"]
 #[cfg(debug_assertions)]
 fn parse_invalid_date_start() {
     let _ = Parser::new("7").parse_date();
@@ -944,7 +944,7 @@ fn parse_display_string_errors() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic = "expected start of display string"]
 #[cfg(debug_assertions)]
 fn parse_invalid_display_string_start() {
     let _ = Parser::new(r#"""#).parse_display_string();
