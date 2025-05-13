@@ -227,7 +227,7 @@ assert_eq!(
     ) -> Result<(), error::Repr> {
         // https://httpwg.org/specs/rfc9651.html#parse-innerlist
 
-        debug_assert_eq!(self.peek(), Some(b'('));
+        debug_assert_eq!(self.peek(), Some(b'('), "expected start of inner list");
         self.next();
 
         while self.peek().is_some() {
@@ -274,7 +274,7 @@ assert_eq!(
     pub(crate) fn parse_bool(&mut self) -> Result<bool, error::Repr> {
         // https://httpwg.org/specs/rfc9651.html#parse-boolean
 
-        debug_assert_eq!(self.peek(), Some(b'?'));
+        debug_assert_eq!(self.peek(), Some(b'?'), "expected start of boolean");
         self.next();
 
         match self.peek() {
@@ -293,7 +293,7 @@ assert_eq!(
     pub(crate) fn parse_string(&mut self) -> Result<Cow<'de, StringRef>, error::Repr> {
         // https://httpwg.org/specs/rfc9651.html#parse-string
 
-        debug_assert_eq!(self.peek(), Some(b'"'));
+        debug_assert_eq!(self.peek(), Some(b'"'), "expected start of string");
         self.next();
 
         let start = self.index;
@@ -362,7 +362,10 @@ assert_eq!(
     pub(crate) fn parse_token(&mut self) -> &'de TokenRef {
         // https://httpwg.org/specs/9651.html#parse-token
 
-        debug_assert!(self.peek().is_some_and(utils::is_allowed_start_token_char));
+        debug_assert!(
+            self.peek().is_some_and(utils::is_allowed_start_token_char),
+            "expected start of token"
+        );
 
         TokenRef::from_validated_str(self.parse_non_empty_str(utils::is_allowed_inner_token_char))
     }
@@ -370,7 +373,7 @@ assert_eq!(
     pub(crate) fn parse_byte_sequence(&mut self) -> Result<Vec<u8>, error::Repr> {
         // https://httpwg.org/specs/rfc9651.html#parse-binary
 
-        debug_assert_eq!(self.peek(), Some(b':'));
+        debug_assert_eq!(self.peek(), Some(b':'), "expected start of byte sequence");
         self.next();
         let start = self.index;
 
@@ -475,7 +478,7 @@ assert_eq!(
     pub(crate) fn parse_date(&mut self) -> Result<Date, error::Repr> {
         // https://httpwg.org/specs/rfc9651.html#parse-date
 
-        debug_assert_eq!(self.peek(), Some(b'@'));
+        debug_assert_eq!(self.peek(), Some(b'@'), "expected start of date");
 
         match self.version {
             Version::Rfc8941 => return Err(error::Repr::Rfc8941Date(self.index)),
@@ -494,7 +497,7 @@ assert_eq!(
     pub(crate) fn parse_display_string(&mut self) -> Result<Cow<'de, str>, error::Repr> {
         // https://httpwg.org/specs/rfc9651.html#parse-display
 
-        debug_assert_eq!(self.peek(), Some(b'%'));
+        debug_assert_eq!(self.peek(), Some(b'%'), "expected start of display string");
 
         match self.version {
             Version::Rfc8941 => return Err(error::Repr::Rfc8941DisplayString(self.index)),
