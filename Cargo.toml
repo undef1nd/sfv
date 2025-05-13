@@ -25,6 +25,9 @@ serde = { version = "1.0", features = ["derive"] }
 criterion = "0.5.1"
 base32 = "0.5.1"
 
+[lints.clippy]
+pedantic = "deny"
+
 [[bench]]
 name = "bench"
 harness = false
