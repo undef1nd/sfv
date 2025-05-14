@@ -144,7 +144,7 @@ impl<'input> ItemVisitor<'input> for CoordVisitor<'_> {
 }
 
 impl EntryVisitor<'_> for CoordVisitor<'_> {
-    fn inner_list<'ilv>(self) -> Result<impl InnerListVisitor<'ilv>, Self::Error> {
+    fn inner_list(self) -> Result<impl InnerListVisitor, Self::Error> {
         // Use `Never` to enforce at the type level that this method will only
         // return `Err`, as our coordinate must be a single integer, not an
         // inner list.
@@ -233,9 +233,7 @@ pub trait ItemVisitor<'input> {
 }
 
 /// A visitor whose methods are called during inner-list parsing.
-///
-/// The lifetime `'input` is the lifetime of the input.
-pub trait InnerListVisitor<'input> {
+pub trait InnerListVisitor {
     /// The error type that can be returned if some error occurs during parsing.
     type Error: Error;
 
@@ -274,7 +272,7 @@ pub trait EntryVisitor<'input>: ItemVisitor<'input> {
     ///
     /// # Errors
     /// The error result should report the reason for any failed validation.
-    fn inner_list<'ilv>(self) -> Result<impl InnerListVisitor<'ilv>, Self::Error>;
+    fn inner_list(self) -> Result<impl InnerListVisitor, Self::Error>;
 }
 
 /// A visitor whose methods are called during dictionary parsing.
@@ -370,12 +368,12 @@ impl<'input> ItemVisitor<'input> for Ignored {
 }
 
 impl EntryVisitor<'_> for Ignored {
-    fn inner_list<'ilv>(self) -> Result<impl InnerListVisitor<'ilv>, Self::Error> {
+    fn inner_list(self) -> Result<impl InnerListVisitor, Self::Error> {
         Ok(Ignored)
     }
 }
 
-impl InnerListVisitor<'_> for Ignored {
+impl InnerListVisitor for Ignored {
     type Error = Infallible;
 
     fn item<'iv>(&mut self) -> Result<impl ItemVisitor<'iv>, Self::Error> {
@@ -439,7 +437,7 @@ impl<'input, V: ItemVisitor<'input>> ItemVisitor<'input> for Option<V> {
 }
 
 impl<'input, V: EntryVisitor<'input>> EntryVisitor<'input> for Option<V> {
-    fn inner_list<'ilv>(self) -> Result<impl InnerListVisitor<'ilv>, Self::Error> {
+    fn inner_list(self) -> Result<impl InnerListVisitor, Self::Error> {
         match self {
             None => Ok(None),
             Some(visitor) => visitor.inner_list().map(Some),
@@ -447,7 +445,7 @@ impl<'input, V: EntryVisitor<'input>> EntryVisitor<'input> for Option<V> {
     }
 }
 
-impl<'input, V: InnerListVisitor<'input>> InnerListVisitor<'input> for Option<V> {
+impl<V: InnerListVisitor> InnerListVisitor for Option<V> {
     type Error = V::Error;
 
     fn item<'iv>(&mut self) -> Result<impl ItemVisitor<'iv>, Self::Error> {
@@ -497,12 +495,12 @@ impl<'input> ItemVisitor<'input> for Never {
 }
 
 impl EntryVisitor<'_> for Never {
-    fn inner_list<'ilv>(self) -> Result<impl InnerListVisitor<'ilv>, Self::Error> {
+    fn inner_list(self) -> Result<impl InnerListVisitor, Self::Error> {
         Ok(self)
     }
 }
 
-impl InnerListVisitor<'_> for Never {
+impl InnerListVisitor for Never {
     type Error = Infallible;
 
     fn item<'iv>(&mut self) -> Result<impl ItemVisitor<'iv>, Self::Error> {

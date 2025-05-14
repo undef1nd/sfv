@@ -257,10 +257,7 @@ assert_eq!(
         }
     }
 
-    pub(crate) fn parse_inner_list<'ilv>(
-        &mut self,
-        mut visitor: impl InnerListVisitor<'ilv>,
-    ) -> SFVResult<()> {
+    pub(crate) fn parse_inner_list(&mut self, mut visitor: impl InnerListVisitor) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc9651.html#parse-innerlist
 
         if Some(b'(') != self.peek() {

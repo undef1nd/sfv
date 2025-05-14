@@ -165,7 +165,7 @@ impl<'a> ItemVisitor<'a> for &mut InnerList {
     }
 }
 
-impl InnerListVisitor<'_> for &mut InnerList {
+impl InnerListVisitor for &mut InnerList {
     type Error = Infallible;
 
     fn item<'iv>(&mut self) -> Result<impl ItemVisitor<'iv>, Self::Error> {
@@ -208,7 +208,7 @@ impl<'a> ItemVisitor<'a> for Entry<'_> {
 }
 
 impl EntryVisitor<'_> for Entry<'_> {
-    fn inner_list<'ilv>(self) -> Result<impl InnerListVisitor<'ilv>, Self::Error> {
+    fn inner_list(self) -> Result<impl InnerListVisitor, Self::Error> {
         match self.insert_entry(InnerList::default().into()).into_mut() {
             ListEntry::InnerList(inner_list) => Ok(inner_list),
             ListEntry::Item(_) => unreachable!(),
@@ -232,7 +232,7 @@ impl<'a> ItemVisitor<'a> for &mut List {
 }
 
 impl EntryVisitor<'_> for &mut List {
-    fn inner_list<'ilv>(self) -> Result<impl InnerListVisitor<'ilv>, Self::Error> {
+    fn inner_list(self) -> Result<impl InnerListVisitor, Self::Error> {
         self.push(InnerList::default().into());
         match self.last_mut() {
             Some(ListEntry::InnerList(inner_list)) => Ok(inner_list),

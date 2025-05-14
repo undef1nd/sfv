@@ -1013,7 +1013,7 @@ impl<'input> ItemVisitor<'input> for CoordVisitor<'_> {
 }
 
 impl EntryVisitor<'_> for CoordVisitor<'_> {
-    fn inner_list<'ilv>(self) -> Result<impl InnerListVisitor<'ilv>, Self::Error> {
+    fn inner_list(self) -> Result<impl InnerListVisitor, Self::Error> {
         Ok(Ignored)
     }
 }
@@ -1107,12 +1107,12 @@ fn complex_list_visitor() {
     }
 
     impl EntryVisitor<'_> for HolderListVisitor<'_> {
-        fn inner_list<'ilv>(self) -> Result<impl InnerListVisitor<'ilv>, Self::Error> {
+        fn inner_list(self) -> Result<impl InnerListVisitor, Self::Error> {
             Ok(self)
         }
     }
 
-    impl InnerListVisitor<'_> for HolderListVisitor<'_> {
+    impl InnerListVisitor for HolderListVisitor<'_> {
         type Error = Infallible;
 
         fn item<'iv>(&mut self) -> Result<impl ItemVisitor<'iv>, Self::Error> {
