@@ -1167,3 +1167,29 @@ fn complex_list_visitor() {
 
     assert_eq!(list, expected);
 }
+
+#[test]
+fn parse_dictionary_lifetime() -> Result<(), Error> {
+    struct Visitor<'input>(Option<&'input KeyRef>);
+
+    impl<'input> DictionaryVisitor<'input> for Visitor<'input> {
+        type Error = Infallible;
+
+        fn entry<'dv, 'ev>(
+            &'dv mut self,
+            key: &'input KeyRef,
+        ) -> Result<impl EntryVisitor<'ev>, Self::Error>
+        where
+            'dv: 'ev,
+        {
+            self.0 = Some(key);
+            Ok(Ignored)
+        }
+    }
+
+    let mut visitor = Visitor(None);
+    Parser::new("a=1").parse_dictionary_with_visitor(&mut visitor)?;
+    // FIXME: cannot borrow `visitor.0` as immutable because it is also borrowed as mutable
+    assert_eq!(visitor.0.as_deref(), Some(key_ref("a")));
+    Ok(())
+}
