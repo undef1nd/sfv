@@ -1168,6 +1168,8 @@ fn complex_list_visitor() {
     assert_eq!(list, expected);
 }
 
+// Regression test for https://github.com/undef1nd/sfv/issues/194.
+// This test does not compile without the associated fix.
 #[test]
 fn parse_dictionary_lifetime() -> Result<(), Error> {
     struct Visitor<'input>(Option<&'input KeyRef>);
@@ -1189,7 +1191,6 @@ fn parse_dictionary_lifetime() -> Result<(), Error> {
 
     let mut visitor = Visitor(None);
     Parser::new("a=1").parse_dictionary_with_visitor(&mut visitor)?;
-    // FIXME: cannot borrow `visitor.0` as immutable because it is also borrowed as mutable
     assert_eq!(visitor.0.as_deref(), Some(key_ref("a")));
     Ok(())
 }

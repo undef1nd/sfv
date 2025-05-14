@@ -120,9 +120,9 @@ assert_eq!(
     ///
     /// # Errors
     /// When the parsing process is unsuccessful, including any error raised by a visitor.
-    pub fn parse_dictionary_with_visitor<'v: 'a>(
+    pub fn parse_dictionary_with_visitor(
         self,
-        visitor: &'v mut (impl ?Sized + DictionaryVisitor<'a>),
+        visitor: &mut (impl ?Sized + DictionaryVisitor<'a>),
     ) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc9651.html#parse-dictionary
         self.parse(move |parser| {
