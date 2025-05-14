@@ -12,10 +12,7 @@ use crate::{
 #[cfg(feature = "parsed-types")]
 use crate::{Dictionary, Item, List};
 
-fn parse_item<'a: 'iv, 'iv>(
-    parser: &mut Parser<'a>,
-    visitor: impl ItemVisitor<'iv>,
-) -> SFVResult<()> {
+fn parse_item<'a>(parser: &mut Parser<'a>, visitor: impl ItemVisitor<'a>) -> SFVResult<()> {
     // https://httpwg.org/specs/rfc9651.html#parse-item
     let param_visitor = visitor
         .bare_item(parser.parse_bare_item()?)
@@ -244,10 +241,7 @@ assert_eq!(
         }
     }
 
-    fn parse_list_entry<'ev>(&mut self, visitor: impl EntryVisitor<'ev>) -> SFVResult<()>
-    where
-        'a: 'ev,
-    {
+    fn parse_list_entry(&mut self, visitor: impl EntryVisitor<'a>) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc9651.html#parse-item-or-list
         // ListEntry represents a tuple (item_or_inner_list, parameters)
 
@@ -257,9 +251,9 @@ assert_eq!(
         }
     }
 
-    pub(crate) fn parse_inner_list<'ilv>(
+    pub(crate) fn parse_inner_list(
         &mut self,
-        mut visitor: impl InnerListVisitor<'ilv>,
+        mut visitor: impl InnerListVisitor<'a>,
     ) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc9651.html#parse-innerlist
 

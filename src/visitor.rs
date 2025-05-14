@@ -18,14 +18,14 @@ relevant state in its fields, before using that state to perform the operation
 # use sfv::visitor::{Ignored, ItemVisitor, ParameterVisitor};
 # use sfv::{BareItemFromInput, TokenRef};
 # fn main() -> Result<(), sfv::Error> {
-struct Visitor<'v> {
-    token: Option<&'v TokenRef>,
+struct Visitor<'a> {
+    token: Option<&'a TokenRef>,
 }
 
-impl<'a, 'v> ItemVisitor<'a> for &mut Visitor<'v> where 'a: 'v {
+impl<'a> ItemVisitor<'a> for &mut Visitor<'a> {
   type Error = std::convert::Infallible;
 
-  fn bare_item<'p>(self, bare_item: BareItemFromInput<'a>) -> Result<impl ParameterVisitor<'p>, Self::Error> {
+  fn bare_item(self, bare_item: BareItemFromInput<'a>) -> Result<impl ParameterVisitor<'a>, Self::Error> {
       self.token =
           if let BareItemFromInput::Token(token) = bare_item {
               Some(token)
@@ -90,12 +90,10 @@ struct CoordVisitor<'a> {
 impl<'input> DictionaryVisitor<'input> for Point {
     type Error = std::convert::Infallible;
 
-    fn entry<'dv, 'ev>(
-        &'dv mut self,
+    fn entry(
+        &mut self,
         key: &'input KeyRef,
-    ) -> Result<impl EntryVisitor<'ev>, Self::Error>
-    where
-        'dv: 'ev,
+    ) -> Result<impl EntryVisitor<'input>, Self::Error>
     {
         let coord = match key.as_str() {
             "x" => &mut self.x,
@@ -124,10 +122,10 @@ impl std::error::Error for NotAnInteger {}
 impl<'input> ItemVisitor<'input> for CoordVisitor<'_> {
     type Error = NotAnInteger;
 
-    fn bare_item<'pv>(
+    fn bare_item(
         self,
         bare_item: BareItemFromInput<'input>,
-    ) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
+    ) -> Result<impl ParameterVisitor<'input>, Self::Error> {
         if let BareItemFromInput::Integer(v) = bare_item {
             *self.coord = i64::from(v);
             // Ignore the item's parameters by returning `Ignored`. The
@@ -143,8 +141,8 @@ impl<'input> ItemVisitor<'input> for CoordVisitor<'_> {
     }
 }
 
-impl EntryVisitor<'_> for CoordVisitor<'_> {
-    fn inner_list<'ilv>(self) -> Result<impl InnerListVisitor<'ilv>, Self::Error> {
+impl<'input> EntryVisitor<'input> for CoordVisitor<'_> {
+    fn inner_list(self) -> Result<impl InnerListVisitor<'input>, Self::Error> {
         // Use `Never` to enforce at the type level that this method will only
         // return `Err`, as our coordinate must be a single integer, not an
         // inner list.
@@ -226,10 +224,10 @@ pub trait ItemVisitor<'input> {
     ///
     /// # Errors
     /// The error result should report the reason for any failed validation.
-    fn bare_item<'pv>(
+    fn bare_item(
         self,
         bare_item: BareItemFromInput<'input>,
-    ) -> Result<impl ParameterVisitor<'pv>, Self::Error>;
+    ) -> Result<impl ParameterVisitor<'input>, Self::Error>;
 }
 
 /// A visitor whose methods are called during inner-list parsing.
@@ -247,7 +245,7 @@ pub trait InnerListVisitor<'input> {
     ///
     /// # Errors
     /// The error result should report the reason for any failed validation.
-    fn item<'iv>(&mut self) -> Result<impl ItemVisitor<'iv>, Self::Error>;
+    fn item(&mut self) -> Result<impl ItemVisitor<'input>, Self::Error>;
 
     /// Called after all inner-list items have been parsed.
     ///
@@ -259,7 +257,7 @@ pub trait InnerListVisitor<'input> {
     ///
     /// # Errors
     /// The error result should report the reason for any failed validation.
-    fn finish<'pv>(self) -> Result<impl ParameterVisitor<'pv>, Self::Error>;
+    fn finish(self) -> Result<impl ParameterVisitor<'input>, Self::Error>;
 }
 
 /// A visitor whose methods are called during entry parsing.
@@ -274,7 +272,7 @@ pub trait EntryVisitor<'input>: ItemVisitor<'input> {
     ///
     /// # Errors
     /// The error result should report the reason for any failed validation.
-    fn inner_list<'ilv>(self) -> Result<impl InnerListVisitor<'ilv>, Self::Error>;
+    fn inner_list(self) -> Result<impl InnerListVisitor<'input>, Self::Error>;
 }
 
 /// A visitor whose methods are called during dictionary parsing.
@@ -306,12 +304,7 @@ pub trait DictionaryVisitor<'input> {
     ///
     /// # Errors
     /// The error result should report the reason for any failed validation.
-    fn entry<'dv, 'ev>(
-        &'dv mut self,
-        key: &'input KeyRef,
-    ) -> Result<impl EntryVisitor<'ev>, Self::Error>
-    where
-        'dv: 'ev;
+    fn entry(&mut self, key: &'input KeyRef) -> Result<impl EntryVisitor<'input>, Self::Error>;
 }
 
 /// A visitor whose methods are called during list parsing.
@@ -332,7 +325,7 @@ pub trait ListVisitor<'input> {
     ///
     /// # Errors
     /// The error result should report the reason for any failed validation.
-    fn entry<'ev>(&mut self) -> Result<impl EntryVisitor<'ev>, Self::Error>;
+    fn entry(&mut self) -> Result<impl EntryVisitor<'input>, Self::Error>;
 }
 
 /// A visitor that can be used to silently discard structured-field parts.
@@ -361,28 +354,28 @@ impl<'input> ParameterVisitor<'input> for Ignored {
 impl<'input> ItemVisitor<'input> for Ignored {
     type Error = Infallible;
 
-    fn bare_item<'pv>(
+    fn bare_item(
         self,
         _bare_item: BareItemFromInput<'input>,
-    ) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
+    ) -> Result<impl ParameterVisitor<'input>, Self::Error> {
         Ok(Ignored)
     }
 }
 
-impl EntryVisitor<'_> for Ignored {
-    fn inner_list<'ilv>(self) -> Result<impl InnerListVisitor<'ilv>, Self::Error> {
+impl<'input> EntryVisitor<'input> for Ignored {
+    fn inner_list(self) -> Result<impl InnerListVisitor<'input>, Self::Error> {
         Ok(Ignored)
     }
 }
 
-impl InnerListVisitor<'_> for Ignored {
+impl<'input> InnerListVisitor<'input> for Ignored {
     type Error = Infallible;
 
-    fn item<'iv>(&mut self) -> Result<impl ItemVisitor<'iv>, Self::Error> {
+    fn item(&mut self) -> Result<impl ItemVisitor<'input>, Self::Error> {
         Ok(Ignored)
     }
 
-    fn finish<'pv>(self) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
+    fn finish(self) -> Result<impl ParameterVisitor<'input>, Self::Error> {
         Ok(Ignored)
     }
 }
@@ -390,21 +383,15 @@ impl InnerListVisitor<'_> for Ignored {
 impl<'input> DictionaryVisitor<'input> for Ignored {
     type Error = Infallible;
 
-    fn entry<'dv, 'ev>(
-        &'dv mut self,
-        _key: &'input KeyRef,
-    ) -> Result<impl EntryVisitor<'ev>, Self::Error>
-    where
-        'dv: 'ev,
-    {
+    fn entry(&mut self, _key: &'input KeyRef) -> Result<impl EntryVisitor<'input>, Self::Error> {
         Ok(Ignored)
     }
 }
 
-impl ListVisitor<'_> for Ignored {
+impl<'input> ListVisitor<'input> for Ignored {
     type Error = Infallible;
 
-    fn entry<'ev>(&mut self) -> Result<impl EntryVisitor<'ev>, Self::Error> {
+    fn entry(&mut self) -> Result<impl EntryVisitor<'input>, Self::Error> {
         Ok(Ignored)
     }
 }
@@ -427,10 +414,10 @@ impl<'input, V: ParameterVisitor<'input>> ParameterVisitor<'input> for Option<V>
 impl<'input, V: ItemVisitor<'input>> ItemVisitor<'input> for Option<V> {
     type Error = V::Error;
 
-    fn bare_item<'pv>(
+    fn bare_item(
         self,
         bare_item: BareItemFromInput<'input>,
-    ) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
+    ) -> Result<impl ParameterVisitor<'input>, Self::Error> {
         match self {
             None => Ok(None),
             Some(visitor) => visitor.bare_item(bare_item).map(Some),
@@ -439,7 +426,7 @@ impl<'input, V: ItemVisitor<'input>> ItemVisitor<'input> for Option<V> {
 }
 
 impl<'input, V: EntryVisitor<'input>> EntryVisitor<'input> for Option<V> {
-    fn inner_list<'ilv>(self) -> Result<impl InnerListVisitor<'ilv>, Self::Error> {
+    fn inner_list(self) -> Result<impl InnerListVisitor<'input>, Self::Error> {
         match self {
             None => Ok(None),
             Some(visitor) => visitor.inner_list().map(Some),
@@ -450,14 +437,14 @@ impl<'input, V: EntryVisitor<'input>> EntryVisitor<'input> for Option<V> {
 impl<'input, V: InnerListVisitor<'input>> InnerListVisitor<'input> for Option<V> {
     type Error = V::Error;
 
-    fn item<'iv>(&mut self) -> Result<impl ItemVisitor<'iv>, Self::Error> {
+    fn item(&mut self) -> Result<impl ItemVisitor<'input>, Self::Error> {
         match self {
             None => Ok(None),
             Some(visitor) => visitor.item().map(Some),
         }
     }
 
-    fn finish<'pv>(self) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
+    fn finish(self) -> Result<impl ParameterVisitor<'input>, Self::Error> {
         match self {
             None => Ok(None),
             Some(visitor) => visitor.finish().map(Some),
@@ -488,28 +475,28 @@ impl<'input> ParameterVisitor<'input> for Never {
 impl<'input> ItemVisitor<'input> for Never {
     type Error = Infallible;
 
-    fn bare_item<'pv>(
+    fn bare_item(
         self,
         _bare_item: BareItemFromInput<'input>,
-    ) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
+    ) -> Result<impl ParameterVisitor<'input>, Self::Error> {
         Ok(self)
     }
 }
 
-impl EntryVisitor<'_> for Never {
-    fn inner_list<'ilv>(self) -> Result<impl InnerListVisitor<'ilv>, Self::Error> {
+impl<'input> EntryVisitor<'input> for Never {
+    fn inner_list(self) -> Result<impl InnerListVisitor<'input>, Self::Error> {
         Ok(self)
     }
 }
 
-impl InnerListVisitor<'_> for Never {
+impl<'input> InnerListVisitor<'input> for Never {
     type Error = Infallible;
 
-    fn item<'iv>(&mut self) -> Result<impl ItemVisitor<'iv>, Self::Error> {
+    fn item(&mut self) -> Result<impl ItemVisitor<'input>, Self::Error> {
         Ok(*self)
     }
 
-    fn finish<'pv>(self) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
+    fn finish(self) -> Result<impl ParameterVisitor<'input>, Self::Error> {
         Ok(self)
     }
 }
@@ -517,21 +504,15 @@ impl InnerListVisitor<'_> for Never {
 impl<'input> DictionaryVisitor<'input> for Never {
     type Error = Infallible;
 
-    fn entry<'dv, 'ev>(
-        &'dv mut self,
-        _key: &'input KeyRef,
-    ) -> Result<impl EntryVisitor<'ev>, Self::Error>
-    where
-        'dv: 'ev,
-    {
+    fn entry(&mut self, _key: &'input KeyRef) -> Result<impl EntryVisitor<'input>, Self::Error> {
         Ok(*self)
     }
 }
 
-impl ListVisitor<'_> for Never {
+impl<'input> ListVisitor<'input> for Never {
     type Error = Infallible;
 
-    fn entry<'ev>(&mut self) -> Result<impl EntryVisitor<'ev>, Self::Error> {
+    fn entry(&mut self) -> Result<impl EntryVisitor<'input>, Self::Error> {
         Ok(*self)
     }
 }

@@ -142,10 +142,10 @@ impl<'a> ParameterVisitor<'a> for &mut Parameters {
 impl<'a> ItemVisitor<'a> for &mut Item {
     type Error = Infallible;
 
-    fn bare_item<'pv>(
+    fn bare_item(
         self,
         bare_item: BareItemFromInput<'a>,
-    ) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
+    ) -> Result<impl ParameterVisitor<'a>, Self::Error> {
         self.bare_item = bare_item.into();
         Ok(&mut self.params)
     }
@@ -153,10 +153,10 @@ impl<'a> ItemVisitor<'a> for &mut Item {
 
 impl<'a> ItemVisitor<'a> for &mut InnerList {
     type Error = Infallible;
-    fn bare_item<'pv>(
+    fn bare_item(
         self,
         bare_item: BareItemFromInput<'a>,
-    ) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
+    ) -> Result<impl ParameterVisitor<'a>, Self::Error> {
         self.items.push(Item::new(bare_item));
         match self.items.last_mut() {
             Some(item) => Ok(&mut item.params),
@@ -165,14 +165,14 @@ impl<'a> ItemVisitor<'a> for &mut InnerList {
     }
 }
 
-impl InnerListVisitor<'_> for &mut InnerList {
+impl<'a> InnerListVisitor<'a> for &mut InnerList {
     type Error = Infallible;
 
-    fn item<'iv>(&mut self) -> Result<impl ItemVisitor<'iv>, Self::Error> {
+    fn item(&mut self) -> Result<impl ItemVisitor<'a>, Self::Error> {
         Ok(&mut **self)
     }
 
-    fn finish<'pv>(self) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
+    fn finish(self) -> Result<impl ParameterVisitor<'a>, Self::Error> {
         Ok(&mut self.params)
     }
 }
@@ -180,13 +180,7 @@ impl InnerListVisitor<'_> for &mut InnerList {
 impl<'a> DictionaryVisitor<'a> for Dictionary {
     type Error = Infallible;
 
-    fn entry<'dv, 'ev>(
-        &'dv mut self,
-        key: &'a KeyRef,
-    ) -> Result<impl EntryVisitor<'ev>, Self::Error>
-    where
-        'dv: 'ev,
-    {
+    fn entry(&mut self, key: &'a KeyRef) -> Result<impl EntryVisitor<'a>, Self::Error> {
         Ok(self.entry(key.to_owned()))
     }
 }
@@ -196,10 +190,10 @@ type Entry<'a> = indexmap::map::Entry<'a, Key, ListEntry>;
 impl<'a> ItemVisitor<'a> for Entry<'_> {
     type Error = Infallible;
 
-    fn bare_item<'pv>(
+    fn bare_item(
         self,
         bare_item: BareItemFromInput<'a>,
-    ) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
+    ) -> Result<impl ParameterVisitor<'a>, Self::Error> {
         match self.insert_entry(Item::new(bare_item).into()).into_mut() {
             ListEntry::Item(item) => Ok(&mut item.params),
             ListEntry::InnerList(_) => unreachable!(),
@@ -207,8 +201,8 @@ impl<'a> ItemVisitor<'a> for Entry<'_> {
     }
 }
 
-impl EntryVisitor<'_> for Entry<'_> {
-    fn inner_list<'ilv>(self) -> Result<impl InnerListVisitor<'ilv>, Self::Error> {
+impl<'a> EntryVisitor<'a> for Entry<'_> {
+    fn inner_list(self) -> Result<impl InnerListVisitor<'a>, Self::Error> {
         match self.insert_entry(InnerList::default().into()).into_mut() {
             ListEntry::InnerList(inner_list) => Ok(inner_list),
             ListEntry::Item(_) => unreachable!(),
@@ -219,10 +213,10 @@ impl EntryVisitor<'_> for Entry<'_> {
 impl<'a> ItemVisitor<'a> for &mut List {
     type Error = Infallible;
 
-    fn bare_item<'pv>(
+    fn bare_item(
         self,
         bare_item: BareItemFromInput<'a>,
-    ) -> Result<impl ParameterVisitor<'pv>, Self::Error> {
+    ) -> Result<impl ParameterVisitor<'a>, Self::Error> {
         self.push(Item::new(bare_item).into());
         match self.last_mut() {
             Some(ListEntry::Item(item)) => Ok(&mut item.params),
@@ -231,8 +225,8 @@ impl<'a> ItemVisitor<'a> for &mut List {
     }
 }
 
-impl EntryVisitor<'_> for &mut List {
-    fn inner_list<'ilv>(self) -> Result<impl InnerListVisitor<'ilv>, Self::Error> {
+impl<'a> EntryVisitor<'a> for &mut List {
+    fn inner_list(self) -> Result<impl InnerListVisitor<'a>, Self::Error> {
         self.push(InnerList::default().into());
         match self.last_mut() {
             Some(ListEntry::InnerList(inner_list)) => Ok(inner_list),
@@ -241,10 +235,10 @@ impl EntryVisitor<'_> for &mut List {
     }
 }
 
-impl ListVisitor<'_> for List {
+impl<'a> ListVisitor<'a> for List {
     type Error = Infallible;
 
-    fn entry<'ev>(&mut self) -> Result<impl EntryVisitor<'ev>, Self::Error> {
+    fn entry(&mut self) -> Result<impl EntryVisitor<'a>, Self::Error> {
         Ok(self)
     }
 }
