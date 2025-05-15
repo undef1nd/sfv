@@ -1179,6 +1179,6 @@ fn parse_dictionary_lifetime() -> Result<(), Error> {
 
     let mut visitor = Visitor(None);
     Parser::new("a=1").parse_dictionary_with_visitor(&mut visitor)?;
-    assert_eq!(visitor.0.as_deref(), Some(key_ref("a")));
+    assert_eq!(visitor.0, Some(key_ref("a")));
     Ok(())
 }
