@@ -55,6 +55,7 @@ fn parse_comma_separated<'a>(
 }
 
 /// Exposes methods for parsing input into a structured field value.
+#[derive(Debug)]
 pub struct Parser<'a> {
     input: &'a [u8],
     index: usize,
