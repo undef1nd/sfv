@@ -336,7 +336,7 @@ pub trait ListVisitor<'de> {
 ///
 /// See [the module documentation](crate::visitor#discarding-irrelevant-parts)
 /// for example usage.
-#[derive(Default)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct Ignored;
 
 impl<'de> ParameterVisitor<'de> for Ignored {
@@ -457,7 +457,7 @@ impl<'de, V: InnerListVisitor<'de>> InnerListVisitor<'de> for Option<V> {
 /// [`std::convert::Infallible`].
 ///
 /// When [`!`] is stabilized, this type will be replaced with an alias for it.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum Never {}
 
 impl<'de> ParameterVisitor<'de> for Never {
