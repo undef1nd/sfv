@@ -70,7 +70,7 @@ type ExpectedList = Vec<ExpectedListEntry>;
 
 type ExpectedDict = Vec<(String, ExpectedListEntry)>;
 
-trait TestCase: for<'a> Deserialize<'a> {
+trait TestCase: for<'de> Deserialize<'de> {
     fn run(self);
 }
 
@@ -78,7 +78,7 @@ impl TestCase for ParseTestData {
     fn run(mut self) {
         fn check<T: PartialEq + fmt::Debug + SerializeValue>(
             test_case: &ParseTestData,
-            parse: impl for<'a> FnOnce(Parser<'a>) -> Result<T, sfv::Error>,
+            parse: impl for<'de> FnOnce(Parser<'de>) -> Result<T, sfv::Error>,
             expected: Option<impl Build<T>>,
         ) {
             println!("- {}", test_case.data.name);

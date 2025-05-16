@@ -12,7 +12,7 @@ use crate::{
 #[cfg(feature = "parsed-types")]
 use crate::{Dictionary, Item, List};
 
-fn parse_item<'a>(parser: &mut Parser<'a>, visitor: impl ItemVisitor<'a>) -> SFVResult<()> {
+fn parse_item<'de>(parser: &mut Parser<'de>, visitor: impl ItemVisitor<'de>) -> SFVResult<()> {
     // https://httpwg.org/specs/rfc9651.html#parse-item
     let param_visitor = visitor
         .bare_item(parser.parse_bare_item()?)
@@ -20,9 +20,9 @@ fn parse_item<'a>(parser: &mut Parser<'a>, visitor: impl ItemVisitor<'a>) -> SFV
     parser.parse_parameters(param_visitor)
 }
 
-fn parse_comma_separated<'a>(
-    parser: &mut Parser<'a>,
-    mut parse_member: impl FnMut(&mut Parser<'a>) -> SFVResult<()>,
+fn parse_comma_separated<'de>(
+    parser: &mut Parser<'de>,
+    mut parse_member: impl FnMut(&mut Parser<'de>) -> SFVResult<()>,
 ) -> SFVResult<()> {
     while parser.peek().is_some() {
         parse_member(parser)?;
@@ -55,16 +55,15 @@ fn parse_comma_separated<'a>(
 }
 
 /// Exposes methods for parsing input into a structured field value.
-#[derive(Debug)]
-pub struct Parser<'a> {
-    input: &'a [u8],
+pub struct Parser<'de> {
+    input: &'de [u8],
     index: usize,
     version: Version,
 }
 
-impl<'a> Parser<'a> {
+impl<'de> Parser<'de> {
     /// Creates a parser from the given input with [`Version::Rfc9651`].
-    pub fn new(input: &'a (impl ?Sized + AsRef<[u8]>)) -> Self {
+    pub fn new(input: &'de (impl ?Sized + AsRef<[u8]>)) -> Self {
         Self {
             input: input.as_ref(),
             index: 0,
@@ -120,7 +119,7 @@ assert_eq!(
     /// When the parsing process is unsuccessful, including any error raised by a visitor.
     pub fn parse_dictionary_with_visitor(
         self,
-        visitor: &mut (impl ?Sized + DictionaryVisitor<'a>),
+        visitor: &mut (impl ?Sized + DictionaryVisitor<'de>),
     ) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc9651.html#parse-dictionary
         self.parse(move |parser| {
@@ -182,7 +181,7 @@ assert_eq!(
     /// When the parsing process is unsuccessful, including any error raised by a visitor.
     pub fn parse_list_with_visitor(
         self,
-        visitor: &mut (impl ?Sized + ListVisitor<'a>),
+        visitor: &mut (impl ?Sized + ListVisitor<'de>),
     ) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc9651.html#parse-list
         self.parse(|parser| {
@@ -208,7 +207,7 @@ assert_eq!(
     ///
     /// # Errors
     /// When the parsing process is unsuccessful, including any error raised by a visitor.
-    pub fn parse_item_with_visitor(self, visitor: impl ItemVisitor<'a>) -> SFVResult<()> {
+    pub fn parse_item_with_visitor(self, visitor: impl ItemVisitor<'de>) -> SFVResult<()> {
         self.parse(|parser| parse_item(parser, visitor))
     }
 
@@ -242,7 +241,7 @@ assert_eq!(
         }
     }
 
-    fn parse_list_entry(&mut self, visitor: impl EntryVisitor<'a>) -> SFVResult<()> {
+    fn parse_list_entry(&mut self, visitor: impl EntryVisitor<'de>) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc9651.html#parse-item-or-list
         // ListEntry represents a tuple (item_or_inner_list, parameters)
 
@@ -254,7 +253,7 @@ assert_eq!(
 
     pub(crate) fn parse_inner_list(
         &mut self,
-        mut visitor: impl InnerListVisitor<'a>,
+        mut visitor: impl InnerListVisitor<'de>,
     ) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc9651.html#parse-innerlist
 
@@ -285,7 +284,7 @@ assert_eq!(
         self.error("unterminated inner list")
     }
 
-    pub(crate) fn parse_bare_item(&mut self) -> SFVResult<BareItemFromInput<'a>> {
+    pub(crate) fn parse_bare_item(&mut self) -> SFVResult<BareItemFromInput<'de>> {
         // https://httpwg.org/specs/rfc9651.html#parse-bare-item
 
         match self.peek() {
@@ -329,7 +328,7 @@ assert_eq!(
         }
     }
 
-    pub(crate) fn parse_string(&mut self) -> SFVResult<Cow<'a, StringRef>> {
+    pub(crate) fn parse_string(&mut self) -> SFVResult<Cow<'de, StringRef>> {
         // https://httpwg.org/specs/rfc9651.html#parse-string
 
         if self.peek() != Some(b'"') {
@@ -388,7 +387,7 @@ assert_eq!(
         &mut self,
         is_allowed_start_char: impl FnOnce(u8) -> bool,
         is_allowed_inner_char: impl Fn(u8) -> bool,
-    ) -> Option<&'a str> {
+    ) -> Option<&'de str> {
         let start = self.index;
 
         match self.peek() {
@@ -410,7 +409,7 @@ assert_eq!(
         }
     }
 
-    pub(crate) fn parse_token(&mut self) -> SFVResult<&'a TokenRef> {
+    pub(crate) fn parse_token(&mut self) -> SFVResult<&'de TokenRef> {
         // https://httpwg.org/specs/9651.html#parse-token
 
         match self.parse_non_empty_str(
@@ -554,7 +553,7 @@ assert_eq!(
         }
     }
 
-    pub(crate) fn parse_display_string(&mut self) -> SFVResult<Cow<'a, str>> {
+    pub(crate) fn parse_display_string(&mut self) -> SFVResult<Cow<'de, str>> {
         // https://httpwg.org/specs/rfc9651.html#parse-display
 
         if self.peek() != Some(b'%') {
@@ -638,7 +637,7 @@ assert_eq!(
 
     pub(crate) fn parse_parameters(
         &mut self,
-        mut visitor: impl ParameterVisitor<'a>,
+        mut visitor: impl ParameterVisitor<'de>,
     ) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc9651.html#parse-param
 
@@ -663,7 +662,7 @@ assert_eq!(
         visitor.finish().map_err(Error::custom)
     }
 
-    pub(crate) fn parse_key(&mut self) -> SFVResult<&'a KeyRef> {
+    pub(crate) fn parse_key(&mut self) -> SFVResult<&'de KeyRef> {
         // https://httpwg.org/specs/rfc9651.html#parse-key
 
         match self.parse_non_empty_str(
