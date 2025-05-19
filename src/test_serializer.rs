@@ -2,20 +2,20 @@ use crate::{
     integer, key_ref, serializer::Serializer, string_ref, token_ref, Date, Decimal, Error,
 };
 #[cfg(feature = "parsed-types")]
-use crate::{BareItem, Dictionary, InnerList, Item, List, Parameters, SerializeValue};
+use crate::{BareItem, Dictionary, FieldType, InnerList, Item, List, Parameters};
 
 #[test]
 #[cfg(feature = "parsed-types")]
 fn serialize_value_empty_dict() {
     let dict_field_value = Dictionary::new();
-    assert_eq!(None, dict_field_value.serialize_value());
+    assert_eq!(None, dict_field_value.serialize());
 }
 
 #[test]
 #[cfg(feature = "parsed-types")]
 fn serialize_value_empty_list() {
     let list_field_value = List::new();
-    assert_eq!(None, list_field_value.serialize_value());
+    assert_eq!(None, list_field_value.serialize());
 }
 
 #[test]
@@ -50,7 +50,7 @@ fn serialize_value_list_mixed_members_with_params() -> Result<(), Error> {
         Some(
             r#"42.457, 17;itm2_p, ("str1";in1_p=?0 str2;in2_p="valu\\e");inner_list_param=:d2VhdGhlcg==:"#
         ),
-        list_field_value.serialize_value().as_deref(),
+        list_field_value.serialize().as_deref(),
     );
     Ok(())
 }
@@ -64,14 +64,14 @@ fn serialize_item_byteseq_with_param() {
     );
     let item_param = Parameters::from_iter(vec![item_param]);
     let item = Item::with_params(b"parser".to_vec(), item_param);
-    assert_eq!(":cGFyc2Vy:;a=*ab_1", item.serialize_value());
+    assert_eq!(":cGFyc2Vy:;a=*ab_1", item.serialize());
 }
 
 #[test]
 #[cfg(feature = "parsed-types")]
 fn serialize_item_without_params() {
     let item = Item::new(1);
-    assert_eq!("1", item.serialize_value());
+    assert_eq!("1", item.serialize());
 }
 
 #[test]
@@ -79,7 +79,7 @@ fn serialize_item_without_params() {
 fn serialize_item_with_bool_true_param() -> Result<(), Error> {
     let param = Parameters::from_iter(vec![(key_ref("a").to_owned(), BareItem::Boolean(true))]);
     let item = Item::with_params(Decimal::try_from(12.35)?, param);
-    assert_eq!("12.35;a", item.serialize_value());
+    assert_eq!("12.35;a", item.serialize());
     Ok(())
 }
 
@@ -91,7 +91,7 @@ fn serialize_item_with_token_param() {
         BareItem::Token(token_ref("*tok").to_owned()),
     )]);
     let item = Item::with_params(string_ref("12.35"), param);
-    assert_eq!(r#""12.35";a1=*tok"#, item.serialize_value());
+    assert_eq!(r#""12.35";a1=*tok"#, item.serialize());
 }
 
 #[test]
@@ -315,7 +315,7 @@ fn serialize_list_of_items_and_inner_list() {
 
     assert_eq!(
         Some(r#"12, 14, (a b);param="param_value_1""#),
-        input.serialize_value().as_deref(),
+        input.serialize().as_deref(),
     );
 }
 
@@ -330,7 +330,7 @@ fn serialize_list_of_lists() {
     let inner_list_2 = InnerList::new(vec![item3, item4]);
     let input: List = vec![inner_list_1.into(), inner_list_2.into()];
 
-    assert_eq!(Some("(1 2), (42 43)"), input.serialize_value().as_deref());
+    assert_eq!(Some("(1 2), (42 43)"), input.serialize().as_deref());
 }
 
 #[test]
@@ -344,10 +344,7 @@ fn serialize_list_with_bool_item_and_bool_params() {
     let item2 = Item::new(token_ref("cde_456"));
 
     let input: List = vec![item1.into(), item2.into()];
-    assert_eq!(
-        Some("?0;a;b=?0, cde_456"),
-        input.serialize_value().as_deref(),
-    );
+    assert_eq!(Some("?0;a;b=?0, cde_456"), input.serialize().as_deref());
 }
 
 #[test]
@@ -378,7 +375,7 @@ fn serialize_dictionary_with_params() {
 
     assert_eq!(
         Some(r#"abc=123;a=1;b, def=456, ghi=789;q=?0;r="+w""#),
-        input.serialize_value().as_deref(),
+        input.serialize().as_deref(),
     );
 }
 
@@ -387,7 +384,7 @@ fn serialize_dictionary_with_params() {
 fn serialize_dict_empty_member_value() {
     let inner_list = InnerList::new(vec![]);
     let input = Dictionary::from_iter(vec![(key_ref("a").to_owned(), inner_list.into())]);
-    assert_eq!(Some("a=()"), input.serialize_value().as_deref());
+    assert_eq!(Some("a=()"), input.serialize().as_deref());
 }
 
 #[test]

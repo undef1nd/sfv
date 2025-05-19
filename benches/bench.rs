@@ -3,8 +3,8 @@ extern crate criterion;
 
 use criterion::{BenchmarkId, Criterion};
 use sfv::{
-    integer, key_ref, string_ref, token_ref, Decimal, DictSerializer, ItemSerializer,
-    ListSerializer, Parser, SerializeValue,
+    integer, key_ref, string_ref, token_ref, Decimal, DictSerializer, Dictionary, FieldType, Item,
+    ItemSerializer, List, ListSerializer, Parser,
 };
 
 criterion_main!(parsing, serializing, ref_serializing);
@@ -18,7 +18,7 @@ fn parsing_item(c: &mut Criterion) {
         BenchmarkId::new("parsing_item", fixture),
         &fixture,
         move |bench, &input| {
-            bench.iter(|| Parser::new(input).parse_item().unwrap());
+            bench.iter(|| Parser::new(input).parse::<Item>().unwrap());
         },
     );
 }
@@ -29,7 +29,7 @@ fn parsing_list(c: &mut Criterion) {
         BenchmarkId::new("parsing_list", fixture),
         &fixture,
         move |bench, &input| {
-            bench.iter(|| Parser::new(input).parse_list().unwrap());
+            bench.iter(|| Parser::new(input).parse::<List>().unwrap());
         },
     );
 }
@@ -40,7 +40,7 @@ fn parsing_dict(c: &mut Criterion) {
         BenchmarkId::new("parsing_dict", fixture),
         &fixture,
         move |bench, &input| {
-            bench.iter(|| Parser::new(input).parse_dictionary().unwrap());
+            bench.iter(|| Parser::new(input).parse::<Dictionary>().unwrap());
         },
     );
 }
@@ -59,8 +59,8 @@ fn serializing_item(c: &mut Criterion) {
         BenchmarkId::new("serializing_item", fixture),
         &fixture,
         move |bench, &input| {
-            let parsed_item = Parser::new(input).parse_item().unwrap();
-            bench.iter(|| parsed_item.serialize_value());
+            let parsed_item: Item = Parser::new(input).parse().unwrap();
+            bench.iter(|| parsed_item.serialize());
         },
     );
 }
@@ -71,8 +71,8 @@ fn serializing_list(c: &mut Criterion) {
         BenchmarkId::new("serializing_list", fixture),
         &fixture,
         move |bench, &input| {
-            let parsed_list = Parser::new(input).parse_list().unwrap();
-            bench.iter(|| parsed_list.serialize_value().unwrap());
+            let parsed_list: List = Parser::new(input).parse().unwrap();
+            bench.iter(|| parsed_list.serialize().unwrap());
         },
     );
 }
@@ -83,8 +83,8 @@ fn serializing_dict(c: &mut Criterion) {
         BenchmarkId::new("serializing_dict", fixture),
         &fixture,
         move |bench, &input| {
-            let parsed_dict = Parser::new(input).parse_dictionary().unwrap();
-            bench.iter(|| parsed_dict.serialize_value().unwrap());
+            let parsed_dict: Dictionary = Parser::new(input).parse().unwrap();
+            bench.iter(|| parsed_dict.serialize().unwrap());
         },
     );
 }

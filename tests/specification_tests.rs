@@ -2,8 +2,8 @@ use std::{env, error::Error, fmt, fs, io, path::Path};
 
 use serde::Deserialize;
 use sfv::{
-    BareItem, Date, Dictionary, InnerList, Item, Key, List, ListEntry, Parameters, Parser,
-    SerializeValue,
+    BareItem, Date, Dictionary, FieldType, InnerList, Item, Key, List, ListEntry, Parameters,
+    Parser,
 };
 
 #[derive(Debug, Deserialize)]
@@ -76,15 +76,14 @@ trait TestCase: for<'de> Deserialize<'de> {
 
 impl TestCase for ParseTestData {
     fn run(mut self) {
-        fn check<T: PartialEq + fmt::Debug + SerializeValue>(
+        fn check<T: PartialEq + fmt::Debug + FieldType>(
             test_case: &ParseTestData,
-            parse: impl for<'de> FnOnce(Parser<'de>) -> Result<T, sfv::Error>,
             expected: Option<impl Build<T>>,
         ) {
             println!("- {}", test_case.data.name);
             let input = test_case.raw.join(", ");
 
-            match parse(Parser::new(&input)) {
+            match Parser::new(&input).parse::<T>() {
                 Ok(actual) => {
                     assert!(!test_case.data.must_fail);
                     assert_eq!(
@@ -95,7 +94,7 @@ impl TestCase for ParseTestData {
                             .expect("build should succeed")
                     );
 
-                    let serialized: Option<String> = actual.serialize_value().into();
+                    let serialized: Option<String> = actual.serialize().into();
 
                     match test_case.data.canonical {
                         // If the canonical field is omitted, the canonical form is the input.
@@ -104,7 +103,7 @@ impl TestCase for ParseTestData {
                         }
                         Some(ref canonical) => {
                             // If the canonical field is an empty list, the serialization
-                            // should be omitted, which corresponds to an error from `serialize_value`.
+                            // should be omitted, which corresponds to `None` from `serialize`.
                             if canonical.is_empty() {
                                 assert!(serialized.is_none());
                             } else {
@@ -124,15 +123,15 @@ impl TestCase for ParseTestData {
         match self.data.header_type {
             ExpectedHeaderType::Item(ref mut expected) => {
                 let expected = expected.take();
-                check(&self, |p| p.parse_item(), expected);
+                check(&self, expected);
             }
             ExpectedHeaderType::List(ref mut expected) => {
                 let expected = expected.take();
-                check(&self, |p| p.parse_list(), expected);
+                check(&self, expected);
             }
             ExpectedHeaderType::Dictionary(ref mut expected) => {
                 let expected = expected.take();
-                check(&self, |p| p.parse_dictionary(), expected);
+                check(&self, expected);
             }
         }
     }
@@ -140,10 +139,10 @@ impl TestCase for ParseTestData {
 
 impl TestCase for TestData {
     fn run(mut self) {
-        fn check<T: SerializeValue>(test_case: &TestData, value: Option<impl Build<T>>) {
+        fn check<T: FieldType>(test_case: &TestData, value: Option<impl Build<T>>) {
             println!("- {}", test_case.name);
             match value.expect("expected value should be present").build() {
-                Ok(value) => match value.serialize_value().into() {
+                Ok(value) => match value.serialize().into() {
                     Some(serialized) => {
                         assert!(!test_case.must_fail);
                         assert_eq!(
