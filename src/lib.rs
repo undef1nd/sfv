@@ -624,5 +624,6 @@ impl fmt::Display for Version {
 }
 
 mod private {
+    #[allow(unused)]
     pub trait Sealed {}
 }
