@@ -10,7 +10,7 @@ use crate::{Item, ListEntry};
 /// [`Dates`][crate::Date] and [`Display Strings`][RefBareItem::DisplayString],
 /// which cause parsing errors under [RFC 8941], will be serialized
 /// unconditionally. The consumer of this API is responsible for determining
-/// whether it is valid to serialize these bare items for any specific header.
+/// whether it is valid to serialize these bare items for any specific field.
 ///
 /// [RFC 8941]: <https://httpwg.org/specs/rfc8941.html>
 /// [RFC 9651]: <https://httpwg.org/specs/rfc9651.html>
@@ -121,7 +121,7 @@ fn maybe_write_separator(buffer: &mut String, first: &mut bool) {
 /// [`Dates`][crate::Date] and [`Display Strings`][RefBareItem::DisplayString],
 /// which cause parsing errors under [RFC 8941], will be serialized
 /// unconditionally. The consumer of this API is responsible for determining
-/// whether it is valid to serialize these bare items for any specific header.
+/// whether it is valid to serialize these bare items for any specific field.
 ///
 /// [RFC 8941]: <https://httpwg.org/specs/rfc8941.html>
 /// [RFC 9651]: <https://httpwg.org/specs/rfc9651.html>
@@ -249,7 +249,7 @@ impl<W: BorrowMut<String>> ListSerializer<W> {
 /// [`Dates`][crate::Date] and [`Display Strings`][RefBareItem::DisplayString],
 /// which cause parsing errors under [RFC 8941], will be serialized
 /// unconditionally. The consumer of this API is responsible for determining
-/// whether it is valid to serialize these bare items for any specific header.
+/// whether it is valid to serialize these bare items for any specific field.
 ///
 /// [RFC 8941]: <https://httpwg.org/specs/rfc8941.html>
 /// [RFC 9651]: <https://httpwg.org/specs/rfc9651.html>
