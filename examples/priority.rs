@@ -217,7 +217,7 @@ fn main() -> Result<(), sfv::Error> {
             Priority::from(
                 &sfv::Parser::new(input)
                     .with_version(sfv::Version::Rfc8941)
-                    .parse_dictionary()?
+                    .parse()?
             ),
             expected,
             "{input}"

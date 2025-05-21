@@ -25,21 +25,21 @@ There are also a few lower-level types used to construct structured field values
 ### Parsing
 
 ```
-use sfv::Parser;
+# use sfv::{Dictionary, Item, List, Parser};
 # fn main() -> Result<(), sfv::Error> {
 // Parsing a structured field value of Item type.
 let input = "12.445;foo=bar";
-let item = Parser::new(input).parse_item()?;
+let item: Item = Parser::new(input).parse()?;
 println!("{:#?}", item);
 
 // Parsing a structured field value of List type.
 let input = r#"1;a=tok, ("foo" "bar");baz, ()"#;
-let list = Parser::new(input).parse_list()?;
+let list: List = Parser::new(input).parse()?;
 println!("{:#?}", list);
 
 // Parsing a structured field value of Dictionary type.
 let input = "a=?0, b, c; foo=bar, rating=1.5, fruits=(apple pear)";
-let dict = Parser::new(input).parse_dictionary()?;
+let dict: Dictionary = Parser::new(input).parse()?;
 println!("{:#?}", dict);
 # Ok(())
 # }
@@ -47,10 +47,10 @@ println!("{:#?}", dict);
 
 ### Getting Parsed Value Members
 ```
-use sfv::*;
+# use sfv::*;
 # fn main() -> Result<(), sfv::Error> {
 let input = "u=2, n=(* foo 2)";
-let dict = Parser::new(input).parse_dictionary()?;
+let dict: Dictionary = Parser::new(input).parse()?;
 
 match dict.get("u") {
     Some(ListEntry::Item(item)) => match &item.bare_item {
@@ -194,13 +194,11 @@ pub use error::Error;
 pub use integer::{integer, Integer};
 pub use key::{key_ref, Key, KeyRef};
 #[cfg(feature = "parsed-types")]
-pub use parsed::{Dictionary, InnerList, Item, List, ListEntry, Parameters};
+pub use parsed::{Dictionary, FieldType, InnerList, Item, List, ListEntry, Parameters};
 pub use parser::Parser;
 pub use ref_serializer::{
     DictSerializer, InnerListSerializer, ItemSerializer, ListSerializer, ParameterSerializer,
 };
-#[cfg(feature = "parsed-types")]
-pub use serializer::SerializeValue;
 pub use string::{string_ref, String, StringRef};
 pub use token::{token_ref, Token, TokenRef};
 

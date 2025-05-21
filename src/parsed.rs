@@ -3,11 +3,12 @@ use std::convert::Infallible;
 use indexmap::IndexMap;
 
 use crate::{
+    private::Sealed,
     visitor::{
         DictionaryVisitor, EntryVisitor, InnerListVisitor, ItemVisitor, ListVisitor,
         ParameterVisitor,
     },
-    BareItem, BareItemFromInput, Key, KeyRef,
+    BareItem, BareItemFromInput, Error, Key, KeyRef, Parser,
 };
 
 /// An [item]-type structured field value.
@@ -240,5 +241,93 @@ impl<'de> ListVisitor<'de> for List {
 
     fn entry(&mut self) -> Result<impl EntryVisitor<'de>, Self::Error> {
         Ok(self)
+    }
+}
+
+/// A structured-field type, supporting parsing and serialization.
+pub trait FieldType: Sealed {
+    /// The result of serializing the value into a string.
+    ///
+    /// [`Item`] serialization is infallible; [`List`] and [`Dictionary`]
+    /// serialization is not.
+    type SerializeResult: Into<Option<String>>;
+
+    /// Serializes a structured field value into a string.
+    ///
+    /// Note: The serialization conforms to [RFC 9651], meaning that
+    /// [`Dates`][crate::Date] and [`Display Strings`][RefBareItem::DisplayString],
+    /// which cause parsing errors under [RFC 8941], will be serialized
+    /// unconditionally. The consumer of this API is responsible for determining
+    /// whether it is valid to serialize these bare items for any specific field.
+    ///
+    /// [RFC 8941]: <https://httpwg.org/specs/rfc8941.html>
+    /// [RFC 9651]: <https://httpwg.org/specs/rfc9651.html>
+    ///
+    /// Use [`crate::ItemSerializer`], [`crate::ListSerializer`], or
+    /// [`crate::DictSerializer`] to serialize components incrementally without
+    /// having to create an [`Item`], [`List`], or [`Dictionary`].
+    fn serialize(&self) -> Self::SerializeResult;
+
+    /// Parses a structured-field value from the given parser.
+    ///
+    /// # Errors
+    /// When the parsing process is unsuccessful.
+    fn parse(parser: Parser<'_>) -> Result<Self, Error>
+    where
+        Self: Sized;
+}
+
+impl Sealed for Item {}
+
+impl FieldType for Item {
+    type SerializeResult = String;
+
+    fn serialize(&self) -> String {
+        crate::ItemSerializer::new()
+            .bare_item(&self.bare_item)
+            .parameters(&self.params)
+            .finish()
+    }
+
+    fn parse(parser: Parser<'_>) -> Result<Self, Error> {
+        let mut item = Self::new(false);
+        parser.parse_item_with_visitor(&mut item)?;
+        Ok(item)
+    }
+}
+
+impl Sealed for List {}
+
+impl FieldType for List {
+    type SerializeResult = Option<String>;
+
+    fn serialize(&self) -> Option<String> {
+        let mut ser = crate::ListSerializer::new();
+        ser.members(self);
+        ser.finish()
+    }
+
+    fn parse(parser: Parser<'_>) -> Result<Self, Error> {
+        let mut list = Self::new();
+        parser.parse_list_with_visitor(&mut list)?;
+        Ok(list)
+    }
+}
+
+impl Sealed for Dictionary {}
+
+impl FieldType for Dictionary {
+    type SerializeResult = Option<String>;
+
+    fn serialize(&self) -> Option<String> {
+        let mut ser = crate::DictSerializer::new();
+        ser.members(self);
+        ser.finish()
+    }
+
+    fn parse(parser: Parser<'_>) -> Result<Self, Error> {
+        let mut dict = Self::new();
+        parser.parse_dictionary_with_visitor(&mut dict)?;
+        Ok(dict)
     }
 }

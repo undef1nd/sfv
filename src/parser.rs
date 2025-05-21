@@ -9,8 +9,6 @@ use crate::{
     BareItemFromInput, Date, Decimal, Error, Integer, KeyRef, Num, SFVResult, String, StringRef,
     TokenRef, Version,
 };
-#[cfg(feature = "parsed-types")]
-use crate::{Dictionary, Item, List};
 
 fn parse_item<'de>(parser: &mut Parser<'de>, visitor: impl ItemVisitor<'de>) -> SFVResult<()> {
     // https://httpwg.org/specs/rfc9651.html#parse-item
@@ -78,15 +76,13 @@ impl<'de> Parser<'de> {
         self
     }
 
-    /// Parses input into a structured field value of `Dictionary` type.
+    /// Parses a structured field value.
     ///
     /// # Errors
     /// When the parsing process is unsuccessful.
     #[cfg(feature = "parsed-types")]
-    pub fn parse_dictionary(self) -> SFVResult<Dictionary> {
-        let mut dict = Dictionary::new();
-        self.parse_dictionary_with_visitor(&mut dict)?;
-        Ok(dict)
+    pub fn parse<T: crate::FieldType>(self) -> SFVResult<T> {
+        T::parse(self)
     }
 
     /// Parses input into a structured field value of `Dictionary` type, using
@@ -99,14 +95,14 @@ This can also be used to parse a dictionary that is split into multiple lines by
 them into an existing structure:
 
 ```
-# use sfv::{Parser, SerializeValue};
+# use sfv::{Dictionary, FieldType, Parser};
 # fn main() -> Result<(), sfv::Error> {
-let mut dict = Parser::new("a=1").parse_dictionary()?;
+let mut dict: Dictionary = Parser::new("a=1").parse()?;
 
 Parser::new("b=2").parse_dictionary_with_visitor(&mut dict)?;
 
 assert_eq!(
-    dict.serialize_value().as_deref(),
+    dict.serialize().as_deref(),
     Some("a=1, b=2"),
 );
 # Ok(())
@@ -122,7 +118,7 @@ assert_eq!(
         visitor: &mut (impl ?Sized + DictionaryVisitor<'de>),
     ) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc9651.html#parse-dictionary
-        self.parse(move |parser| {
+        self.parse_internal(move |parser| {
             parse_comma_separated(parser, |parser| {
                 // Note: It is up to the visitor to properly handle duplicate keys.
                 let entry_visitor = visitor.entry(parser.parse_key()?).map_err(Error::custom)?;
@@ -140,17 +136,6 @@ assert_eq!(
         })
     }
 
-    /// Parses input into a structured field value of `List` type.
-    ///
-    /// # Errors
-    /// When the parsing process is unsuccessful.
-    #[cfg(feature = "parsed-types")]
-    pub fn parse_list(self) -> SFVResult<List> {
-        let mut list = List::new();
-        self.parse_list_with_visitor(&mut list)?;
-        Ok(list)
-    }
-
     /// Parses input into a structured field value of `List` type, using the
     /// given visitor.
     #[allow(clippy::needless_raw_string_hashes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/11737
@@ -161,14 +146,14 @@ assert_eq!(
 This can also be used to parse a list that is split into multiple lines by merging them
 into an existing structure:
 ```
-# use sfv::{Parser, SerializeValue};
+# use sfv::{FieldType, List, Parser};
 # fn main() -> Result<(), sfv::Error> {
-let mut list = Parser::new("11, (12 13)").parse_list()?;
+let mut list: List = Parser::new("11, (12 13)").parse()?;
 
 Parser::new(r#""foo",        "bar""#).parse_list_with_visitor(&mut list)?;
 
 assert_eq!(
-    list.serialize_value().as_deref(),
+    list.serialize().as_deref(),
     Some(r#"11, (12 13), "foo", "bar""#),
 );
 # Ok(())
@@ -184,22 +169,11 @@ assert_eq!(
         visitor: &mut (impl ?Sized + ListVisitor<'de>),
     ) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc9651.html#parse-list
-        self.parse(|parser| {
+        self.parse_internal(|parser| {
             parse_comma_separated(parser, |parser| {
                 parser.parse_list_entry(visitor.entry().map_err(Error::custom)?)
             })
         })
-    }
-
-    /// Parses input into a structured field value of `Item` type.
-    ///
-    /// # Errors
-    /// When the parsing process is unsuccessful.
-    #[cfg(feature = "parsed-types")]
-    pub fn parse_item(self) -> SFVResult<Item> {
-        let mut item = Item::new(false);
-        self.parse_item_with_visitor(&mut item)?;
-        Ok(item)
     }
 
     /// Parses input into a structured field value of `Item` type, using the
@@ -208,7 +182,7 @@ assert_eq!(
     /// # Errors
     /// When the parsing process is unsuccessful, including any error raised by a visitor.
     pub fn parse_item_with_visitor(self, visitor: impl ItemVisitor<'de>) -> SFVResult<()> {
-        self.parse(|parser| parse_item(parser, visitor))
+        self.parse_internal(|parser| parse_item(parser, visitor))
     }
 
     fn peek(&self) -> Option<u8> {
@@ -225,7 +199,7 @@ assert_eq!(
 
     // Generic parse method for checking input before parsing
     // and handling trailing text error
-    fn parse(mut self, f: impl FnOnce(&mut Self) -> SFVResult<()>) -> SFVResult<()> {
+    fn parse_internal(mut self, f: impl FnOnce(&mut Self) -> SFVResult<()>) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc9651.html#text-parse
 
         self.consume_sp_chars();
