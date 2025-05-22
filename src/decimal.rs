@@ -103,10 +103,7 @@ macro_rules! impl_try_from_integer {
                 fn try_from(v: $from) -> Result<Decimal, Error> {
                     match v.checked_mul(1000) {
                         None => Err(Error::out_of_range()),
-                        Some(v) => match Integer::try_from(v) {
-                            Ok(v) => Ok(Decimal(v)),
-                            Err(_) => Err(Error::out_of_range()),
-                        },
+                        Some(v) => Integer::try_from(v).map(Decimal),
                     }
                 }
             }
@@ -170,10 +167,7 @@ impl TryFrom<f64> for Decimal {
         // Note that this relies on saturating casts for values > i64::MAX
         // See https://github.com/rust-lang/rust/issues/10184
         #[allow(clippy::cast_possible_truncation)]
-        match Integer::try_from(v as i64) {
-            Ok(v) => Ok(Decimal(v)),
-            Err(_) => Err(Error::out_of_range()),
-        }
+        Integer::try_from(v as i64).map(Decimal)
     }
 }
 
