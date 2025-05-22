@@ -1,27 +1,28 @@
 use std::{borrow::Cow, string::String as StdString};
 
 use crate::{
-    utils,
+    error, utils,
     visitor::{
         DictionaryVisitor, EntryVisitor, InnerListVisitor, ItemVisitor, ListVisitor,
         ParameterVisitor,
     },
-    BareItemFromInput, Date, Decimal, Error, Integer, KeyRef, Num, SFVResult, String, StringRef,
-    TokenRef, Version,
+    BareItemFromInput, Date, Decimal, Integer, KeyRef, Num, SFVResult, String, StringRef, TokenRef,
+    Version,
 };
 
-fn parse_item<'de>(parser: &mut Parser<'de>, visitor: impl ItemVisitor<'de>) -> SFVResult<()> {
+fn parse_item<'de>(
+    parser: &mut Parser<'de>,
+    visitor: impl ItemVisitor<'de>,
+) -> Result<(), error::Repr> {
     // https://httpwg.org/specs/rfc9651.html#parse-item
-    let param_visitor = visitor
-        .bare_item(parser.parse_bare_item()?)
-        .map_err(Error::custom)?;
+    let param_visitor = visitor.bare_item(parser.parse_bare_item()?)?;
     parser.parse_parameters(param_visitor)
 }
 
 fn parse_comma_separated<'de>(
     parser: &mut Parser<'de>,
-    mut parse_member: impl FnMut(&mut Parser<'de>) -> SFVResult<()>,
-) -> SFVResult<()> {
+    mut parse_member: impl FnMut(&mut Parser<'de>) -> Result<(), error::Repr>,
+) -> Result<(), error::Repr> {
     while parser.peek().is_some() {
         parse_member(parser)?;
 
@@ -35,7 +36,7 @@ fn parse_comma_separated<'de>(
 
         if let Some(c) = parser.peek() {
             if c != b',' {
-                return parser.error("trailing characters after member");
+                Err(error::Repr::TrailingCharactersAfterMember(parser.index))?;
             }
             parser.next();
         }
@@ -45,7 +46,7 @@ fn parse_comma_separated<'de>(
         if parser.peek().is_none() {
             // Report the error at the position of the comma itself, rather
             // than at the end of input.
-            return Err(Error::with_index("trailing comma", comma_index));
+            Err(error::Repr::TrailingComma(comma_index))?;
         }
     }
 
@@ -121,15 +122,13 @@ assert_eq!(
         self.parse_internal(move |parser| {
             parse_comma_separated(parser, |parser| {
                 // Note: It is up to the visitor to properly handle duplicate keys.
-                let entry_visitor = visitor.entry(parser.parse_key()?).map_err(Error::custom)?;
+                let entry_visitor = visitor.entry(parser.parse_key()?)?;
 
                 if let Some(b'=') = parser.peek() {
                     parser.next();
                     parser.parse_list_entry(entry_visitor)
                 } else {
-                    let param_visitor = entry_visitor
-                        .bare_item(BareItemFromInput::from(true))
-                        .map_err(Error::custom)?;
+                    let param_visitor = entry_visitor.bare_item(BareItemFromInput::from(true))?;
                     parser.parse_parameters(param_visitor)
                 }
             })
@@ -170,9 +169,7 @@ assert_eq!(
     ) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc9651.html#parse-list
         self.parse_internal(|parser| {
-            parse_comma_separated(parser, |parser| {
-                parser.parse_list_entry(visitor.entry().map_err(Error::custom)?)
-            })
+            parse_comma_separated(parser, |parser| parser.parse_list_entry(visitor.entry()?))
         })
     }
 
@@ -193,13 +190,12 @@ assert_eq!(
         self.peek().inspect(|_| self.index += 1)
     }
 
-    fn error<T>(&self, msg: &'static str) -> SFVResult<T> {
-        Err(Error::with_index(msg, self.index))
-    }
-
     // Generic parse method for checking input before parsing
     // and handling trailing text error
-    fn parse_internal(mut self, f: impl FnOnce(&mut Self) -> SFVResult<()>) -> SFVResult<()> {
+    fn parse_internal(
+        mut self,
+        f: impl FnOnce(&mut Self) -> Result<(), error::Repr>,
+    ) -> SFVResult<()> {
         // https://httpwg.org/specs/rfc9651.html#text-parse
 
         self.consume_sp_chars();
@@ -209,18 +205,18 @@ assert_eq!(
         self.consume_sp_chars();
 
         if self.peek().is_some() {
-            self.error("trailing characters after parsed value")
-        } else {
-            Ok(())
+            Err(error::Repr::TrailingCharactersAfterParsedValue(self.index))?;
         }
+
+        Ok(())
     }
 
-    fn parse_list_entry(&mut self, visitor: impl EntryVisitor<'de>) -> SFVResult<()> {
+    fn parse_list_entry(&mut self, visitor: impl EntryVisitor<'de>) -> Result<(), error::Repr> {
         // https://httpwg.org/specs/rfc9651.html#parse-item-or-list
         // ListEntry represents a tuple (item_or_inner_list, parameters)
 
         match self.peek() {
-            Some(b'(') => self.parse_inner_list(visitor.inner_list().map_err(Error::custom)?),
+            Some(b'(') => self.parse_inner_list(visitor.inner_list()?),
             _ => parse_item(self, visitor),
         }
     }
@@ -228,11 +224,11 @@ assert_eq!(
     pub(crate) fn parse_inner_list(
         &mut self,
         mut visitor: impl InnerListVisitor<'de>,
-    ) -> SFVResult<()> {
+    ) -> Result<(), error::Repr> {
         // https://httpwg.org/specs/rfc9651.html#parse-innerlist
 
         if Some(b'(') != self.peek() {
-            return self.error("expected start of inner list");
+            Err(error::Repr::ExpectedStartOfInnerList(self.index))?;
         }
 
         self.next();
@@ -242,49 +238,47 @@ assert_eq!(
 
             if Some(b')') == self.peek() {
                 self.next();
-                let param_visitor = visitor.finish().map_err(Error::custom)?;
+                let param_visitor = visitor.finish()?;
                 return self.parse_parameters(param_visitor);
             }
 
-            parse_item(self, visitor.item().map_err(Error::custom)?)?;
+            parse_item(self, visitor.item()?)?;
 
             if let Some(c) = self.peek() {
                 if c != b' ' && c != b')' {
-                    return self.error("expected inner list delimiter (' ' or ')')");
+                    Err(error::Repr::ExpectedInnerListDelimiter(self.index))?;
                 }
             }
         }
 
-        self.error("unterminated inner list")
+        Err(error::Repr::UnterminatedInnerList(self.index))
     }
 
-    pub(crate) fn parse_bare_item(&mut self) -> SFVResult<BareItemFromInput<'de>> {
+    pub(crate) fn parse_bare_item(&mut self) -> Result<BareItemFromInput<'de>, error::Repr> {
         // https://httpwg.org/specs/rfc9651.html#parse-bare-item
 
-        match self.peek() {
-            Some(b'?') => Ok(BareItemFromInput::Boolean(self.parse_bool()?)),
-            Some(b'"') => Ok(BareItemFromInput::String(self.parse_string()?)),
-            Some(b':') => Ok(BareItemFromInput::ByteSequence(self.parse_byte_sequence()?)),
-            Some(b'@') => Ok(BareItemFromInput::Date(self.parse_date()?)),
-            Some(b'%') => Ok(BareItemFromInput::DisplayString(
-                self.parse_display_string()?,
-            )),
+        Ok(match self.peek() {
+            Some(b'?') => BareItemFromInput::Boolean(self.parse_bool()?),
+            Some(b'"') => BareItemFromInput::String(self.parse_string()?),
+            Some(b':') => BareItemFromInput::ByteSequence(self.parse_byte_sequence()?),
+            Some(b'@') => BareItemFromInput::Date(self.parse_date()?),
+            Some(b'%') => BareItemFromInput::DisplayString(self.parse_display_string()?),
             Some(c) if utils::is_allowed_start_token_char(c) => {
-                Ok(BareItemFromInput::Token(self.parse_token()?))
+                BareItemFromInput::Token(self.parse_token()?)
             }
             Some(c) if c == b'-' || c.is_ascii_digit() => match self.parse_number()? {
-                Num::Decimal(val) => Ok(BareItemFromInput::Decimal(val)),
-                Num::Integer(val) => Ok(BareItemFromInput::Integer(val)),
+                Num::Decimal(val) => BareItemFromInput::Decimal(val),
+                Num::Integer(val) => BareItemFromInput::Integer(val),
             },
-            _ => self.error("expected start of bare item"),
-        }
+            _ => Err(error::Repr::ExpectedStartOfBareItem(self.index))?,
+        })
     }
 
-    pub(crate) fn parse_bool(&mut self) -> SFVResult<bool> {
+    pub(crate) fn parse_bool(&mut self) -> Result<bool, error::Repr> {
         // https://httpwg.org/specs/rfc9651.html#parse-boolean
 
         if self.peek() != Some(b'?') {
-            return self.error("expected start of boolean ('?')");
+            Err(error::Repr::ExpectedStartOfBoolean(self.index))?;
         }
 
         self.next();
@@ -298,15 +292,15 @@ assert_eq!(
                 self.next();
                 Ok(true)
             }
-            _ => self.error("expected boolean ('0' or '1')"),
+            _ => Err(error::Repr::ExpectedBoolean(self.index)),
         }
     }
 
-    pub(crate) fn parse_string(&mut self) -> SFVResult<Cow<'de, StringRef>> {
+    pub(crate) fn parse_string(&mut self) -> Result<Cow<'de, StringRef>, error::Repr> {
         // https://httpwg.org/specs/rfc9651.html#parse-string
 
         if self.peek() != Some(b'"') {
-            return self.error(r#"expected start of string ('"')"#);
+            Err(error::Repr::ExpectedStartOfString(self.index))?;
         }
 
         self.next();
@@ -332,7 +326,7 @@ assert_eq!(
                     });
                 }
                 0x00..=0x1f | 0x7f..=0xff => {
-                    return self.error("invalid string character");
+                    Err(error::Repr::InvalidStringCharacter(self.index))?;
                 }
                 b'\\' => {
                     self.next();
@@ -341,8 +335,8 @@ assert_eq!(
                             self.next();
                             output.to_mut().push(c);
                         }
-                        None => return self.error("unterminated escape sequence"),
-                        Some(_) => return self.error("invalid escape sequence"),
+                        None => Err(error::Repr::UnterminatedEscapeSequence(self.index))?,
+                        Some(_) => Err(error::Repr::InvalidEscapeSequence(self.index))?,
                     }
                 }
                 _ => {
@@ -354,7 +348,7 @@ assert_eq!(
                 }
             }
         }
-        self.error("unterminated string")
+        Err(error::Repr::UnterminatedString(self.index))
     }
 
     fn parse_non_empty_str(
@@ -383,23 +377,23 @@ assert_eq!(
         }
     }
 
-    pub(crate) fn parse_token(&mut self) -> SFVResult<&'de TokenRef> {
+    pub(crate) fn parse_token(&mut self) -> Result<&'de TokenRef, error::Repr> {
         // https://httpwg.org/specs/9651.html#parse-token
 
         match self.parse_non_empty_str(
             utils::is_allowed_start_token_char,
             utils::is_allowed_inner_token_char,
         ) {
-            None => self.error("expected start of token"),
+            None => Err(error::Repr::ExpectedStartOfToken(self.index)),
             Some(str) => Ok(TokenRef::from_validated_str(str)),
         }
     }
 
-    pub(crate) fn parse_byte_sequence(&mut self) -> SFVResult<Vec<u8>> {
+    pub(crate) fn parse_byte_sequence(&mut self) -> Result<Vec<u8>, error::Repr> {
         // https://httpwg.org/specs/rfc9651.html#parse-binary
 
         if self.peek() != Some(b':') {
-            return self.error("expected start of byte sequence (':')");
+            Err(error::Repr::ExpectedStartOfByteSequence(self.index))?;
         }
 
         self.next();
@@ -409,7 +403,7 @@ assert_eq!(
             match self.next() {
                 Some(b':') => break,
                 Some(_) => {}
-                None => return self.error("unterminated byte sequence"),
+                None => Err(error::Repr::UnterminatedByteSequence(self.index))?,
             }
         }
 
@@ -429,12 +423,12 @@ assert_eq!(
                     }
                 };
 
-                Err(Error::with_index("invalid byte sequence", index))
+                Err(error::Repr::InvalidByteSequence(index))
             }
         }
     }
 
-    pub(crate) fn parse_number(&mut self) -> SFVResult<Num> {
+    pub(crate) fn parse_number(&mut self) -> Result<Num, error::Repr> {
         // https://httpwg.org/specs/rfc9651.html#parse-number
 
         fn char_to_i64(c: u8) -> i64 {
@@ -453,7 +447,7 @@ assert_eq!(
                 self.next();
                 char_to_i64(c)
             }
-            _ => return self.error("expected digit"),
+            _ => Err(error::Repr::ExpectedDigit(self.index))?,
         };
 
         let mut digits = 1;
@@ -462,7 +456,7 @@ assert_eq!(
             match self.peek() {
                 Some(b'.') => {
                     if digits > 12 {
-                        return self.error("too many digits before decimal point");
+                        Err(error::Repr::TooManyDigitsBeforeDecimalPoint(self.index))?;
                     }
                     self.next();
                     break;
@@ -470,7 +464,7 @@ assert_eq!(
                 Some(c @ b'0'..=b'9') => {
                     digits += 1;
                     if digits > 15 {
-                        return self.error("too many digits");
+                        Err(error::Repr::TooManyDigits(self.index))?;
                     }
                     self.next();
                     magnitude = magnitude * 10 + char_to_i64(c);
@@ -484,7 +478,7 @@ assert_eq!(
 
         while let Some(c @ b'0'..=b'9') = self.peek() {
             if scale == 0 {
-                return self.error("too many digits after decimal point");
+                Err(error::Repr::TooManyDigitsAfterDecimalPoint(self.index))?;
             }
 
             self.next();
@@ -495,7 +489,7 @@ assert_eq!(
         if scale == 100 {
             // Report the error at the position of the decimal itself, rather
             // than the next position.
-            Err(Error::with_index("trailing decimal point", self.index - 1))
+            Err(error::Repr::TrailingDecimalPoint(self.index - 1))
         } else {
             Ok(Num::Decimal(Decimal::from_integer_scaled_1000(
                 Integer::try_from(sign * magnitude).unwrap(),
@@ -503,15 +497,15 @@ assert_eq!(
         }
     }
 
-    pub(crate) fn parse_date(&mut self) -> SFVResult<Date> {
+    pub(crate) fn parse_date(&mut self) -> Result<Date, error::Repr> {
         // https://httpwg.org/specs/rfc9651.html#parse-date
 
         if self.peek() != Some(b'@') {
-            return self.error("expected start of date ('@')");
+            Err(error::Repr::ExpectedStartOfDate(self.index))?;
         }
 
         match self.version {
-            Version::Rfc8941 => return self.error("RFC 8941 does not support dates"),
+            Version::Rfc8941 => Err(error::Repr::Rfc8941Date(self.index))?,
             Version::Rfc9651 => {}
         }
 
@@ -520,29 +514,26 @@ assert_eq!(
 
         match self.parse_number()? {
             Num::Integer(seconds) => Ok(Date::from_unix_seconds(seconds)),
-            Num::Decimal(_) => Err(Error::with_index(
-                "date must be an integer number of seconds",
-                start,
-            )),
+            Num::Decimal(_) => Err(error::Repr::NonIntegerDate(start)),
         }
     }
 
-    pub(crate) fn parse_display_string(&mut self) -> SFVResult<Cow<'de, str>> {
+    pub(crate) fn parse_display_string(&mut self) -> Result<Cow<'de, str>, error::Repr> {
         // https://httpwg.org/specs/rfc9651.html#parse-display
 
         if self.peek() != Some(b'%') {
-            return self.error("expected start of display string ('%')");
+            Err(error::Repr::ExpectedStartOfDisplayString(self.index))?;
         }
 
         match self.version {
-            Version::Rfc8941 => return self.error("RFC 8941 does not support display strings"),
+            Version::Rfc8941 => Err(error::Repr::Rfc8941DisplayString(self.index))?,
             Version::Rfc9651 => {}
         }
 
         self.next();
 
         if self.peek() != Some(b'"') {
-            return self.error(r#"expected '"'"#);
+            Err(error::Repr::ExpectedQuote(self.index))?;
         }
 
         self.next();
@@ -557,22 +548,20 @@ assert_eq!(
                     return match output {
                         Cow::Borrowed(output) => match std::str::from_utf8(output) {
                             Ok(output) => Ok(Cow::Borrowed(output)),
-                            Err(err) => Err(Error::with_index(
-                                "invalid UTF-8 in display string",
+                            Err(err) => Err(error::Repr::InvalidUtf8InDisplayString(
                                 start + err.valid_up_to(),
                             )),
                         },
                         Cow::Owned(output) => match StdString::from_utf8(output) {
                             Ok(output) => Ok(Cow::Owned(output)),
-                            Err(err) => Err(Error::with_index(
-                                "invalid UTF-8 in display string",
+                            Err(err) => Err(error::Repr::InvalidUtf8InDisplayString(
                                 start + err.utf8_error().valid_up_to(),
                             )),
                         },
                     };
                 }
                 0x00..=0x1f | 0x7f..=0xff => {
-                    return self.error("invalid display string character");
+                    Err(error::Repr::InvalidDisplayStringCharacter(self.index))?;
                 }
                 b'%' => {
                     self.next();
@@ -590,8 +579,8 @@ assert_eq!(
                                     self.next();
                                     c - b'a' + 10
                                 }
-                                None => return self.error("unterminated escape sequence"),
-                                Some(_) => return self.error("invalid escape sequence"),
+                                None => Err(error::Repr::UnterminatedEscapeSequence(self.index))?,
+                                Some(_) => Err(error::Repr::InvalidEscapeSequence(self.index))?,
                             };
                     }
 
@@ -606,13 +595,13 @@ assert_eq!(
                 }
             }
         }
-        self.error("unterminated display string")
+        Err(error::Repr::UnterminatedDisplayString(self.index))
     }
 
     pub(crate) fn parse_parameters(
         &mut self,
         mut visitor: impl ParameterVisitor<'de>,
-    ) -> SFVResult<()> {
+    ) -> Result<(), error::Repr> {
         // https://httpwg.org/specs/rfc9651.html#parse-param
 
         while let Some(b';') = self.peek() {
@@ -628,22 +617,21 @@ assert_eq!(
                 _ => BareItemFromInput::Boolean(true),
             };
             // Note: It is up to the visitor to properly handle duplicate keys.
-            visitor
-                .parameter(param_name, param_value)
-                .map_err(Error::custom)?;
+            visitor.parameter(param_name, param_value)?;
         }
 
-        visitor.finish().map_err(Error::custom)
+        visitor.finish()?;
+        Ok(())
     }
 
-    pub(crate) fn parse_key(&mut self) -> SFVResult<&'de KeyRef> {
+    pub(crate) fn parse_key(&mut self) -> Result<&'de KeyRef, error::Repr> {
         // https://httpwg.org/specs/rfc9651.html#parse-key
 
         match self.parse_non_empty_str(
             utils::is_allowed_start_key_char,
             utils::is_allowed_inner_key_char,
         ) {
-            None => self.error("expected start of key ('a'-'z' or '*')"),
+            None => Err(error::Repr::ExpectedStartOfKey(self.index)),
             Some(str) => Ok(KeyRef::from_validated_str(str)),
         }
     }
