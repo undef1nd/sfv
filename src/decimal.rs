@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::{Error, Integer};
+use crate::{error, Error, Integer};
 
 /// A structured field value [decimal].
 ///
@@ -102,10 +102,10 @@ macro_rules! impl_try_from_integer {
 
                 fn try_from(v: $from) -> Result<Decimal, Error> {
                     match v.checked_mul(1000) {
-                        None => Err(Error::out_of_range()),
+                        None => Err(error::Repr::OutOfRange)?,
                         Some(v) => match Integer::try_from(v) {
                             Ok(v) => Ok(Decimal(v)),
-                            Err(_) => Err(Error::out_of_range()),
+                            Err(_) => Err(error::Repr::OutOfRange)?,
                         },
                     }
                 }
@@ -162,7 +162,7 @@ impl TryFrom<f64> for Decimal {
 
     fn try_from(v: f64) -> Result<Decimal, Error> {
         if v.is_nan() {
-            return Err(Error::new("NaN"));
+            Err(error::Repr::NaN)?;
         }
 
         let v = (v * 1000.0).round_ties_even();
@@ -172,7 +172,7 @@ impl TryFrom<f64> for Decimal {
         #[allow(clippy::cast_possible_truncation)]
         match Integer::try_from(v as i64) {
             Ok(v) => Ok(Decimal(v)),
-            Err(_) => Err(Error::out_of_range()),
+            Err(_) => Err(error::Repr::OutOfRange)?,
         }
     }
 }

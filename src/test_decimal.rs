@@ -1,4 +1,4 @@
-use crate::{Decimal, Error, Integer};
+use crate::{error, Decimal, Error, Integer};
 
 // Expect a floating point error less than the smallest allowed value of 0.001
 const ABSERR: f64 = 0.000_1_f64;
@@ -59,19 +59,19 @@ fn test_into_f64() {
 #[test]
 fn test_try_from_f64() {
     for (expected, input) in [
-        (Err(Error::new("NaN")), f64::NAN),
-        (Err(Error::out_of_range()), f64::INFINITY),
-        (Err(Error::out_of_range()), f64::NEG_INFINITY),
-        (Err(Error::out_of_range()), 2_f64.powi(65)),
-        (Err(Error::out_of_range()), -(2_f64.powi(65))),
-        (Err(Error::out_of_range()), -1_000_000_000_000.0),
-        (Err(Error::out_of_range()), 1_000_000_000_000.0),
+        (Err(error::Repr::NaN), f64::NAN),
+        (Err(error::Repr::OutOfRange), f64::INFINITY),
+        (Err(error::Repr::OutOfRange), f64::NEG_INFINITY),
+        (Err(error::Repr::OutOfRange), 2_f64.powi(65)),
+        (Err(error::Repr::OutOfRange), -(2_f64.powi(65))),
+        (Err(error::Repr::OutOfRange), -1_000_000_000_000.0),
+        (Err(error::Repr::OutOfRange), 1_000_000_000_000.0),
         (Ok(Decimal::MIN), -999_999_999_999.999),
         (Ok(Decimal::MIN), -999_999_999_999.999_1),
-        (Err(Error::out_of_range()), -999_999_999_999.999_5),
+        (Err(error::Repr::OutOfRange), -999_999_999_999.999_5),
         (Ok(Decimal::MAX), 999_999_999_999.999),
         (Ok(Decimal::MAX), 999_999_999_999.999_1),
-        (Err(Error::out_of_range()), 999_999_999_999.999_5),
+        (Err(error::Repr::OutOfRange), 999_999_999_999.999_5),
         (Ok(Decimal::ZERO), 0.0),
         (Ok(Decimal::ZERO), -0.0),
         (
@@ -99,6 +99,6 @@ fn test_try_from_f64() {
             -0.1236,
         ),
     ] {
-        assert_eq!(expected, Decimal::try_from(input));
+        assert_eq!(expected.map_err(Error::from), Decimal::try_from(input));
     }
 }

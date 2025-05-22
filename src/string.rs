@@ -4,7 +4,7 @@ use std::{
     string::String as StdString,
 };
 
-use crate::Error;
+use crate::{error, Error};
 
 /// An owned structured field value [string].
 ///
@@ -32,8 +32,8 @@ struct StringError {
 }
 
 impl From<StringError> for Error {
-    fn from(err: StringError) -> Error {
-        Error::with_index("invalid character", err.byte_index)
+    fn from(err: StringError) -> Self {
+        error::Repr::InvalidCharacter(err.byte_index).into()
     }
 }
 

@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::{Error, GenericBareItem};
+use crate::{error, Error, GenericBareItem};
 
 const RANGE_I64: std::ops::RangeInclusive<i64> = -999_999_999_999_999..=999_999_999_999_999;
 
@@ -79,7 +79,7 @@ macro_rules! impl_conversion {
             fn try_from(v: $t) -> Result<Integer, Error> {
                 match i64::try_from(v) {
                     Ok(v) if RANGE_I64.contains(&v) => Ok(Integer(v)),
-                    _ => Err(Error::out_of_range()),
+                    _ => Err(error::Repr::OutOfRange)?,
                 }
             }
         }
@@ -103,7 +103,7 @@ macro_rules! impl_conversion {
             type Error = Error;
 
             fn try_from(v: Integer) -> Result<$t, Error> {
-                v.0.try_into().map_err(|_| Error::out_of_range())
+                v.0.try_into().map_err(|_| error::Repr::OutOfRange.into())
             }
         }
     };
