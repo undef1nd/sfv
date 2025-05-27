@@ -101,6 +101,7 @@ impl<W: BorrowMut<String>> ParameterSerializer<W> {
     }
 
     /// Finishes parameter serialization and returns the serializer's output.
+    #[must_use]
     pub fn finish(self) -> W {
         self.buffer
     }
@@ -233,6 +234,7 @@ impl<W: BorrowMut<String>> ListSerializer<W> {
     /// Returns `None` if and only if no members were serialized, as [empty
     /// lists are not meant to be serialized at
     /// all](https://httpwg.org/specs/rfc9651.html#text-serialize).
+    #[must_use]
     pub fn finish(self) -> Option<W> {
         if self.first {
             None
@@ -377,6 +379,7 @@ impl<W: BorrowMut<String>> DictSerializer<W> {
     /// Returns `None` if and only if no members were serialized, as [empty
     /// dictionaries are not meant to be serialized at
     /// all](https://httpwg.org/specs/rfc9651.html#text-serialize).
+    #[must_use]
     pub fn finish(self) -> Option<W> {
         if self.first {
             None

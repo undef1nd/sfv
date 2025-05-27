@@ -73,7 +73,7 @@ impl NonEmptyStringError {
         }
     }
 
-    pub const fn msg(&self) -> &'static str {
+    pub(crate) const fn msg(&self) -> &'static str {
         match self.byte_index {
             None => "cannot be empty",
             Some(_) => "invalid character",

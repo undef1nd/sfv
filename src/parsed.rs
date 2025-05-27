@@ -30,6 +30,7 @@ pub struct Item {
 
 impl Item {
     /// Returns a new `Item` with empty `Parameters`.
+    #[must_use]
     pub fn new(bare_item: impl Into<BareItem>) -> Self {
         Self {
             bare_item: bare_item.into(),
@@ -38,6 +39,7 @@ impl Item {
     }
 
     /// Returns a new `Item` with the given `Parameters`.
+    #[must_use]
     pub fn with_params(bare_item: impl Into<BareItem>, params: Parameters) -> Self {
         Self {
             bare_item: bare_item.into(),
@@ -266,6 +268,7 @@ pub trait FieldType: Sealed {
     /// Use [`crate::ItemSerializer`], [`crate::ListSerializer`], or
     /// [`crate::DictSerializer`] to serialize components incrementally without
     /// having to create an [`Item`], [`List`], or [`Dictionary`].
+    #[must_use]
     fn serialize(&self) -> Self::SerializeResult;
 
     /// Parses a structured-field value from the given parser.

@@ -262,6 +262,7 @@ pub enum GenericBareItem<S, B, T, D> {
 
 impl<S, B, T, D> GenericBareItem<S, B, T, D> {
     /// If the bare item is a decimal, returns it; otherwise returns `None`.
+    #[must_use]
     pub fn as_decimal(&self) -> Option<Decimal> {
         match *self {
             Self::Decimal(val) => Some(val),
@@ -270,6 +271,7 @@ impl<S, B, T, D> GenericBareItem<S, B, T, D> {
     }
 
     /// If the bare item is an integer, returns it; otherwise returns `None`.
+    #[must_use]
     pub fn as_integer(&self) -> Option<Integer> {
         match *self {
             Self::Integer(val) => Some(val),
@@ -278,6 +280,7 @@ impl<S, B, T, D> GenericBareItem<S, B, T, D> {
     }
 
     /// If the bare item is a string, returns a reference to it; otherwise returns `None`.
+    #[must_use]
     pub fn as_string(&self) -> Option<&StringRef>
     where
         S: Borrow<StringRef>,
@@ -289,6 +292,7 @@ impl<S, B, T, D> GenericBareItem<S, B, T, D> {
     }
 
     /// If the bare item is a byte sequence, returns a reference to it; otherwise returns `None`.
+    #[must_use]
     pub fn as_byte_sequence(&self) -> Option<&[u8]>
     where
         B: Borrow<[u8]>,
@@ -300,6 +304,7 @@ impl<S, B, T, D> GenericBareItem<S, B, T, D> {
     }
 
     /// If the bare item is a boolean, returns it; otherwise returns `None`.
+    #[must_use]
     pub fn as_boolean(&self) -> Option<bool> {
         match *self {
             Self::Boolean(val) => Some(val),
@@ -308,6 +313,7 @@ impl<S, B, T, D> GenericBareItem<S, B, T, D> {
     }
 
     /// If the bare item is a token, returns a reference to it; otherwise returns `None`.
+    #[must_use]
     pub fn as_token(&self) -> Option<&TokenRef>
     where
         T: Borrow<TokenRef>,
@@ -319,6 +325,7 @@ impl<S, B, T, D> GenericBareItem<S, B, T, D> {
     }
 
     /// If the bare item is a date, returns it; otherwise returns `None`.
+    #[must_use]
     pub fn as_date(&self) -> Option<Date> {
         match *self {
             Self::Date(val) => Some(val),
@@ -327,6 +334,7 @@ impl<S, B, T, D> GenericBareItem<S, B, T, D> {
     }
 
     /// If the bare item is a display string, returns a reference to it; otherwise returns `None`.
+    #[must_use]
     pub fn as_display_string(&self) -> Option<&D> {
         match *self {
             Self::DisplayString(ref val) => Some(val),
