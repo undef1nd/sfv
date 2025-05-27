@@ -51,14 +51,11 @@ const fn validate(v: &[u8]) -> Result<(), StringError> {
 }
 
 impl StringRef {
+    /// An empty `&StringRef`.
+    pub const EMPTY: &Self = Self::cast("");
+
     #[ref_cast::ref_cast_custom]
     const fn cast(v: &str) -> &Self;
-
-    /// Creates an empty `&StringRef`.
-    #[must_use]
-    pub const fn empty() -> &'static Self {
-        Self::cast("")
-    }
 
     /// Creates a `&StringRef` from a `&str`.
     ///
@@ -226,6 +223,6 @@ impl<'a> arbitrary::Arbitrary<'a> for String {
 
 impl Default for &StringRef {
     fn default() -> Self {
-        StringRef::empty()
+        StringRef::EMPTY
     }
 }
