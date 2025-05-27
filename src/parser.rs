@@ -53,6 +53,7 @@ fn parse_comma_separated<'de>(
 }
 
 /// Exposes methods for parsing input into a structured field value.
+#[must_use]
 pub struct Parser<'de> {
     input: &'de [u8],
     index: usize,
@@ -70,7 +71,6 @@ impl<'de> Parser<'de> {
     }
 
     /// Sets the parser's version and returns it.
-    #[must_use]
     pub fn with_version(mut self, version: Version) -> Self {
         self.version = version;
         self

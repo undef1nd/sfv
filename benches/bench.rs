@@ -115,11 +115,11 @@ fn serializing_ref_list(c: &mut Criterion) {
     c.bench_function("serializing_ref_list", move |bench| {
         bench.iter(|| {
             let mut ser = ListSerializer::new();
-            ser.bare_item(token_ref("a"));
-            ser.bare_item(token_ref("abcdefghigklmnoprst"));
-            ser.bare_item(integer(123_456_785_686_457));
-            ser.bare_item(Decimal::try_from(99_999_999_999.999).unwrap());
-            ser.inner_list();
+            _ = ser.bare_item(token_ref("a"));
+            _ = ser.bare_item(token_ref("abcdefghigklmnoprst"));
+            _ = ser.bare_item(integer(123_456_785_686_457));
+            _ = ser.bare_item(Decimal::try_from(99_999_999_999.999).unwrap());
+            _ = ser.inner_list();
             {
                 let mut ser = ser.inner_list();
                 _ = ser.bare_item(string_ref("somelongstringvalue"));
@@ -140,9 +140,9 @@ fn serializing_ref_dict(c: &mut Criterion) {
     c.bench_function("serializing_ref_dict", move |bench| {
         bench.iter(|| {
             let mut ser = DictSerializer::new();
-            ser.bare_item(key_ref("a"), true);
-            ser.bare_item(key_ref("dict_key2"), token_ref("abcdefghigklmnoprst"));
-            ser.bare_item(key_ref("dict_key3"), integer(123_456_785_686_457));
+            _ = ser.bare_item(key_ref("a"), true);
+            _ = ser.bare_item(key_ref("dict_key2"), token_ref("abcdefghigklmnoprst"));
+            _ = ser.bare_item(key_ref("dict_key3"), integer(123_456_785_686_457));
             {
                 let mut ser = ser.inner_list(key_ref("dict_key4"));
                 _ = ser.bare_item(string_ref("inner-list-member"));
