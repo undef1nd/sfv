@@ -66,7 +66,7 @@ fn test_fast_serialize_dict() {
             _ = ser.bare_item(0);
         }
 
-        ser.bare_item(key_ref("key6"), string_ref("foo"));
+        _ = ser.bare_item(key_ref("key6"), string_ref("foo"));
 
         {
             let mut ser = ser.inner_list(key_ref("key7"));
@@ -75,7 +75,7 @@ fn test_fast_serialize_dict() {
             _ = ser.finish().parameter(key_ref("lparam"), 10);
         }
 
-        ser.bare_item(key_ref("key8"), true);
+        _ = ser.bare_item(key_ref("key8"), true);
 
         assert_eq!(
             Some(
@@ -105,10 +105,10 @@ fn test_serialize_empty() {
 #[test]
 fn test_with_buffer_separator() {
     let mut output = String::from(" ");
-    ListSerializer::with_buffer(&mut output).bare_item(1);
+    _ = ListSerializer::with_buffer(&mut output).bare_item(1);
     assert_eq!(output, " 1");
 
     let mut output = String::from(" ");
-    DictSerializer::with_buffer(&mut output).bare_item(key_ref("key1"), 1);
+    _ = DictSerializer::with_buffer(&mut output).bare_item(key_ref("key1"), 1);
     assert_eq!(output, " key1=1");
 }

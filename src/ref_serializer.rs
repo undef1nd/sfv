@@ -29,6 +29,7 @@ use crate::{Item, ListEntry};
 /// ```
 // https://httpwg.org/specs/rfc9651.html#ser-item
 #[derive(Debug)]
+#[must_use]
 pub struct ItemSerializer<W> {
     buffer: W,
 }
@@ -41,7 +42,6 @@ impl Default for ItemSerializer<String> {
 
 impl ItemSerializer<String> {
     /// Creates a serializer that writes into a new string.
-    #[must_use]
     pub fn new() -> Self {
         Self {
             buffer: String::new(),
@@ -73,6 +73,7 @@ impl<W: BorrowMut<String>> ItemSerializer<W> {
 
 /// Serializes parameters incrementally.
 #[derive(Debug)]
+#[must_use]
 pub struct ParameterSerializer<W> {
     buffer: W,
 }
@@ -81,7 +82,6 @@ impl<W: BorrowMut<String>> ParameterSerializer<W> {
     /// Serializes a parameter with the given name and value.
     ///
     /// Returns the serializer.
-    #[must_use]
     pub fn parameter<'b>(mut self, name: &KeyRef, value: impl Into<RefBareItem<'b>>) -> Self {
         Serializer::serialize_parameter(name, value, self.buffer.borrow_mut());
         self
@@ -90,7 +90,6 @@ impl<W: BorrowMut<String>> ParameterSerializer<W> {
     /// Serializes the given parameters.
     ///
     /// Returns the serializer.
-    #[must_use]
     pub fn parameters<'b>(
         mut self,
         params: impl IntoIterator<Item = (impl AsRef<KeyRef>, impl Into<RefBareItem<'b>>)>,
@@ -102,6 +101,7 @@ impl<W: BorrowMut<String>> ParameterSerializer<W> {
     }
 
     /// Finishes parameter serialization and returns the serializer's output.
+    #[must_use]
     pub fn finish(self) -> W {
         self.buffer
     }
@@ -155,6 +155,7 @@ fn maybe_write_separator(buffer: &mut String, first: &mut bool) {
 /// ```
 // https://httpwg.org/specs/rfc9651.html#ser-list
 #[derive(Debug)]
+#[must_use]
 pub struct ListSerializer<W> {
     buffer: W,
     first: bool,
@@ -168,7 +169,6 @@ impl Default for ListSerializer<String> {
 
 impl ListSerializer<String> {
     /// Creates a serializer that writes into a new string.
-    #[must_use]
     pub fn new() -> Self {
         Self {
             buffer: String::new(),
@@ -234,6 +234,7 @@ impl<W: BorrowMut<String>> ListSerializer<W> {
     /// Returns `None` if and only if no members were serialized, as [empty
     /// lists are not meant to be serialized at
     /// all](https://httpwg.org/specs/rfc9651.html#text-serialize).
+    #[must_use]
     pub fn finish(self) -> Option<W> {
         if self.first {
             None
@@ -286,6 +287,7 @@ impl<W: BorrowMut<String>> ListSerializer<W> {
 /// ```
 // https://httpwg.org/specs/rfc9651.html#ser-dictionary
 #[derive(Debug)]
+#[must_use]
 pub struct DictSerializer<W> {
     buffer: W,
     first: bool,
@@ -299,7 +301,6 @@ impl Default for DictSerializer<String> {
 
 impl DictSerializer<String> {
     /// Creates a serializer that writes into a new string.
-    #[must_use]
     pub fn new() -> Self {
         Self {
             buffer: String::new(),
@@ -378,6 +379,7 @@ impl<W: BorrowMut<String>> DictSerializer<W> {
     /// Returns `None` if and only if no members were serialized, as [empty
     /// dictionaries are not meant to be serialized at
     /// all](https://httpwg.org/specs/rfc9651.html#text-serialize).
+    #[must_use]
     pub fn finish(self) -> Option<W> {
         if self.first {
             None
@@ -396,6 +398,7 @@ impl<W: BorrowMut<String>> DictSerializer<W> {
 /// an invalid serialization that lacks a closing `)` character.
 // https://httpwg.org/specs/rfc9651.html#ser-innerlist
 #[derive(Debug)]
+#[must_use]
 pub struct InnerListSerializer<'a> {
     buffer: Option<&'a mut String>,
 }
@@ -412,7 +415,6 @@ impl<'a> InnerListSerializer<'a> {
     /// Serializes the given bare item as a member of the inner list.
     ///
     /// Returns a serializer for the item's parameters.
-    #[must_use]
     #[allow(clippy::missing_panics_doc)] // The unwrap is safe by construction.
     pub fn bare_item<'b>(
         &mut self,
@@ -435,7 +437,6 @@ impl<'a> InnerListSerializer<'a> {
     }
 
     /// Closes the inner list and returns a serializer for its parameters.
-    #[must_use]
     #[allow(clippy::missing_panics_doc)]
     pub fn finish(mut self) -> ParameterSerializer<&'a mut String> {
         let buffer = self.buffer.take().unwrap();
