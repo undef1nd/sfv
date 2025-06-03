@@ -36,7 +36,7 @@ fn parse_comma_separated<'de>(
 
         if let Some(c) = parser.peek() {
             if c != b',' {
-                Err(error::Repr::TrailingCharactersAfterMember(parser.index))?;
+                return Err(error::Repr::TrailingCharactersAfterMember(parser.index));
             }
             parser.next();
         }
@@ -46,7 +46,7 @@ fn parse_comma_separated<'de>(
         if parser.peek().is_none() {
             // Report the error at the position of the comma itself, rather
             // than at the end of input.
-            Err(error::Repr::TrailingComma(comma_index))?;
+            return Err(error::Repr::TrailingComma(comma_index));
         }
     }
 
@@ -205,7 +205,7 @@ assert_eq!(
         self.consume_sp_chars();
 
         if self.peek().is_some() {
-            Err(error::Repr::TrailingCharactersAfterParsedValue(self.index))?;
+            return Err(error::Repr::TrailingCharactersAfterParsedValue(self.index).into());
         }
 
         Ok(())
@@ -228,7 +228,7 @@ assert_eq!(
         // https://httpwg.org/specs/rfc9651.html#parse-innerlist
 
         if Some(b'(') != self.peek() {
-            Err(error::Repr::ExpectedStartOfInnerList(self.index))?;
+            return Err(error::Repr::ExpectedStartOfInnerList(self.index));
         }
 
         self.next();
@@ -246,7 +246,7 @@ assert_eq!(
 
             if let Some(c) = self.peek() {
                 if c != b' ' && c != b')' {
-                    Err(error::Repr::ExpectedInnerListDelimiter(self.index))?;
+                    return Err(error::Repr::ExpectedInnerListDelimiter(self.index));
                 }
             }
         }
@@ -270,7 +270,7 @@ assert_eq!(
                 Num::Decimal(val) => BareItemFromInput::Decimal(val),
                 Num::Integer(val) => BareItemFromInput::Integer(val),
             },
-            _ => Err(error::Repr::ExpectedStartOfBareItem(self.index))?,
+            _ => return Err(error::Repr::ExpectedStartOfBareItem(self.index)),
         })
     }
 
@@ -278,7 +278,7 @@ assert_eq!(
         // https://httpwg.org/specs/rfc9651.html#parse-boolean
 
         if self.peek() != Some(b'?') {
-            Err(error::Repr::ExpectedStartOfBoolean(self.index))?;
+            return Err(error::Repr::ExpectedStartOfBoolean(self.index));
         }
 
         self.next();
@@ -300,7 +300,7 @@ assert_eq!(
         // https://httpwg.org/specs/rfc9651.html#parse-string
 
         if self.peek() != Some(b'"') {
-            Err(error::Repr::ExpectedStartOfString(self.index))?;
+            return Err(error::Repr::ExpectedStartOfString(self.index));
         }
 
         self.next();
@@ -326,7 +326,7 @@ assert_eq!(
                     });
                 }
                 0x00..=0x1f | 0x7f..=0xff => {
-                    Err(error::Repr::InvalidStringCharacter(self.index))?;
+                    return Err(error::Repr::InvalidStringCharacter(self.index));
                 }
                 b'\\' => {
                     self.next();
@@ -335,8 +335,8 @@ assert_eq!(
                             self.next();
                             output.to_mut().push(c);
                         }
-                        None => Err(error::Repr::UnterminatedEscapeSequence(self.index))?,
-                        Some(_) => Err(error::Repr::InvalidEscapeSequence(self.index))?,
+                        None => return Err(error::Repr::UnterminatedEscapeSequence(self.index)),
+                        Some(_) => return Err(error::Repr::InvalidEscapeSequence(self.index)),
                     }
                 }
                 _ => {
@@ -393,7 +393,7 @@ assert_eq!(
         // https://httpwg.org/specs/rfc9651.html#parse-binary
 
         if self.peek() != Some(b':') {
-            Err(error::Repr::ExpectedStartOfByteSequence(self.index))?;
+            return Err(error::Repr::ExpectedStartOfByteSequence(self.index));
         }
 
         self.next();
@@ -403,7 +403,7 @@ assert_eq!(
             match self.next() {
                 Some(b':') => break,
                 Some(_) => {}
-                None => Err(error::Repr::UnterminatedByteSequence(self.index))?,
+                None => return Err(error::Repr::UnterminatedByteSequence(self.index)),
             }
         }
 
@@ -447,7 +447,7 @@ assert_eq!(
                 self.next();
                 char_to_i64(c)
             }
-            _ => Err(error::Repr::ExpectedDigit(self.index))?,
+            _ => return Err(error::Repr::ExpectedDigit(self.index)),
         };
 
         let mut digits = 1;
@@ -456,7 +456,7 @@ assert_eq!(
             match self.peek() {
                 Some(b'.') => {
                     if digits > 12 {
-                        Err(error::Repr::TooManyDigitsBeforeDecimalPoint(self.index))?;
+                        return Err(error::Repr::TooManyDigitsBeforeDecimalPoint(self.index));
                     }
                     self.next();
                     break;
@@ -464,7 +464,7 @@ assert_eq!(
                 Some(c @ b'0'..=b'9') => {
                     digits += 1;
                     if digits > 15 {
-                        Err(error::Repr::TooManyDigits(self.index))?;
+                        return Err(error::Repr::TooManyDigits(self.index));
                     }
                     self.next();
                     magnitude = magnitude * 10 + char_to_i64(c);
@@ -478,7 +478,7 @@ assert_eq!(
 
         while let Some(c @ b'0'..=b'9') = self.peek() {
             if scale == 0 {
-                Err(error::Repr::TooManyDigitsAfterDecimalPoint(self.index))?;
+                return Err(error::Repr::TooManyDigitsAfterDecimalPoint(self.index));
             }
 
             self.next();
@@ -501,11 +501,11 @@ assert_eq!(
         // https://httpwg.org/specs/rfc9651.html#parse-date
 
         if self.peek() != Some(b'@') {
-            Err(error::Repr::ExpectedStartOfDate(self.index))?;
+            return Err(error::Repr::ExpectedStartOfDate(self.index));
         }
 
         match self.version {
-            Version::Rfc8941 => Err(error::Repr::Rfc8941Date(self.index))?,
+            Version::Rfc8941 => return Err(error::Repr::Rfc8941Date(self.index)),
             Version::Rfc9651 => {}
         }
 
@@ -522,18 +522,18 @@ assert_eq!(
         // https://httpwg.org/specs/rfc9651.html#parse-display
 
         if self.peek() != Some(b'%') {
-            Err(error::Repr::ExpectedStartOfDisplayString(self.index))?;
+            return Err(error::Repr::ExpectedStartOfDisplayString(self.index));
         }
 
         match self.version {
-            Version::Rfc8941 => Err(error::Repr::Rfc8941DisplayString(self.index))?,
+            Version::Rfc8941 => return Err(error::Repr::Rfc8941DisplayString(self.index)),
             Version::Rfc9651 => {}
         }
 
         self.next();
 
         if self.peek() != Some(b'"') {
-            Err(error::Repr::ExpectedQuote(self.index))?;
+            return Err(error::Repr::ExpectedQuote(self.index));
         }
 
         self.next();
@@ -561,7 +561,7 @@ assert_eq!(
                     };
                 }
                 0x00..=0x1f | 0x7f..=0xff => {
-                    Err(error::Repr::InvalidDisplayStringCharacter(self.index))?;
+                    return Err(error::Repr::InvalidDisplayStringCharacter(self.index));
                 }
                 b'%' => {
                     self.next();
@@ -579,8 +579,12 @@ assert_eq!(
                                     self.next();
                                     c - b'a' + 10
                                 }
-                                None => Err(error::Repr::UnterminatedEscapeSequence(self.index))?,
-                                Some(_) => Err(error::Repr::InvalidEscapeSequence(self.index))?,
+                                None => {
+                                    return Err(error::Repr::UnterminatedEscapeSequence(self.index))
+                                }
+                                Some(_) => {
+                                    return Err(error::Repr::InvalidEscapeSequence(self.index))
+                                }
                             };
                     }
 

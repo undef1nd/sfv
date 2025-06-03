@@ -79,7 +79,7 @@ macro_rules! impl_conversion {
             fn try_from(v: $t) -> Result<Integer, Error> {
                 match i64::try_from(v) {
                     Ok(v) if RANGE_I64.contains(&v) => Ok(Integer(v)),
-                    _ => Err(error::Repr::OutOfRange)?,
+                    _ => Err(error::Repr::OutOfRange.into()),
                 }
             }
         }
