@@ -1,7 +1,7 @@
 use std::convert::Infallible;
 
 use crate::{
-    integer, key_ref, string_ref, token_ref,
+    error, integer, key_ref, string_ref, token_ref,
     visitor::{
         DictionaryVisitor, EntryVisitor, Ignored, InnerListVisitor, ItemVisitor, ListVisitor,
         ParameterVisitor,
@@ -31,19 +31,16 @@ fn parse() -> Result<(), Error> {
 fn parse_errors() {
     let input = r#""some_value¢""#;
     assert_eq!(
-        Err(Error::with_index("invalid string character", 11)),
+        Err(error::Repr::InvalidStringCharacter(11).into()),
         Parser::new(input).parse_item_with_visitor(Ignored)
     );
     let input = r#""some_value" trailing_text""#;
     assert_eq!(
-        Err(Error::with_index(
-            "trailing characters after parsed value",
-            13
-        )),
+        Err(error::Repr::TrailingCharactersAfterParsedValue(13).into()),
         Parser::new(input).parse_item_with_visitor(Ignored)
     );
     assert_eq!(
-        Err(Error::with_index("expected start of bare item", 0)),
+        Err(error::Repr::ExpectedStartOfBareItem(0).into()),
         Parser::new("").parse_item_with_visitor(Ignored)
     );
 }
@@ -148,52 +145,49 @@ fn parse_list_of_items_and_lists_with_param() -> Result<(), Error> {
 fn parse_list_errors() {
     let input = ",";
     assert_eq!(
-        Err(Error::with_index("expected start of bare item", 0)),
+        Err(error::Repr::ExpectedStartOfBareItem(0).into()),
         Parser::new(input).parse_list_with_visitor(&mut Ignored)
     );
 
     let input = "a, b c";
     assert_eq!(
-        Err(Error::with_index("trailing characters after member", 5)),
+        Err(error::Repr::TrailingCharactersAfterMember(5).into()),
         Parser::new(input).parse_list_with_visitor(&mut Ignored)
     );
 
     let input = "a,";
     assert_eq!(
-        Err(Error::with_index("trailing comma", 1)),
+        Err(error::Repr::TrailingComma(1).into()),
         Parser::new(input).parse_list_with_visitor(&mut Ignored)
     );
 
     let input = "a     ,    ";
     assert_eq!(
-        Err(Error::with_index("trailing comma", 6)),
+        Err(error::Repr::TrailingComma(6).into()),
         Parser::new(input).parse_list_with_visitor(&mut Ignored)
     );
 
     let input = "a\t \t ,\t ";
     assert_eq!(
-        Err(Error::with_index("trailing comma", 5)),
+        Err(error::Repr::TrailingComma(5).into()),
         Parser::new(input).parse_list_with_visitor(&mut Ignored)
     );
 
     let input = "a\t\t,\t\t\t";
     assert_eq!(
-        Err(Error::with_index("trailing comma", 3)),
+        Err(error::Repr::TrailingComma(3).into()),
         Parser::new(input).parse_list_with_visitor(&mut Ignored)
     );
 
     let input = "(a b),";
     assert_eq!(
-        Err(Error::with_index("trailing comma", 5)),
+        Err(error::Repr::TrailingComma(5).into()),
         Parser::new(input).parse_list_with_visitor(&mut Ignored)
     );
 
     let input = "(1, 2, (a b)";
     assert_eq!(
-        Err(Error::with_index(
-            "expected inner list delimiter (' ' or ')')",
-            2
-        )),
+        Err(error::Repr::ExpectedInnerListDelimiter(2).into()),
         Parser::new(input).parse_list_with_visitor(&mut Ignored)
     );
 }
@@ -202,13 +196,13 @@ fn parse_list_errors() {
 fn parse_inner_list_errors() {
     let input = "c b); a=1";
     assert_eq!(
-        Err(Error::with_index("expected start of inner list", 0)),
+        Err(error::Repr::ExpectedStartOfInnerList(0)),
         Parser::new(input).parse_inner_list(Ignored)
     );
 
     let input = "(";
     assert_eq!(
-        Err(Error::with_index("unterminated inner list", 1)),
+        Err(error::Repr::UnterminatedInnerList(1)),
         Parser::new(input).parse_inner_list(Ignored)
     );
 }
@@ -273,12 +267,12 @@ fn parse_dict_empty() -> Result<(), Error> {
 fn parse_dict_errors() {
     let input = "abc=123;a=1;b=2 def";
     assert_eq!(
-        Err(Error::with_index("trailing characters after member", 16)),
+        Err(error::Repr::TrailingCharactersAfterMember(16).into()),
         Parser::new(input).parse_dictionary_with_visitor(&mut Ignored)
     );
     let input = "abc=123;a=1,";
     assert_eq!(
-        Err(Error::with_index("trailing comma", 11)),
+        Err(error::Repr::TrailingComma(11).into()),
         Parser::new(input).parse_dictionary_with_visitor(&mut Ignored)
     );
 }
@@ -392,15 +386,15 @@ fn parse_bare_item() -> Result<(), Error> {
 #[test]
 fn parse_bare_item_errors() {
     assert_eq!(
-        Err(Error::with_index("expected start of bare item", 0)),
+        Err(error::Repr::ExpectedStartOfBareItem(0)),
         Parser::new("!?0").parse_bare_item()
     );
     assert_eq!(
-        Err(Error::with_index("expected start of bare item", 0)),
+        Err(error::Repr::ExpectedStartOfBareItem(0)),
         Parser::new("_11abc").parse_bare_item()
     );
     assert_eq!(
-        Err(Error::with_index("expected start of bare item", 0)),
+        Err(error::Repr::ExpectedStartOfBareItem(0)),
         Parser::new("   ").parse_bare_item()
     );
 }
@@ -420,11 +414,11 @@ fn parse_bool() -> Result<(), Error> {
 #[test]
 fn parse_bool_errors() {
     assert_eq!(
-        Err(Error::with_index("expected start of boolean ('?')", 0)),
+        Err(error::Repr::ExpectedStartOfBoolean(0)),
         Parser::new("").parse_bool()
     );
     assert_eq!(
-        Err(Error::with_index("expected boolean ('0' or '1')", 1)),
+        Err(error::Repr::ExpectedBoolean(1)),
         Parser::new("?").parse_bool()
     );
 }
@@ -451,23 +445,23 @@ fn parse_string() -> Result<(), Error> {
 #[test]
 fn parse_string_errors() {
     assert_eq!(
-        Err(Error::with_index(r#"expected start of string ('"')"#, 0)),
+        Err(error::Repr::ExpectedStartOfString(0)),
         Parser::new("test").parse_string()
     );
     assert_eq!(
-        Err(Error::with_index("unterminated escape sequence", 2)),
+        Err(error::Repr::UnterminatedEscapeSequence(2)),
         Parser::new(r#""\"#).parse_string()
     );
     assert_eq!(
-        Err(Error::with_index("invalid escape sequence", 2)),
+        Err(error::Repr::InvalidEscapeSequence(2)),
         Parser::new(r#""\l""#).parse_string()
     );
     assert_eq!(
-        Err(Error::with_index("invalid string character", 1)),
+        Err(error::Repr::InvalidStringCharacter(1)),
         Parser::new("\"\u{1f}\"").parse_string()
     );
     assert_eq!(
-        Err(Error::with_index("unterminated string", 5)),
+        Err(error::Repr::UnterminatedString(5)),
         Parser::new(r#""smth"#).parse_string()
     );
 }
@@ -502,17 +496,17 @@ fn parse_token() -> Result<(), Error> {
 fn parse_token_errors() {
     let mut parser = Parser::new("765token");
     assert_eq!(
-        Err(Error::with_index("expected start of token", 0)),
+        Err(error::Repr::ExpectedStartOfToken(0)),
         parser.parse_token()
     );
     assert_eq!(parser.remaining(), b"765token");
 
     assert_eq!(
-        Err(Error::with_index("expected start of token", 0)),
+        Err(error::Repr::ExpectedStartOfToken(0)),
         Parser::new("7token").parse_token()
     );
     assert_eq!(
-        Err(Error::with_index("expected start of token", 0)),
+        Err(error::Repr::ExpectedStartOfToken(0)),
         Parser::new("").parse_token()
     );
 }
@@ -542,18 +536,15 @@ fn parse_byte_sequence() -> Result<(), Error> {
 #[test]
 fn parse_byte_sequence_errors() {
     assert_eq!(
-        Err(Error::with_index(
-            "expected start of byte sequence (':')",
-            0
-        )),
+        Err(error::Repr::ExpectedStartOfByteSequence(0)),
         Parser::new("aGVsbG8").parse_byte_sequence()
     );
     assert_eq!(
-        Err(Error::with_index("invalid byte sequence", 6)),
+        Err(error::Repr::InvalidByteSequence(6)),
         Parser::new(":aGVsb G8=:").parse_byte_sequence()
     );
     assert_eq!(
-        Err(Error::with_index("unterminated byte sequence", 9)),
+        Err(error::Repr::UnterminatedByteSequence(9)),
         Parser::new(":aGVsbG8=").parse_byte_sequence()
     );
 }
@@ -644,71 +635,62 @@ fn parse_number_decimal() -> Result<(), Error> {
 #[test]
 fn parse_number_errors() {
     let mut parser = Parser::new(":aGVsbG8:rest");
-    assert_eq!(
-        Err(Error::with_index("expected digit", 0)),
-        parser.parse_number()
-    );
+    assert_eq!(Err(error::Repr::ExpectedDigit(0)), parser.parse_number());
     assert_eq!(parser.remaining(), b":aGVsbG8:rest");
 
     let mut parser = Parser::new("-11.5555 test string");
     assert_eq!(
-        Err(Error::with_index("too many digits after decimal point", 7)),
+        Err(error::Repr::TooManyDigitsAfterDecimalPoint(7)),
         parser.parse_number()
     );
     assert_eq!(parser.remaining(), b"5 test string");
 
     assert_eq!(
-        Err(Error::with_index("expected digit", 1)),
+        Err(error::Repr::ExpectedDigit(1)),
         Parser::new("--0").parse_number()
     );
     assert_eq!(
-        Err(Error::with_index(
-            "too many digits before decimal point",
-            13
-        )),
+        Err(error::Repr::TooManyDigitsBeforeDecimalPoint(13)),
         Parser::new("1999999999999.1").parse_number()
     );
     assert_eq!(
-        Err(Error::with_index("trailing decimal point", 11)),
+        Err(error::Repr::TrailingDecimalPoint(11)),
         Parser::new("19888899999.").parse_number()
     );
     assert_eq!(
-        Err(Error::with_index("too many digits", 15)),
+        Err(error::Repr::TooManyDigits(15)),
         Parser::new("1999999999999999").parse_number()
     );
     assert_eq!(
-        Err(Error::with_index("too many digits after decimal point", 15)),
+        Err(error::Repr::TooManyDigitsAfterDecimalPoint(15)),
         Parser::new("19999999999.99991").parse_number()
     );
     assert_eq!(
-        Err(Error::with_index("expected digit", 1)),
+        Err(error::Repr::ExpectedDigit(1)),
         Parser::new("- 42").parse_number()
     );
     assert_eq!(
-        Err(Error::with_index("trailing decimal point", 1)),
+        Err(error::Repr::TrailingDecimalPoint(1)),
         Parser::new("1..4").parse_number()
     );
     assert_eq!(
-        Err(Error::with_index("expected digit", 1)),
+        Err(error::Repr::ExpectedDigit(1)),
         Parser::new("-").parse_number()
     );
     assert_eq!(
-        Err(Error::with_index("trailing decimal point", 2)),
+        Err(error::Repr::TrailingDecimalPoint(2)),
         Parser::new("-5. 14").parse_number()
     );
     assert_eq!(
-        Err(Error::with_index("trailing decimal point", 1)),
+        Err(error::Repr::TrailingDecimalPoint(1)),
         Parser::new("7. 1").parse_number()
     );
     assert_eq!(
-        Err(Error::with_index("too many digits after decimal point", 6)),
+        Err(error::Repr::TooManyDigitsAfterDecimalPoint(6)),
         Parser::new("-7.3333333333").parse_number()
     );
     assert_eq!(
-        Err(Error::with_index(
-            "too many digits before decimal point",
-            14
-        )),
+        Err(error::Repr::TooManyDigitsBeforeDecimalPoint(14)),
         Parser::new("-7333333333323.12").parse_number()
     );
 }
@@ -799,10 +781,7 @@ fn parse_key() -> Result<(), Error> {
 #[test]
 fn parse_key_errors() {
     assert_eq!(
-        Err(Error::with_index(
-            "expected start of key ('a'-'z' or '*')",
-            0
-        )),
+        Err(error::Repr::ExpectedStartOfKey(0)),
         Parser::new("[*f=10").parse_key()
     );
 }
@@ -902,37 +881,37 @@ fn parse_display_string() -> Result<(), Error> {
 fn parse_display_string_errors() {
     assert_eq!(
         Parser::new(" %").parse::<Item>(),
-        Err(Error::with_index(r#"expected '"'"#, 2))
+        Err(error::Repr::ExpectedQuote(2).into())
     );
 
     assert_eq!(
         Parser::new(r#" %""#).parse::<Item>(),
-        Err(Error::with_index("unterminated display string", 3))
+        Err(error::Repr::UnterminatedDisplayString(3).into())
     );
 
     assert_eq!(
         Parser::new(r#" %"%"#).parse::<Item>(),
-        Err(Error::with_index("unterminated escape sequence", 4))
+        Err(error::Repr::UnterminatedEscapeSequence(4).into())
     );
 
     assert_eq!(
         Parser::new(r#" %"%a"#).parse::<Item>(),
-        Err(Error::with_index("unterminated escape sequence", 5))
+        Err(error::Repr::UnterminatedEscapeSequence(5).into())
     );
 
     assert_eq!(
         Parser::new(r#" %"%A"#).parse::<Item>(),
-        Err(Error::with_index("invalid escape sequence", 4))
+        Err(error::Repr::InvalidEscapeSequence(4).into())
     );
 
     assert_eq!(
         Parser::new(r#" %"%aA"#).parse::<Item>(),
-        Err(Error::with_index("invalid escape sequence", 5))
+        Err(error::Repr::InvalidEscapeSequence(5).into())
     );
 
     assert_eq!(
         Parser::new(r#" %"x%aa""#).parse::<Item>(),
-        Err(Error::with_index("invalid UTF-8 in display string", 4))
+        Err(error::Repr::InvalidUtf8InDisplayString(4).into())
     );
 }
 

@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::{Error, Integer};
+use crate::{error, Error, Integer};
 
 /// A structured field value [decimal].
 ///
@@ -102,7 +102,7 @@ macro_rules! impl_try_from_integer {
 
                 fn try_from(v: $from) -> Result<Decimal, Error> {
                     match v.checked_mul(1000) {
-                        None => Err(Error::out_of_range()),
+                        None => Err(error::Repr::OutOfRange.into()),
                         Some(v) => Integer::try_from(v).map(Decimal),
                     }
                 }
@@ -159,7 +159,7 @@ impl TryFrom<f64> for Decimal {
 
     fn try_from(v: f64) -> Result<Decimal, Error> {
         if v.is_nan() {
-            return Err(Error::new("NaN"));
+            return Err(error::Repr::NaN.into());
         }
 
         let v = (v * 1000.0).round_ties_even();
