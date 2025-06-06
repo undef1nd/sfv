@@ -63,68 +63,84 @@ impl<E: std::error::Error> From<E> for Repr {
     }
 }
 
+impl Repr {
+    fn parts(&self) -> (&str, Option<usize>) {
+        match *self {
+            Self::Visit(ref msg) => (msg, None),
+
+            Self::NaN => ("NaN", None),
+            Self::OutOfRange => ("out of range", None),
+
+            Self::Empty => ("cannot be empty", None),
+            Self::InvalidCharacter(i) => ("invalid character", Some(i)),
+
+            Self::TrailingCharactersAfterMember(i) => ("trailing characters after member", Some(i)),
+            Self::TrailingComma(i) => ("trailing comma", Some(i)),
+            Self::TrailingCharactersAfterParsedValue(i) => {
+                ("trailing characters after parsed value", Some(i))
+            }
+
+            Self::ExpectedStartOfInnerList(i) => ("expected start of inner list", Some(i)),
+            Self::ExpectedInnerListDelimiter(i) => {
+                ("expected inner list delimiter (' ' or ')')", Some(i))
+            }
+            Self::UnterminatedInnerList(i) => ("unterminated inner list", Some(i)),
+
+            Self::ExpectedStartOfBareItem(i) => ("expected start of bare item", Some(i)),
+
+            Self::ExpectedStartOfBoolean(i) => ("expected start of boolean ('?')", Some(i)),
+            Self::ExpectedBoolean(i) => ("expected boolean ('0' or '1')", Some(i)),
+
+            Self::ExpectedStartOfString(i) => (r#"expected start of string ('"')"#, Some(i)),
+            Self::InvalidStringCharacter(i) => ("invalid string character", Some(i)),
+            Self::UnterminatedString(i) => ("unterminated string", Some(i)),
+
+            Self::UnterminatedEscapeSequence(i) => ("unterminated escape sequence", Some(i)),
+            Self::InvalidEscapeSequence(i) => ("invalid escape sequence", Some(i)),
+
+            Self::ExpectedStartOfToken(i) => ("expected start of token", Some(i)),
+
+            Self::ExpectedStartOfByteSequence(i) => {
+                ("expected start of byte sequence (':')", Some(i))
+            }
+            Self::UnterminatedByteSequence(i) => ("unterminated byte sequence", Some(i)),
+            Self::InvalidByteSequence(i) => ("invalid byte sequence", Some(i)),
+
+            Self::ExpectedDigit(i) => ("expected digit", Some(i)),
+            Self::TooManyDigits(i) => ("too many digits", Some(i)),
+            Self::TooManyDigitsBeforeDecimalPoint(i) => {
+                ("too many digits before decimal point", Some(i))
+            }
+            Self::TooManyDigitsAfterDecimalPoint(i) => {
+                ("too many digits after decimal point", Some(i))
+            }
+            Self::TrailingDecimalPoint(i) => ("trailing decimal point", Some(i)),
+
+            Self::ExpectedStartOfDate(i) => ("expected start of date ('@')", Some(i)),
+            Self::Rfc8941Date(i) => ("RFC 8941 does not support dates", Some(i)),
+            Self::NonIntegerDate(i) => ("date must be an integer number of seconds", Some(i)),
+
+            Self::ExpectedStartOfDisplayString(i) => {
+                ("expected start of display string ('%')", Some(i))
+            }
+            Self::Rfc8941DisplayString(i) => ("RFC 8941 does not support display strings", Some(i)),
+            Self::ExpectedQuote(i) => (r#"expected '"'"#, Some(i)),
+            Self::InvalidUtf8InDisplayString(i) => ("invalid UTF-8 in display string", Some(i)),
+            Self::InvalidDisplayStringCharacter(i) => ("invalid display string character", Some(i)),
+            Self::UnterminatedDisplayString(i) => ("unterminated display string", Some(i)),
+
+            Self::ExpectedStartOfKey(i) => ("expected start of key ('a'-'z' or '*')", Some(i)),
+        }
+    }
+}
+
 impl fmt::Display for Repr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let (msg, index) = match *self {
-            Self::Visit(ref msg) => return f.write_str(msg),
-
-            Self::NaN => return f.write_str("NaN"),
-            Self::OutOfRange => return f.write_str("out of range"),
-
-            Self::Empty => return f.write_str("cannot be empty"),
-            Self::InvalidCharacter(i) => ("invalid character", i),
-
-            Self::TrailingCharactersAfterMember(i) => ("trailing characters after member", i),
-            Self::TrailingComma(i) => ("trailing comma", i),
-            Self::TrailingCharactersAfterParsedValue(i) => {
-                ("trailing characters after parsed value", i)
-            }
-
-            Self::ExpectedStartOfInnerList(i) => ("expected start of inner list", i),
-            Self::ExpectedInnerListDelimiter(i) => {
-                ("expected inner list delimiter (' ' or ')')", i)
-            }
-            Self::UnterminatedInnerList(i) => ("unterminated inner list", i),
-
-            Self::ExpectedStartOfBareItem(i) => ("expected start of bare item", i),
-
-            Self::ExpectedStartOfBoolean(i) => ("expected start of boolean ('?')", i),
-            Self::ExpectedBoolean(i) => ("expected boolean ('0' or '1')", i),
-
-            Self::ExpectedStartOfString(i) => (r#"expected start of string ('"')"#, i),
-            Self::InvalidStringCharacter(i) => ("invalid string character", i),
-            Self::UnterminatedString(i) => ("unterminated string", i),
-
-            Self::UnterminatedEscapeSequence(i) => ("unterminated escape sequence", i),
-            Self::InvalidEscapeSequence(i) => ("invalid escape sequence", i),
-
-            Self::ExpectedStartOfToken(i) => ("expected start of token", i),
-
-            Self::ExpectedStartOfByteSequence(i) => ("expected start of byte sequence (':')", i),
-            Self::UnterminatedByteSequence(i) => ("unterminated byte sequence", i),
-            Self::InvalidByteSequence(i) => ("invalid byte sequence", i),
-
-            Self::ExpectedDigit(i) => ("expected digit", i),
-            Self::TooManyDigits(i) => ("too many digits", i),
-            Self::TooManyDigitsBeforeDecimalPoint(i) => ("too many digits before decimal point", i),
-            Self::TooManyDigitsAfterDecimalPoint(i) => ("too many digits after decimal point", i),
-            Self::TrailingDecimalPoint(i) => ("trailing decimal point", i),
-
-            Self::ExpectedStartOfDate(i) => ("expected start of date ('@')", i),
-            Self::Rfc8941Date(i) => ("RFC 8941 does not support dates", i),
-            Self::NonIntegerDate(i) => ("date must be an integer number of seconds", i),
-
-            Self::ExpectedStartOfDisplayString(i) => ("expected start of display string ('%')", i),
-            Self::Rfc8941DisplayString(i) => ("RFC 8941 does not support display strings", i),
-            Self::ExpectedQuote(i) => (r#"expected '"'"#, i),
-            Self::InvalidUtf8InDisplayString(i) => ("invalid UTF-8 in display string", i),
-            Self::InvalidDisplayStringCharacter(i) => ("invalid display string character", i),
-            Self::UnterminatedDisplayString(i) => ("unterminated display string", i),
-
-            Self::ExpectedStartOfKey(i) => ("expected start of key ('a'-'z' or '*')", i),
-        };
-
-        write!(f, "{msg} at index {index}")
+        let (msg, index) = self.parts();
+        match (f.alternate(), index) {
+            (true, _) | (false, None) => f.write_str(msg),
+            (false, Some(index)) => write!(f, "{msg} at index {index}"),
+        }
     }
 }
 
@@ -137,9 +153,18 @@ impl fmt::Display for Repr {
 /// - Attempting to serialize an empty [list][crate::ListSerializer::finish] or
 ///   [dictionary][crate::DictSerializer::finish]
 ///
-/// Other than implementing the [`std::error::Error`], [`std::fmt::Debug`], and
-/// [`std::fmt::Display`] traits, this error type currently provides no
-/// introspection capabilities.
+/// By default, the `std::fmt::Display` implementation for this type includes
+/// the index at which the error occurred, if any. To omit this, use the
+/// alternate form:
+///
+/// ```
+/// # use sfv::{visitor::Ignored, Parser};
+/// let err = Parser::new("abc;0").parse_item_with_visitor(Ignored).unwrap_err();
+///
+/// assert_eq!(format!("{}", err), "expected start of key ('a'-'z' or '*') at index 4");
+/// assert_eq!(format!("{:#}", err), "expected start of key ('a'-'z' or '*')");
+/// assert_eq!(err.index(), Some(4));
+/// ```
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct Error {
@@ -159,6 +184,15 @@ impl fmt::Display for Error {
 }
 
 impl std::error::Error for Error {}
+
+impl Error {
+    /// Returns the zero-based index in the input at which the error occurred,
+    /// if any.
+    #[must_use]
+    pub fn index(&self) -> Option<usize> {
+        self.repr.parts().1
+    }
+}
 
 pub(crate) struct NonEmptyStringError {
     byte_index: Option<usize>,
