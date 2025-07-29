@@ -15,25 +15,19 @@ pub(crate) enum Repr {
     TrailingComma(usize),
     TrailingCharactersAfterParsedValue(usize),
 
-    ExpectedStartOfInnerList(usize),
     ExpectedInnerListDelimiter(usize),
     UnterminatedInnerList(usize),
 
     ExpectedStartOfBareItem(usize),
 
-    ExpectedStartOfBoolean(usize),
     ExpectedBoolean(usize),
 
-    ExpectedStartOfString(usize),
     InvalidStringCharacter(usize),
     UnterminatedString(usize),
 
     UnterminatedEscapeSequence(usize),
     InvalidEscapeSequence(usize),
 
-    ExpectedStartOfToken(usize),
-
-    ExpectedStartOfByteSequence(usize),
     UnterminatedByteSequence(usize),
     InvalidByteSequence(usize),
 
@@ -43,11 +37,9 @@ pub(crate) enum Repr {
     TooManyDigitsAfterDecimalPoint(usize),
     TrailingDecimalPoint(usize),
 
-    ExpectedStartOfDate(usize),
     Rfc8941Date(usize),
     NonIntegerDate(usize),
 
-    ExpectedStartOfDisplayString(usize),
     Rfc8941DisplayString(usize),
     ExpectedQuote(usize),
     InvalidUtf8InDisplayString(usize),
@@ -80,7 +72,6 @@ impl Repr {
                 ("trailing characters after parsed value", Some(i))
             }
 
-            Self::ExpectedStartOfInnerList(i) => ("expected start of inner list", Some(i)),
             Self::ExpectedInnerListDelimiter(i) => {
                 ("expected inner list delimiter (' ' or ')')", Some(i))
             }
@@ -88,21 +79,14 @@ impl Repr {
 
             Self::ExpectedStartOfBareItem(i) => ("expected start of bare item", Some(i)),
 
-            Self::ExpectedStartOfBoolean(i) => ("expected start of boolean ('?')", Some(i)),
             Self::ExpectedBoolean(i) => ("expected boolean ('0' or '1')", Some(i)),
 
-            Self::ExpectedStartOfString(i) => (r#"expected start of string ('"')"#, Some(i)),
             Self::InvalidStringCharacter(i) => ("invalid string character", Some(i)),
             Self::UnterminatedString(i) => ("unterminated string", Some(i)),
 
             Self::UnterminatedEscapeSequence(i) => ("unterminated escape sequence", Some(i)),
             Self::InvalidEscapeSequence(i) => ("invalid escape sequence", Some(i)),
 
-            Self::ExpectedStartOfToken(i) => ("expected start of token", Some(i)),
-
-            Self::ExpectedStartOfByteSequence(i) => {
-                ("expected start of byte sequence (':')", Some(i))
-            }
             Self::UnterminatedByteSequence(i) => ("unterminated byte sequence", Some(i)),
             Self::InvalidByteSequence(i) => ("invalid byte sequence", Some(i)),
 
@@ -116,13 +100,9 @@ impl Repr {
             }
             Self::TrailingDecimalPoint(i) => ("trailing decimal point", Some(i)),
 
-            Self::ExpectedStartOfDate(i) => ("expected start of date ('@')", Some(i)),
             Self::Rfc8941Date(i) => ("RFC 8941 does not support dates", Some(i)),
             Self::NonIntegerDate(i) => ("date must be an integer number of seconds", Some(i)),
 
-            Self::ExpectedStartOfDisplayString(i) => {
-                ("expected start of display string ('%')", Some(i))
-            }
             Self::Rfc8941DisplayString(i) => ("RFC 8941 does not support display strings", Some(i)),
             Self::ExpectedQuote(i) => (r#"expected '"'"#, Some(i)),
             Self::InvalidUtf8InDisplayString(i) => ("invalid UTF-8 in display string", Some(i)),
