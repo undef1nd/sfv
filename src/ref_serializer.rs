@@ -203,7 +203,7 @@ impl<W: BorrowMut<String>> ListSerializer<W> {
 
     /// Opens an inner list, returning a serializer to be used for its items and
     /// parameters.
-    pub fn inner_list(&mut self) -> InnerListSerializer {
+    pub fn inner_list(&mut self) -> InnerListSerializer<'_> {
         let buffer = self.buffer.borrow_mut();
         maybe_write_separator(buffer, &mut self.first);
         buffer.push('(');
@@ -342,7 +342,7 @@ impl<W: BorrowMut<String>> DictSerializer<W> {
 
     /// Opens an inner list with the given key, returning a serializer to be
     /// used for its items and parameters.
-    pub fn inner_list(&mut self, name: &KeyRef) -> InnerListSerializer {
+    pub fn inner_list<'a>(&'a mut self, name: &KeyRef) -> InnerListSerializer<'a> {
         let buffer = self.buffer.borrow_mut();
         maybe_write_separator(buffer, &mut self.first);
         Serializer::serialize_key(name, buffer);
