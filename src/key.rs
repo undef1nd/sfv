@@ -74,14 +74,15 @@ impl KeyRef {
         Self::cast(v)
     }
 
-    /// Creates a `&KeyRef`, panicking if the value is invalid.
+    /// Creates a `&KeyRef`.
     ///
     /// This method is intended to be called from `const` contexts in which the
     /// value is known to be valid. Use [`KeyRef::from_str`] for non-panicking
     /// conversions.
     ///
-    /// # Errors
-    /// If the input string validation fails.
+    /// # Panics
+    ///
+    /// Panics if the value is invalid.
     #[must_use]
     pub const fn constant(v: &str) -> &Self {
         match validate(v.as_bytes()) {
