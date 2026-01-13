@@ -67,11 +67,15 @@ impl StringRef {
         Ok(Self::cast(v))
     }
 
-    /// Creates a `&StringRef`, panicking if the value is invalid.
+    /// Creates a `&StringRef`.
     ///
     /// This method is intended to be called from `const` contexts in which the
     /// value is known to be valid. Use [`StringRef::from_str`] for non-panicking
     /// conversions.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the value is invalid.
     #[must_use]
     pub const fn constant(v: &str) -> &Self {
         match validate(v.as_bytes()) {

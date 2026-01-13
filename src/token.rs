@@ -74,11 +74,15 @@ impl TokenRef {
         Self::cast(v)
     }
 
-    /// Creates a `&TokenRef`, panicking if the value is invalid.
+    /// Creates a `&TokenRef`.
     ///
     /// This method is intended to be called from `const` contexts in which the
     /// value is known to be valid. Use [`TokenRef::from_str`] for non-panicking
     /// conversions.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the given value is invalid.
     #[must_use]
     pub const fn constant(v: &str) -> &Self {
         match validate(v.as_bytes()) {
