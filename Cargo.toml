@@ -11,7 +11,7 @@ Implementation of RFC 8941 and RFC 9651."""
 repository = "https://github.com/undef1nd/sfv"
 keywords = ["http-header", "structured-header", ]
 exclude = ["tests/**", ".github/*", "benches/**", "fuzz/**"]
-rust-version = "1.77"
+rust-version = "1.82"
 
 [dependencies]
 arbitrary = { version = "1.4.1", optional = true, features = ["derive"] }
