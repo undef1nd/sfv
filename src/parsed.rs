@@ -257,7 +257,7 @@ pub trait FieldType: Sealed {
     /// Serializes a structured field value into a string.
     ///
     /// Note: The serialization conforms to [RFC 9651], meaning that
-    /// [`Dates`][crate::Date] and [`Display Strings`][RefBareItem::DisplayString],
+    /// [`Dates`][crate::Date] and [`Display Strings`][crate::RefBareItem::DisplayString],
     /// which cause parsing errors under [RFC 8941], will be serialized
     /// unconditionally. The consumer of this API is responsible for determining
     /// whether it is valid to serialize these bare items for any specific field.
