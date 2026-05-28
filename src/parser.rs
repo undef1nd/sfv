@@ -378,7 +378,7 @@ assert_eq!(
     }
 
     pub(crate) fn parse_token(&mut self) -> Result<&'de TokenRef, error::Repr> {
-        // https://httpwg.org/specs/9651.html#parse-token
+        // https://httpwg.org/specs/rfc9651.html#parse-token
 
         match self.parse_non_empty_str(
             utils::is_allowed_start_token_char,

@@ -211,7 +211,7 @@ type SFVResult<T> = std::result::Result<T, Error>;
 /// - [`RefBareItem`], for completely borrowed data
 /// - [`BareItemFromInput`], for data borrowed from input when possible
 ///
-/// [bare item]: <https://httpwg.org/specs/9651.html#item>
+/// [bare item]: <https://httpwg.org/specs/rfc9651.html#item>
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum GenericBareItem<S, B, T, D> {
@@ -604,7 +604,7 @@ where
 /// A version for serialized structured field values.
 ///
 /// Each HTTP specification that uses structured field values must indicate
-/// which version it uses. See [the guidance from RFC 9651] for details.
+/// which version it uses. See [the guidance from RFC 9651][RFC 9651] for details.
 ///
 /// [RFC 9651]: <https://httpwg.org/specs/rfc9651.html#using-new-structured-types-in-extensions>
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
