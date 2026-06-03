@@ -151,6 +151,7 @@ assert_eq!(
 */
 
 #![deny(missing_docs)]
+#![deny(missing_debug_implementations)]
 
 mod date;
 mod decimal;
