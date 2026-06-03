@@ -119,7 +119,6 @@ impl TestCase for ParseTestData {
             }
         }
 
-        #[allow(clippy::redundant_closure_for_method_calls)] // HRTB issue
         match self.data.header_type {
             ExpectedHeaderType::Item(ref mut expected) => {
                 let expected = expected.take();
