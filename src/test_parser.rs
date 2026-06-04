@@ -21,7 +21,7 @@ fn parse() -> Result<(), Error> {
 
     let input = "12.35;a ";
     let params = Parameters::from_iter(vec![(key_ref("a").to_owned(), BareItem::Boolean(true))]);
-    let expected = Item::with_params(Decimal::try_from(12.35)?, params);
+    let expected = Item::with_params(Decimal::from_integer_scaled_1000(integer(12_350)), params);
 
     assert_eq!(expected, Parser::new(input).parse::<Item>()?);
     Ok(())
@@ -236,7 +236,7 @@ fn parse_item_decimal_with_bool_param_and_space() -> Result<(), Error> {
     let input = "12.35;a ";
     let param = Parameters::from_iter(vec![(key_ref("a").to_owned(), BareItem::Boolean(true))]);
     assert_eq!(
-        Item::with_params(Decimal::try_from(12.35)?, param),
+        Item::with_params(Decimal::from_integer_scaled_1000(integer(12_350)), param),
         Parser::new(input).parse::<Item>()?
     );
     Ok(())
@@ -377,7 +377,7 @@ fn parse_bare_item() -> Result<(), Error> {
         Parser::new(":YmFzZV82NCBlbmNvZGluZyB0ZXN0:").parse_bare_item()?
     );
     assert_eq!(
-        RefBareItem::Decimal(Decimal::try_from(-3.55)?),
+        RefBareItem::Decimal(Decimal::from_integer_scaled_1000(integer(-3_550))),
         Parser::new("-3.55").parse_bare_item()?
     );
     Ok(())
@@ -595,37 +595,41 @@ fn parse_number_int() -> Result<(), Error> {
 fn parse_number_decimal() -> Result<(), Error> {
     let mut parser = Parser::new("00.42 test string");
     assert_eq!(
-        Num::Decimal(Decimal::try_from(0.42)?),
+        Num::Decimal(Decimal::from_integer_scaled_1000(integer(420))),
         parser.parse_number()?
     );
     assert_eq!(parser.remaining(), b" test string");
 
     assert_eq!(
-        Num::Decimal(Decimal::try_from(1.5)?),
+        Num::Decimal(Decimal::from_integer_scaled_1000(integer(1_500))),
         Parser::new("1.5.4.").parse_number()?
     );
     assert_eq!(
-        Num::Decimal(Decimal::try_from(1.8)?),
+        Num::Decimal(Decimal::from_integer_scaled_1000(integer(1_800))),
         Parser::new("1.8.").parse_number()?
     );
     assert_eq!(
-        Num::Decimal(Decimal::try_from(1.7)?),
+        Num::Decimal(Decimal::from_integer_scaled_1000(integer(1_700))),
         Parser::new("1.7.0").parse_number()?
     );
     assert_eq!(
-        Num::Decimal(Decimal::try_from(2.14)?),
+        Num::Decimal(Decimal::from_integer_scaled_1000(integer(2_140))),
         Parser::new("2.14").parse_number()?
     );
     assert_eq!(
-        Num::Decimal(Decimal::try_from(-2.14)?),
+        Num::Decimal(Decimal::from_integer_scaled_1000(integer(-2_140))),
         Parser::new("-2.14").parse_number()?
     );
     assert_eq!(
-        Num::Decimal(Decimal::try_from(123_456_789_012.1)?),
+        Num::Decimal(Decimal::from_integer_scaled_1000(integer(
+            123_456_789_012_100
+        ))),
         Parser::new("123456789012.1").parse_number()?
     );
     assert_eq!(
-        Num::Decimal(Decimal::try_from(1_234_567_890.112)?),
+        Num::Decimal(Decimal::from_integer_scaled_1000(integer(
+            1_234_567_890_112
+        ))),
         Parser::new("1234567890.112").parse_number()?
     );
 
@@ -731,7 +735,7 @@ fn parse_params_mixed_types() -> Result<(), Error> {
         (key_ref("key1").to_owned(), BareItem::Boolean(false)),
         (
             key_ref("key2").to_owned(),
-            Decimal::try_from(746.15)?.into(),
+            Decimal::from_integer_scaled_1000(integer(746_150)).into(),
         ),
     ]);
     let mut params = Parameters::new();
