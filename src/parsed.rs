@@ -160,11 +160,7 @@ impl<'de> ItemVisitor<'de> for &mut InnerList {
         self,
         bare_item: BareItemFromInput<'de>,
     ) -> Result<impl ParameterVisitor<'de>, Self::Error> {
-        self.items.push(Item::new(bare_item));
-        match self.items.last_mut() {
-            Some(item) => Ok(&mut item.params),
-            None => unreachable!(),
-        }
+        Ok(&mut self.items.push_mut(Item::new(bare_item)).params)
     }
 }
 
@@ -220,20 +216,20 @@ impl<'de> ItemVisitor<'de> for &mut List {
         self,
         bare_item: BareItemFromInput<'de>,
     ) -> Result<impl ParameterVisitor<'de>, Self::Error> {
-        self.push(Item::new(bare_item).into());
-        match self.last_mut() {
-            Some(ListEntry::Item(item)) => Ok(&mut item.params),
-            _ => unreachable!(),
+        let last = self.push_mut(Item::new(bare_item).into());
+        match last {
+            ListEntry::Item(item) => Ok(&mut item.params),
+            ListEntry::InnerList(_) => unreachable!(),
         }
     }
 }
 
 impl<'de> EntryVisitor<'de> for &mut List {
     fn inner_list(self) -> Result<impl InnerListVisitor<'de>, Self::Error> {
-        self.push(InnerList::default().into());
-        match self.last_mut() {
-            Some(ListEntry::InnerList(inner_list)) => Ok(inner_list),
-            _ => unreachable!(),
+        let last = self.push_mut(InnerList::default().into());
+        match last {
+            ListEntry::InnerList(inner_list) => Ok(inner_list),
+            ListEntry::Item(_) => unreachable!(),
         }
     }
 }
