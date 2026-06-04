@@ -118,7 +118,9 @@ fn serializing_ref_list(c: &mut Criterion) {
             _ = ser.bare_item(token_ref("a"));
             _ = ser.bare_item(token_ref("abcdefghigklmnoprst"));
             _ = ser.bare_item(integer(123_456_785_686_457));
-            _ = ser.bare_item(Decimal::try_from(99_999_999_999.999).unwrap());
+            _ = ser.bare_item(Decimal::from_integer_scaled_1000(integer(
+                99_999_999_999_999,
+            )));
             _ = ser.inner_list();
             {
                 let mut ser = ser.inner_list();

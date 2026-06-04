@@ -1,6 +1,4 @@
-use crate::{
-    integer, key_ref, serializer::Serializer, string_ref, token_ref, Date, Decimal, Error,
-};
+use crate::{integer, key_ref, serializer::Serializer, string_ref, token_ref, Date, Decimal};
 #[cfg(feature = "parsed-types")]
 use crate::{BareItem, Dictionary, FieldType, InnerList, Item, List, Parameters};
 
@@ -20,8 +18,8 @@ fn serialize_value_empty_list() {
 
 #[test]
 #[cfg(feature = "parsed-types")]
-fn serialize_value_list_mixed_members_with_params() -> Result<(), Error> {
-    let item1 = Item::new(Decimal::try_from(42.4568)?);
+fn serialize_value_list_mixed_members_with_params() {
+    let item1 = Item::new(Decimal::from_integer_scaled_1000(integer(42_457)));
     let item2_param = Parameters::from_iter(vec![(
         key_ref("itm2_p").to_owned(),
         BareItem::Boolean(true),
@@ -52,7 +50,6 @@ fn serialize_value_list_mixed_members_with_params() -> Result<(), Error> {
         ),
         list_field_value.serialize().as_deref(),
     );
-    Ok(())
 }
 
 #[test]
@@ -76,11 +73,10 @@ fn serialize_item_without_params() {
 
 #[test]
 #[cfg(feature = "parsed-types")]
-fn serialize_item_with_bool_true_param() -> Result<(), Error> {
+fn serialize_item_with_bool_true_param() {
     let param = Parameters::from_iter(vec![(key_ref("a").to_owned(), BareItem::Boolean(true))]);
-    let item = Item::with_params(Decimal::try_from(12.35)?, param);
+    let item = Item::with_params(Decimal::from_integer_scaled_1000(integer(12_350)), param);
     assert_eq!("12.35;a", item.serialize());
-    Ok(())
 }
 
 #[test]
@@ -114,43 +110,66 @@ fn serialize_integer() {
 }
 
 #[test]
-fn serialize_decimal() -> Result<(), Error> {
+fn serialize_decimal() {
     let mut buf = String::new();
-    Serializer::serialize_decimal(Decimal::try_from(-99.134_689_7)?, &mut buf);
+    Serializer::serialize_decimal(
+        Decimal::from_integer_scaled_1000(integer(-99_135)),
+        &mut buf,
+    );
     assert_eq!("-99.135", &buf);
 
     buf.clear();
-    Serializer::serialize_decimal(Decimal::try_from(-1.00)?, &mut buf);
+    Serializer::serialize_decimal(Decimal::from_integer_scaled_1000(integer(-1_000)), &mut buf);
     assert_eq!("-1.0", &buf);
 
     buf.clear();
-    Serializer::serialize_decimal(Decimal::try_from(-99.134_689_7)?, &mut buf);
+    Serializer::serialize_decimal(
+        Decimal::from_integer_scaled_1000(integer(-99_135)),
+        &mut buf,
+    );
     assert_eq!("-99.135", &buf);
 
     buf.clear();
-    Serializer::serialize_decimal(Decimal::try_from(100.13)?, &mut buf);
+    Serializer::serialize_decimal(
+        Decimal::from_integer_scaled_1000(integer(100_130)),
+        &mut buf,
+    );
     assert_eq!("100.13", &buf);
 
     buf.clear();
-    Serializer::serialize_decimal(Decimal::try_from(-100.130)?, &mut buf);
+    Serializer::serialize_decimal(
+        Decimal::from_integer_scaled_1000(integer(-100_130)),
+        &mut buf,
+    );
     assert_eq!("-100.13", &buf);
 
     buf.clear();
-    Serializer::serialize_decimal(Decimal::try_from(-100.100)?, &mut buf);
+    Serializer::serialize_decimal(
+        Decimal::from_integer_scaled_1000(integer(-100_100)),
+        &mut buf,
+    );
     assert_eq!("-100.1", &buf);
 
     buf.clear();
-    Serializer::serialize_decimal(Decimal::try_from(-137.0)?, &mut buf);
+    Serializer::serialize_decimal(
+        Decimal::from_integer_scaled_1000(integer(-137_000)),
+        &mut buf,
+    );
     assert_eq!("-137.0", &buf);
 
     buf.clear();
-    Serializer::serialize_decimal(Decimal::try_from(137_121_212_112.123)?, &mut buf);
+    Serializer::serialize_decimal(
+        Decimal::from_integer_scaled_1000(integer(137_121_212_112_123)),
+        &mut buf,
+    );
     assert_eq!("137121212112.123", &buf);
 
     buf.clear();
-    Serializer::serialize_decimal(Decimal::try_from(137_121_212_112.123_8)?, &mut buf);
+    Serializer::serialize_decimal(
+        Decimal::from_integer_scaled_1000(integer(137_121_212_112_124)),
+        &mut buf,
+    );
     assert_eq!("137121212112.124", &buf);
-    Ok(())
 }
 
 #[test]
@@ -268,16 +287,19 @@ fn serialize_params_string() {
 
 #[test]
 #[cfg(feature = "parsed-types")]
-fn serialize_params_numbers() -> Result<(), Error> {
+fn serialize_params_numbers() {
     let mut buf = String::new();
 
-    Serializer::serialize_parameter(key_ref("key1"), Decimal::try_from(746.15)?, &mut buf);
+    Serializer::serialize_parameter(
+        key_ref("key1"),
+        Decimal::from_integer_scaled_1000(integer(746_150)),
+        &mut buf,
+    );
     assert_eq!(";key1=746.15", buf);
 
     buf.clear();
     Serializer::serialize_parameter(key_ref("key2"), 11111, &mut buf);
     assert_eq!(";key2=11111", buf);
-    Ok(())
 }
 
 #[test]

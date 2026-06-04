@@ -1,7 +1,8 @@
 use std::borrow::BorrowMut;
 
 use crate::{
-    key_ref, string_ref, token_ref, Decimal, DictSerializer, ItemSerializer, ListSerializer,
+    integer, key_ref, string_ref, token_ref, Decimal, DictSerializer, ItemSerializer,
+    ListSerializer,
 };
 
 #[test]
@@ -57,7 +58,10 @@ fn test_fast_serialize_dict() {
 
         _ = ser
             .bare_item(key_ref("member2"), true)
-            .parameter(key_ref("key3"), Decimal::try_from(45.4586).unwrap())
+            .parameter(
+                key_ref("key3"),
+                Decimal::from_integer_scaled_1000(integer(45_459)),
+            )
             .parameter(key_ref("key4"), string_ref("str"));
 
         {

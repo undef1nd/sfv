@@ -146,6 +146,7 @@ impl From<Decimal> for f64 {
     }
 }
 
+/// Prefer using [`Decimal::from_integer_scaled_1000`] for precise conversions.
 impl TryFrom<f32> for Decimal {
     type Error = Error;
 
@@ -154,6 +155,7 @@ impl TryFrom<f32> for Decimal {
     }
 }
 
+/// Prefer using [`Decimal::from_integer_scaled_1000`] for precise conversions.
 impl TryFrom<f64> for Decimal {
     type Error = Error;
 
