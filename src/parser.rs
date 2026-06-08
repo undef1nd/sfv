@@ -319,10 +319,10 @@ assert_eq!(
                     return Ok(if output.is_empty() {
                         let slice = &self.input[start..end];
                         let output = std::str::from_utf8(slice).unwrap();
-                        Cow::Borrowed(StringRef::from_str(output).unwrap())
+                        Cow::Borrowed(StringRef::from_validated_str(output))
                     } else {
                         let output = StdString::from_utf8(output).unwrap();
-                        Cow::Owned(String::from_string(output).unwrap())
+                        Cow::Owned(String::from_validated_string(output))
                     });
                 }
                 0x00..=0x1f | 0x7f..=0xff => {
