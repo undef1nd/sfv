@@ -307,34 +307,37 @@ assert_eq!(
         self.next();
 
         let start = self.index;
-        let mut output = Cow::Borrowed(&[] as &[u8]);
+        let mut output = Vec::new();
 
         while let Some(curr_char) = self.peek() {
             match curr_char {
                 b'"' => {
+                    let end = self.index;
                     self.next();
                     // TODO: The UTF-8 validation is redundant with the preceding character checks, but
                     // its removal is only possible with unsafe code.
-                    return Ok(match output {
-                        Cow::Borrowed(output) => {
-                            let output = std::str::from_utf8(output).unwrap();
-                            Cow::Borrowed(StringRef::from_str(output).unwrap())
-                        }
-                        Cow::Owned(output) => {
-                            let output = StdString::from_utf8(output).unwrap();
-                            Cow::Owned(String::from_string(output).unwrap())
-                        }
+                    return Ok(if output.is_empty() {
+                        let slice = &self.input[start..end];
+                        let output = std::str::from_utf8(slice).unwrap();
+                        Cow::Borrowed(StringRef::from_str(output).unwrap())
+                    } else {
+                        let output = StdString::from_utf8(output).unwrap();
+                        Cow::Owned(String::from_string(output).unwrap())
                     });
                 }
                 0x00..=0x1f | 0x7f..=0xff => {
                     return Err(error::Repr::InvalidStringCharacter(self.index));
                 }
                 b'\\' => {
+                    let escape_index = self.index;
                     self.next();
                     match self.peek() {
                         Some(c @ (b'\\' | b'"')) => {
                             self.next();
-                            output.to_mut().push(c);
+                            if output.is_empty() {
+                                output = self.input[start..escape_index].to_vec();
+                            }
+                            output.push(c);
                         }
                         None => return Err(error::Repr::UnterminatedEscapeSequence(self.index)),
                         Some(_) => return Err(error::Repr::InvalidEscapeSequence(self.index)),
@@ -342,9 +345,8 @@ assert_eq!(
                 }
                 _ => {
                     self.next();
-                    match output {
-                        Cow::Borrowed(ref mut output) => *output = &self.input[start..self.index],
-                        Cow::Owned(ref mut output) => output.push(curr_char),
+                    if !output.is_empty() {
+                        output.push(curr_char);
                     }
                 }
             }
@@ -540,31 +542,35 @@ assert_eq!(
         self.next();
 
         let start = self.index;
-        let mut output = Cow::Borrowed(&[] as &[u8]);
+        let mut output = Vec::new();
 
         while let Some(curr_char) = self.peek() {
             match curr_char {
                 b'"' => {
+                    let end = self.index;
                     self.next();
-                    return match output {
-                        Cow::Borrowed(output) => match std::str::from_utf8(output) {
+                    return if output.is_empty() {
+                        let slice = &self.input[start..end];
+                        match std::str::from_utf8(slice) {
                             Ok(output) => Ok(Cow::Borrowed(output)),
                             Err(err) => Err(error::Repr::InvalidUtf8InDisplayString(
                                 start + err.valid_up_to(),
                             )),
-                        },
-                        Cow::Owned(output) => match StdString::from_utf8(output) {
+                        }
+                    } else {
+                        match StdString::from_utf8(output) {
                             Ok(output) => Ok(Cow::Owned(output)),
                             Err(err) => Err(error::Repr::InvalidUtf8InDisplayString(
                                 start + err.utf8_error().valid_up_to(),
                             )),
-                        },
+                        }
                     };
                 }
                 0x00..=0x1f | 0x7f..=0xff => {
                     return Err(error::Repr::InvalidDisplayStringCharacter(self.index));
                 }
                 b'%' => {
+                    let escape_index = self.index;
                     self.next();
 
                     let mut octet = 0;
@@ -589,13 +595,15 @@ assert_eq!(
                             };
                     }
 
-                    output.to_mut().push(octet);
+                    if output.is_empty() {
+                        output = self.input[start..escape_index].to_vec();
+                    }
+                    output.push(octet);
                 }
                 _ => {
                     self.next();
-                    match output {
-                        Cow::Borrowed(ref mut output) => *output = &self.input[start..self.index],
-                        Cow::Owned(ref mut output) => output.push(curr_char),
+                    if !output.is_empty() {
+                        output.push(curr_char);
                     }
                 }
             }
