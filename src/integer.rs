@@ -46,6 +46,12 @@ impl Integer {
             panic!("out of range for Integer")
         }
     }
+
+    // Like `TryFrom`, but assumes that the range has already been validated.
+    pub(crate) fn from_validated_i64(v: i64) -> Self {
+        debug_assert!(RANGE_I64.contains(&v));
+        Self(v)
+    }
 }
 
 impl fmt::Display for Integer {

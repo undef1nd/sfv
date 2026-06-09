@@ -472,7 +472,7 @@ assert_eq!(
                     self.next();
                     magnitude = magnitude * 10 + char_to_i64(c);
                 }
-                _ => return Ok(Num::Integer(Integer::try_from(sign * magnitude).unwrap())),
+                _ => return Ok(Num::Integer(Integer::from_validated_i64(sign * magnitude))),
             }
         }
 
@@ -495,7 +495,7 @@ assert_eq!(
             Err(error::Repr::TrailingDecimalPoint(self.index - 1))
         } else {
             Ok(Num::Decimal(Decimal::from_integer_scaled_1000(
-                Integer::try_from(sign * magnitude).unwrap(),
+                Integer::from_validated_i64(sign * magnitude),
             )))
         }
     }
