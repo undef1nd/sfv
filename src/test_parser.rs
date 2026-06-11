@@ -20,7 +20,7 @@ fn parse() -> Result<(), Error> {
     assert_eq!(expected, Parser::new(input).parse::<Item>()?);
 
     let input = "12.35;a ";
-    let params = Parameters::from_iter(vec![(key_ref("a").to_owned(), BareItem::Boolean(true))]);
+    let params = Parameters::from([(key_ref("a").to_owned(), BareItem::Boolean(true))]);
     let expected = Item::with_params(Decimal::from_integer_scaled_1000(integer(12_350)), params);
 
     assert_eq!(expected, Parser::new(input).parse::<Item>()?);
@@ -107,7 +107,7 @@ fn parse_list_of_lists_with_param_and_spaces() -> Result<(), Error> {
     let input = "(  1  42  ); k=*";
     let item1 = Item::new(1);
     let item2 = Item::new(42);
-    let inner_list_param = Parameters::from_iter(vec![(
+    let inner_list_param = Parameters::from([(
         key_ref("k").to_owned(),
         BareItem::Token(token_ref("*").to_owned()),
     )]);
@@ -125,7 +125,7 @@ fn parse_list_of_items_and_lists_with_param() -> Result<(), Error> {
     let item2 = Item::new(14);
     let item3 = Item::new(token_ref("a"));
     let item4 = Item::new(token_ref("b"));
-    let inner_list_param = Parameters::from_iter(vec![(
+    let inner_list_param = Parameters::from([(
         key_ref("param").to_owned(),
         BareItem::String(string_ref("param_value_1").to_owned()),
     )]);
@@ -211,7 +211,7 @@ fn parse_inner_list_errors() {
 #[cfg(feature = "parsed-types")]
 fn parse_inner_list_with_param_and_spaces() -> Result<(), Error> {
     let input = "(c b); a=1";
-    let inner_list_param = Parameters::from_iter(vec![(key_ref("a").to_owned(), 1.into())]);
+    let inner_list_param = Parameters::from([(key_ref("a").to_owned(), 1.into())]);
 
     let item1 = Item::new(token_ref("c"));
     let item2 = Item::new(token_ref("b"));
@@ -234,7 +234,7 @@ fn parse_item_int_with_space() -> Result<(), Error> {
 #[cfg(feature = "parsed-types")]
 fn parse_item_decimal_with_bool_param_and_space() -> Result<(), Error> {
     let input = "12.35;a ";
-    let param = Parameters::from_iter(vec![(key_ref("a").to_owned(), BareItem::Boolean(true))]);
+    let param = Parameters::from([(key_ref("a").to_owned(), BareItem::Boolean(true))]);
     assert_eq!(
         Item::with_params(Decimal::from_integer_scaled_1000(integer(12_350)), param),
         Parser::new(input).parse::<Item>()?
@@ -245,7 +245,7 @@ fn parse_item_decimal_with_bool_param_and_space() -> Result<(), Error> {
 #[test]
 #[cfg(feature = "parsed-types")]
 fn parse_item_number_with_param() -> Result<(), Error> {
-    let param = Parameters::from_iter(vec![(
+    let param = Parameters::from([(
         key_ref("a1").to_owned(),
         BareItem::Token(token_ref("*").to_owned()),
     )]);
@@ -281,11 +281,11 @@ fn parse_dict_errors() {
 #[cfg(feature = "parsed-types")]
 fn parse_dict_with_spaces_and_params() -> Result<(), Error> {
     let input = r#"abc=123;a=1;b=2, def=456, ghi=789;q=9;r="+w""#;
-    let item1_params = Parameters::from_iter(vec![
+    let item1_params = Parameters::from([
         (key_ref("a").to_owned(), 1.into()),
         (key_ref("b").to_owned(), 2.into()),
     ]);
-    let item3_params = Parameters::from_iter(vec![
+    let item3_params = Parameters::from([
         (key_ref("q").to_owned(), 9.into()),
         (
             key_ref("r").to_owned(),
@@ -297,7 +297,7 @@ fn parse_dict_with_spaces_and_params() -> Result<(), Error> {
     let item2 = Item::new(456);
     let item3 = Item::with_params(789, item3_params);
 
-    let expected_dict = Dictionary::from_iter(vec![
+    let expected_dict = Dictionary::from([
         (key_ref("abc").to_owned(), item1.into()),
         (key_ref("def").to_owned(), item2.into()),
         (key_ref("ghi").to_owned(), item3.into()),
@@ -312,7 +312,7 @@ fn parse_dict_with_spaces_and_params() -> Result<(), Error> {
 fn parse_dict_empty_value() -> Result<(), Error> {
     let input = "a=()";
     let inner_list = InnerList::new(vec![]);
-    let expected_dict = Dictionary::from_iter(vec![(key_ref("a").to_owned(), inner_list.into())]);
+    let expected_dict = Dictionary::from([(key_ref("a").to_owned(), inner_list.into())]);
     assert_eq!(expected_dict, Parser::new(input).parse::<Dictionary>()?);
     Ok(())
 }
@@ -321,14 +321,14 @@ fn parse_dict_empty_value() -> Result<(), Error> {
 #[cfg(feature = "parsed-types")]
 fn parse_dict_with_token_param() -> Result<(), Error> {
     let input = "a=1, b;foo=*, c=3";
-    let item2_params = Parameters::from_iter(vec![(
+    let item2_params = Parameters::from([(
         key_ref("foo").to_owned(),
         BareItem::Token(token_ref("*").to_owned()),
     )]);
     let item1 = Item::new(1);
     let item2 = Item::with_params(true, item2_params);
     let item3 = Item::new(3);
-    let expected_dict = Dictionary::from_iter(vec![
+    let expected_dict = Dictionary::from([
         (key_ref("a").to_owned(), item1.into()),
         (key_ref("b").to_owned(), item2.into()),
         (key_ref("c").to_owned(), item3.into()),
@@ -343,7 +343,7 @@ fn parse_dict_multiple_spaces() -> Result<(), Error> {
     // input1, input2, input3 must be parsed into the same structure
     let item1 = Item::new(1);
     let item2 = Item::new(2);
-    let expected_dict = Dictionary::from_iter(vec![
+    let expected_dict = Dictionary::from([
         (key_ref("a").to_owned(), item1.into()),
         (key_ref("b").to_owned(), item2.into()),
     ]);
@@ -703,7 +703,7 @@ fn parse_number_errors() {
 #[cfg(feature = "parsed-types")]
 fn parse_params_string() -> Result<(), Error> {
     let input = r#";b="param_val""#;
-    let expected = Parameters::from_iter(vec![(
+    let expected = Parameters::from([(
         key_ref("b").to_owned(),
         BareItem::String(string_ref("param_val").to_owned()),
     )]);
@@ -717,7 +717,7 @@ fn parse_params_string() -> Result<(), Error> {
 #[cfg(feature = "parsed-types")]
 fn parse_params_bool() -> Result<(), Error> {
     let input = ";b;a";
-    let expected = Parameters::from_iter(vec![
+    let expected = Parameters::from([
         (key_ref("b").to_owned(), BareItem::Boolean(true)),
         (key_ref("a").to_owned(), BareItem::Boolean(true)),
     ]);
@@ -731,7 +731,7 @@ fn parse_params_bool() -> Result<(), Error> {
 #[cfg(feature = "parsed-types")]
 fn parse_params_mixed_types() -> Result<(), Error> {
     let input = ";key1=?0;key2=746.15";
-    let expected = Parameters::from_iter(vec![
+    let expected = Parameters::from([
         (key_ref("key1").to_owned(), BareItem::Boolean(false)),
         (
             key_ref("key2").to_owned(),
@@ -748,7 +748,7 @@ fn parse_params_mixed_types() -> Result<(), Error> {
 #[cfg(feature = "parsed-types")]
 fn parse_params_with_spaces() -> Result<(), Error> {
     let input = "; key1=?0; key2=11111";
-    let expected = Parameters::from_iter(vec![
+    let expected = Parameters::from([
         (key_ref("key1").to_owned(), BareItem::Boolean(false)),
         (key_ref("key2").to_owned(), 11111.into()),
     ]);
@@ -808,14 +808,14 @@ fn parse_more_list() -> Result<(), Error> {
 #[test]
 #[cfg(feature = "parsed-types")]
 fn parse_more_dict() -> Result<(), Error> {
-    let item2_params = Parameters::from_iter(vec![(
+    let item2_params = Parameters::from([(
         key_ref("foo").to_owned(),
         BareItem::Token(token_ref("*").to_owned()),
     )]);
     let item1 = Item::new(1);
     let item2 = Item::with_params(true, item2_params);
     let item3 = Item::new(3);
-    let expected_dict = Dictionary::from_iter(vec![
+    let expected_dict = Dictionary::from([
         (key_ref("a").to_owned(), item1.into()),
         (key_ref("b").to_owned(), item2.into()),
         (key_ref("c").to_owned(), item3.into()),
