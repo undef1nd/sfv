@@ -985,7 +985,7 @@ impl<'de> ItemVisitor<'de> for CoordVisitor<'_> {
         if let Some(v) = bare_item.as_integer() {
             *self.coord = i64::from(v);
         }
-        Ok(None::<Ignored>)
+        Ok(Ignored)
     }
 }
 
@@ -1079,7 +1079,7 @@ fn complex_list_visitor() {
             self,
             _bare_item: BareItemFromInput<'de>,
         ) -> Result<impl ParameterVisitor<'de>, Self::Error> {
-            Ok(None::<Ignored>)
+            Ok(Ignored)
         }
     }
 
