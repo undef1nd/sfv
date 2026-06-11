@@ -184,29 +184,42 @@ impl<'de> DictionaryVisitor<'de> for Dictionary {
     type Error = Infallible;
 
     fn entry(&mut self, key: &'de KeyRef) -> Result<impl EntryVisitor<'de>, Self::Error> {
-        Ok(self.entry(key.to_owned()))
+        Ok(Entry { dict: self, key })
     }
 }
 
-type Entry<'a> = indexmap::map::Entry<'a, Key, ListEntry>;
+struct Entry<'de, 'a> {
+    dict: &'a mut Dictionary,
+    key: &'de KeyRef,
+}
 
-impl<'de> ItemVisitor<'de> for Entry<'_> {
+impl<'de> ItemVisitor<'de> for Entry<'de, '_> {
     type Error = Infallible;
 
     fn bare_item(
         self,
         bare_item: BareItemFromInput<'de>,
     ) -> Result<impl ParameterVisitor<'de>, Self::Error> {
-        match self.insert_entry(Item::new(bare_item).into()).into_mut() {
+        match self
+            .dict
+            .entry(self.key.to_owned())
+            .insert_entry(Item::new(bare_item).into())
+            .into_mut()
+        {
             ListEntry::Item(item) => Ok(&mut item.params),
             ListEntry::InnerList(_) => unreachable!(),
         }
     }
 }
 
-impl<'de> EntryVisitor<'de> for Entry<'_> {
+impl<'de> EntryVisitor<'de> for Entry<'de, '_> {
     fn inner_list(self) -> Result<impl InnerListVisitor<'de>, Self::Error> {
-        match self.insert_entry(InnerList::default().into()).into_mut() {
+        match self
+            .dict
+            .entry(self.key.to_owned())
+            .insert_entry(InnerList::default().into())
+            .into_mut()
+        {
             ListEntry::InnerList(inner_list) => Ok(inner_list),
             ListEntry::Item(_) => unreachable!(),
         }
