@@ -1063,8 +1063,7 @@ fn complex_list_visitor() {
     impl<'de> ListVisitor<'de> for OuterListVisitor<'_> {
         type Error = Infallible;
         fn entry(&mut self) -> Result<impl EntryVisitor<'de>, Self::Error> {
-            self.list.push(ListHolder::default());
-            let list = self.list.last_mut().unwrap(); // cannot fail
+            let list = self.list.push_mut(ListHolder::default());
             Ok(HolderListVisitor { list })
         }
     }
@@ -1093,8 +1092,7 @@ fn complex_list_visitor() {
         type Error = Infallible;
 
         fn item(&mut self) -> Result<impl ItemVisitor<'de>, Self::Error> {
-            self.list.list.push(Holder::default());
-            let holder = self.list.list.last_mut().unwrap(); // cannot fail
+            let holder = self.list.list.push_mut(Holder::default());
             Ok(HolderVisitor { holder })
         }
 
