@@ -48,6 +48,16 @@ impl Item {
     }
 }
 
+impl<T> From<T> for Item
+where
+    T: Into<BareItem>,
+{
+    /// Converts a value into an [`Item`] with no parameters.
+    fn from(bare_item: T) -> Self {
+        Self::new(bare_item)
+    }
+}
+
 /// A [dictionary]-type structured field value.
 ///
 /// [dictionary]: <https://httpwg.org/specs/rfc9651.html#dictionary>
@@ -95,6 +105,16 @@ impl From<Item> for ListEntry {
 impl From<InnerList> for ListEntry {
     fn from(inner_list: InnerList) -> Self {
         ListEntry::InnerList(inner_list)
+    }
+}
+
+impl<T> From<T> for ListEntry
+where
+    T: Into<BareItem>,
+{
+    /// Converts a value into a [`ListEntry::Item`] with no parameters.
+    fn from(bare_item: T) -> Self {
+        ListEntry::Item(Item::new(bare_item))
     }
 }
 
