@@ -7,5 +7,5 @@ use libfuzzer_sys::fuzz_target;
 fuzz_target!(|input: input::Input| {
     let _ = sfv::Parser::new(input.data)
         .with_version(input.version)
-        .parse::<sfv::Item>();
+        .parse_item_with_visitor(sfv::visitor::Ignored);
 });
