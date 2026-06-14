@@ -115,12 +115,12 @@ assert_eq!(
     ///
     /// # Errors
     /// When the parsing process is unsuccessful, including any error raised by a visitor.
-    pub fn parse_dictionary_with_visitor(
-        self,
-        visitor: &mut (impl ?Sized + DictionaryVisitor<'de>),
-    ) -> SFVResult<()> {
+    pub fn parse_dictionary_with_visitor<V>(self, mut visitor: V) -> SFVResult<V::Out>
+    where
+        V: DictionaryVisitor<'de>,
+    {
         // https://httpwg.org/specs/rfc9651.html#parse-dictionary
-        self.parse_internal(move |parser| {
+        self.parse_internal(|parser| {
             parse_comma_separated(parser, |parser| {
                 // Note: It is up to the visitor to properly handle duplicate keys.
                 let entry_visitor = visitor.entry(parser.parse_key()?)?;
@@ -133,7 +133,9 @@ assert_eq!(
                     parser.parse_parameters(param_visitor)?;
                     Ok(())
                 }
-            })
+            })?;
+
+            Ok(visitor.finish()?)
         })
     }
 
@@ -165,13 +167,14 @@ assert_eq!(
     ///
     /// # Errors
     /// When the parsing process is unsuccessful, including any error raised by a visitor.
-    pub fn parse_list_with_visitor(
-        self,
-        visitor: &mut (impl ?Sized + ListVisitor<'de>),
-    ) -> SFVResult<()> {
+    pub fn parse_list_with_visitor<V>(self, mut visitor: V) -> SFVResult<V::Out>
+    where
+        V: ListVisitor<'de>,
+    {
         // https://httpwg.org/specs/rfc9651.html#parse-list
         self.parse_internal(|parser| {
-            parse_comma_separated(parser, |parser| parser.parse_list_entry(visitor.entry()?))
+            parse_comma_separated(parser, |parser| parser.parse_list_entry(visitor.entry()?))?;
+            Ok(visitor.finish()?)
         })
     }
 

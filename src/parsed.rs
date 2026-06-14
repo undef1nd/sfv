@@ -207,11 +207,16 @@ impl<'de> InnerListVisitor<'de> for &mut InnerList {
     }
 }
 
-impl<'de> DictionaryVisitor<'de> for Dictionary {
+impl<'de> DictionaryVisitor<'de> for &mut Dictionary {
+    type Out = ();
     type Error = Infallible;
 
     fn entry(&mut self, key: &'de KeyRef) -> Result<impl EntryVisitor<'de>, Self::Error> {
         Ok(Entry { dict: self, key })
+    }
+
+    fn finish(self) -> Result<Self::Out, Self::Error> {
+        Ok(())
     }
 }
 
@@ -280,11 +285,16 @@ impl<'de> EntryVisitor<'de> for &mut List {
     }
 }
 
-impl<'de> ListVisitor<'de> for List {
+impl<'de> ListVisitor<'de> for &mut List {
+    type Out = ();
     type Error = Infallible;
 
     fn entry(&mut self) -> Result<impl EntryVisitor<'de>, Self::Error> {
-        Ok(self)
+        Ok(&mut **self)
+    }
+
+    fn finish(self) -> Result<Self::Out, Self::Error> {
+        Ok(())
     }
 }
 

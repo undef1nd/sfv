@@ -167,49 +167,49 @@ fn parse_list_errors() {
     let input = ",";
     assert_eq!(
         Err(error::Repr::ExpectedStartOfBareItem(0).into()),
-        Parser::new(input).parse_list_with_visitor(&mut Ignored)
+        Parser::new(input).parse_list_with_visitor(Ignored)
     );
 
     let input = "a, b c";
     assert_eq!(
         Err(error::Repr::TrailingCharactersAfterMember(5).into()),
-        Parser::new(input).parse_list_with_visitor(&mut Ignored)
+        Parser::new(input).parse_list_with_visitor(Ignored)
     );
 
     let input = "a,";
     assert_eq!(
         Err(error::Repr::TrailingComma(1).into()),
-        Parser::new(input).parse_list_with_visitor(&mut Ignored)
+        Parser::new(input).parse_list_with_visitor(Ignored)
     );
 
     let input = "a     ,    ";
     assert_eq!(
         Err(error::Repr::TrailingComma(6).into()),
-        Parser::new(input).parse_list_with_visitor(&mut Ignored)
+        Parser::new(input).parse_list_with_visitor(Ignored)
     );
 
     let input = "a\t \t ,\t ";
     assert_eq!(
         Err(error::Repr::TrailingComma(5).into()),
-        Parser::new(input).parse_list_with_visitor(&mut Ignored)
+        Parser::new(input).parse_list_with_visitor(Ignored)
     );
 
     let input = "a\t\t,\t\t\t";
     assert_eq!(
         Err(error::Repr::TrailingComma(3).into()),
-        Parser::new(input).parse_list_with_visitor(&mut Ignored)
+        Parser::new(input).parse_list_with_visitor(Ignored)
     );
 
     let input = "(a b),";
     assert_eq!(
         Err(error::Repr::TrailingComma(5).into()),
-        Parser::new(input).parse_list_with_visitor(&mut Ignored)
+        Parser::new(input).parse_list_with_visitor(Ignored)
     );
 
     let input = "(1, 2, (a b)";
     assert_eq!(
         Err(error::Repr::ExpectedInnerListDelimiter(2).into()),
-        Parser::new(input).parse_list_with_visitor(&mut Ignored)
+        Parser::new(input).parse_list_with_visitor(Ignored)
     );
 }
 
@@ -280,12 +280,12 @@ fn parse_dict_errors() {
     let input = "abc=123;a=1;b=2 def";
     assert_eq!(
         Err(error::Repr::TrailingCharactersAfterMember(16).into()),
-        Parser::new(input).parse_dictionary_with_visitor(&mut Ignored)
+        Parser::new(input).parse_dictionary_with_visitor(Ignored)
     );
     let input = "abc=123;a=1,";
     assert_eq!(
         Err(error::Repr::TrailingComma(11).into()),
-        Parser::new(input).parse_dictionary_with_visitor(&mut Ignored)
+        Parser::new(input).parse_dictionary_with_visitor(Ignored)
     );
 }
 
@@ -916,7 +916,8 @@ impl<'de> ParameterVisitor<'de> for &mut Point {
     }
 }
 
-impl<'de> DictionaryVisitor<'de> for Point {
+impl<'de> DictionaryVisitor<'de> for &mut Point {
+    type Out = ();
     type Error = Infallible;
 
     fn entry(&mut self, key: &'de KeyRef) -> Result<impl EntryVisitor<'de>, Self::Error> {
@@ -926,6 +927,10 @@ impl<'de> DictionaryVisitor<'de> for Point {
             _ => return Ok(None),
         };
         Ok(Some(CoordVisitor { coord }))
+    }
+
+    fn finish(self) -> Result<Self::Out, Self::Error> {
+        Ok(())
     }
 }
 
@@ -1004,12 +1009,17 @@ fn complex_list_visitor() {
         point: Point,
     }
 
-    impl<'de> ListVisitor<'de> for Vec<ListHolder> {
+    impl<'de> ListVisitor<'de> for &mut Vec<ListHolder> {
+        type Out = ();
         type Error = Infallible;
 
         fn entry(&mut self) -> Result<impl EntryVisitor<'de>, Self::Error> {
             self.push(ListHolder::default());
             Ok(self.last_mut().unwrap()) // cannot fail
+        }
+
+        fn finish(self) -> Result<Self::Out, Self::Error> {
+            Ok(())
         }
     }
 
@@ -1090,16 +1100,22 @@ fn parse_dictionary_lifetime() -> Result<(), Error> {
     struct Visitor<'de>(Option<&'de KeyRef>);
 
     impl<'de> DictionaryVisitor<'de> for Visitor<'de> {
+        type Out = Option<&'de KeyRef>;
         type Error = Infallible;
 
         fn entry(&mut self, key: &'de KeyRef) -> Result<impl EntryVisitor<'de>, Self::Error> {
             self.0 = Some(key);
             Ok(Ignored)
         }
+
+        fn finish(self) -> Result<Self::Out, Self::Error> {
+            Ok(self.0)
+        }
     }
 
-    let mut visitor = Visitor(None);
-    Parser::new("a=1").parse_dictionary_with_visitor(&mut visitor)?;
-    assert_eq!(visitor.0, Some(key_ref("a")));
+    assert_eq!(
+        Parser::new("a=1").parse_dictionary_with_visitor(Visitor(None))?,
+        Some(key_ref("a"))
+    );
     Ok(())
 }

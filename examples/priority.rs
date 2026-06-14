@@ -33,6 +33,7 @@ fn parse_incremental(v: Option<bool>) -> bool {
 }
 
 impl<'de> sfv::visitor::DictionaryVisitor<'de> for Priority {
+    type Out = Self;
     type Error = std::convert::Infallible;
 
     fn entry(
@@ -46,6 +47,10 @@ impl<'de> sfv::visitor::DictionaryVisitor<'de> for Priority {
             // dictionary keys are ignored.
             _ => None,
         })
+    }
+
+    fn finish(self) -> Result<Self::Out, Self::Error> {
+        Ok(self)
     }
 }
 
@@ -218,20 +223,16 @@ fn main() -> Result<(), sfv::Error> {
             Priority::from(
                 &sfv::Parser::new(input)
                     .with_version(sfv::Version::Rfc8941)
-                    .parse()?
+                    .parse::<sfv::Dictionary>()?
             ),
             expected,
             "{input}"
         );
 
         assert_eq!(
-            {
-                let mut priority = Priority::default();
-                sfv::Parser::new(input)
-                    .with_version(sfv::Version::Rfc8941)
-                    .parse_dictionary_with_visitor(&mut priority)?;
-                priority
-            },
+            sfv::Parser::new(input)
+                .with_version(sfv::Version::Rfc8941)
+                .parse_dictionary_with_visitor(Priority::default())?,
             expected,
             "{input}"
         );

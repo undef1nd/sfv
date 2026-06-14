@@ -164,6 +164,7 @@ struct CoordVisitor<'a> {
 }
 
 impl<'de> DictionaryVisitor<'de> for Point {
+    type Out = Self;
     type Error = std::convert::Infallible;
 
     fn entry(
@@ -181,6 +182,10 @@ impl<'de> DictionaryVisitor<'de> for Point {
         };
         // Visit this key's value by returning `Some`.
         Ok(Some(CoordVisitor { coord }))
+    }
+
+    fn finish(self) -> Result<Self::Out, Self::Error> {
+        Ok(self)
     }
 }
 
@@ -228,9 +233,9 @@ impl<'de> EntryVisitor<'de> for CoordVisitor<'_> {
 }
 
 # fn main() -> Result<(), sfv::Error> {
-let mut point = Point::default();
-Parser::new("x=10, z=abc, y=3").parse_dictionary_with_visitor(&mut point)?;
-assert_eq!(point, Point { x: 10, y: 3 });
+assert_eq!(
+    Parser::new("x=10, z=abc, y=3").parse_dictionary_with_visitor(Point::default())?,
+    Point { x: 10, y: 3 });
 # Ok(())
 # }
 ```
@@ -369,6 +374,9 @@ pub trait EntryVisitor<'de>: ItemVisitor<'de> {
 /// Use this trait with
 /// [`Parser::parse_dictionary_with_visitor`][crate::Parser::parse_dictionary_with_visitor].
 pub trait DictionaryVisitor<'de> {
+    /// The successful return type of the [`DictionaryVisitor::finish`] method.
+    type Out;
+
     /// The error type that can be returned if some error occurs during parsing.
     type Error: Error;
 
@@ -392,6 +400,14 @@ pub trait DictionaryVisitor<'de> {
     /// # Errors
     /// The error result should report the reason for any failed validation.
     fn entry(&mut self, key: &'de KeyRef) -> Result<impl EntryVisitor<'de>, Self::Error>;
+
+    /// Called after all dictionary keys have been parsed.
+    ///
+    /// Parsing will be terminated early if an error is returned.
+    ///
+    /// # Errors
+    /// The error result should report the reason for any failed validation.
+    fn finish(self) -> Result<Self::Out, Self::Error>;
 }
 
 /// A visitor whose methods are called during list parsing.
@@ -401,6 +417,9 @@ pub trait DictionaryVisitor<'de> {
 /// Use this trait with
 /// [`Parser::parse_list_with_visitor`][crate::Parser::parse_list_with_visitor].
 pub trait ListVisitor<'de> {
+    /// The successful return type of the [`ListVisitor::finish`] method.
+    type Out;
+
     /// The error type that can be returned if some error occurs during parsing.
     type Error: Error;
 
@@ -413,6 +432,14 @@ pub trait ListVisitor<'de> {
     /// # Errors
     /// The error result should report the reason for any failed validation.
     fn entry(&mut self) -> Result<impl EntryVisitor<'de>, Self::Error>;
+
+    /// Called after all list entries have been parsed.
+    ///
+    /// Parsing will be terminated early if an error is returned.
+    ///
+    /// # Errors
+    /// The error result should report the reason for any failed validation.
+    fn finish(self) -> Result<Self::Out, Self::Error>;
 }
 
 /// A visitor that can be used to silently discard structured-field parts.
@@ -474,18 +501,28 @@ impl<'de> InnerListVisitor<'de> for Ignored {
 }
 
 impl<'de> DictionaryVisitor<'de> for Ignored {
+    type Out = ();
     type Error = Infallible;
 
     fn entry(&mut self, _key: &'de KeyRef) -> Result<impl EntryVisitor<'de>, Self::Error> {
         Ok(Ignored)
     }
+
+    fn finish(self) -> Result<Self::Out, Self::Error> {
+        Ok(())
+    }
 }
 
 impl<'de> ListVisitor<'de> for Ignored {
+    type Out = ();
     type Error = Infallible;
 
     fn entry(&mut self) -> Result<impl EntryVisitor<'de>, Self::Error> {
         Ok(Ignored)
+    }
+
+    fn finish(self) -> Result<Self::Out, Self::Error> {
+        Ok(())
     }
 }
 
