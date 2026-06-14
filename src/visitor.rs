@@ -126,6 +126,39 @@ assert!(sfv::Parser::new("123").parse_item_with_visitor(Visitor).is_err());
 # }
 ```
 
+Or using a function, given the blanket implementation of [`ItemVisitor`] for [`FnOnce`]:
+
+```
+# use sfv::visitor::{Ignored, ParameterVisitor, parameter_visitor_with};
+# use sfv::{BareItemFromInput, TokenRef, token_ref};
+# fn main() -> Result<(), sfv::Error> {
+# #[derive(Debug)]
+# struct ExpectedToken;
+#
+# impl std::fmt::Display for ExpectedToken {
+#    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+#        f.write_str("expected token")
+#    }
+# }
+#
+# impl std::error::Error for ExpectedToken {}
+#
+fn as_token<'de>(bare_item: BareItemFromInput<'de>) -> Result<impl ParameterVisitor<'de, Out = &'de TokenRef>, ExpectedToken> {
+  if let BareItemFromInput::Token(token) = bare_item {
+      Ok(parameter_visitor_with(Ignored, move |_| Ok(token)))
+  } else {
+      Err(ExpectedToken)
+  }
+}
+
+assert_eq!(
+  token_ref("abc"),
+  sfv::Parser::new("abc").parse_item_with_visitor(as_token)?,
+);
+# Ok(())
+# }
+```
+
 # Discarding irrelevant parts
 
 Two kinds of helpers are provided for silently discarding structured-field
@@ -320,6 +353,23 @@ pub trait ItemVisitor<'de> {
         self,
         bare_item: BareItemFromInput<'de>,
     ) -> Result<impl ParameterVisitor<'de, Out = Self::Out>, Self::Error>;
+}
+
+impl<'de, F, V, E> ItemVisitor<'de> for F
+where
+    F: FnOnce(BareItemFromInput<'de>) -> Result<V, E>,
+    V: ParameterVisitor<'de>,
+    E: Error,
+{
+    type Out = V::Out;
+    type Error = E;
+
+    fn bare_item(
+        self,
+        bare_item: BareItemFromInput<'de>,
+    ) -> Result<impl ParameterVisitor<'de, Out = Self::Out>, Self::Error> {
+        self(bare_item)
+    }
 }
 
 /// A visitor whose methods are called during inner-list parsing.
