@@ -500,19 +500,3 @@ impl<'de> InnerListVisitor<'de> for Never {
         Ok(self)
     }
 }
-
-impl<'de> DictionaryVisitor<'de> for Never {
-    type Error = Infallible;
-
-    fn entry(&mut self, _key: &'de KeyRef) -> Result<impl EntryVisitor<'de>, Self::Error> {
-        Ok(*self)
-    }
-}
-
-impl<'de> ListVisitor<'de> for Never {
-    type Error = Infallible;
-
-    fn entry(&mut self) -> Result<impl EntryVisitor<'de>, Self::Error> {
-        Ok(*self)
-    }
-}
