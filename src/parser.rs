@@ -10,10 +10,10 @@ use crate::{
     Version,
 };
 
-fn parse_item<'de>(
-    parser: &mut Parser<'de>,
-    visitor: impl ItemVisitor<'de>,
-) -> Result<(), error::Repr> {
+fn parse_item<'de, V>(parser: &mut Parser<'de>, visitor: V) -> Result<V::Out, error::Repr>
+where
+    V: ItemVisitor<'de>,
+{
     // https://httpwg.org/specs/rfc9651.html#parse-item
     let param_visitor = visitor.bare_item(parser.parse_bare_item()?)?;
     parser.parse_parameters(param_visitor)
@@ -130,7 +130,8 @@ assert_eq!(
                     parser.parse_list_entry(entry_visitor)
                 } else {
                     let param_visitor = entry_visitor.bare_item(BareItemFromInput::from(true))?;
-                    parser.parse_parameters(param_visitor)
+                    parser.parse_parameters(param_visitor)?;
+                    Ok(())
                 }
             })
         })
@@ -179,7 +180,10 @@ assert_eq!(
     ///
     /// # Errors
     /// When the parsing process is unsuccessful, including any error raised by a visitor.
-    pub fn parse_item_with_visitor(self, visitor: impl ItemVisitor<'de>) -> SFVResult<()> {
+    pub fn parse_item_with_visitor<V>(self, visitor: V) -> SFVResult<V::Out>
+    where
+        V: ItemVisitor<'de>,
+    {
         self.parse_internal(|parser| parse_item(parser, visitor))
     }
 
@@ -193,15 +197,15 @@ assert_eq!(
 
     // Generic parse method for checking input before parsing
     // and handling trailing text error
-    fn parse_internal(
+    fn parse_internal<T>(
         mut self,
-        f: impl FnOnce(&mut Self) -> Result<(), error::Repr>,
-    ) -> SFVResult<()> {
+        f: impl FnOnce(&mut Self) -> Result<T, error::Repr>,
+    ) -> SFVResult<T> {
         // https://httpwg.org/specs/rfc9651.html#text-parse
 
         self.consume_sp_chars();
 
-        f(&mut self)?;
+        let value = f(&mut self)?;
 
         self.consume_sp_chars();
 
@@ -209,16 +213,18 @@ assert_eq!(
             return Err(error::Repr::TrailingCharactersAfterParsedValue(self.index).into());
         }
 
-        Ok(())
+        Ok(value)
     }
 
     fn parse_list_entry(&mut self, visitor: impl EntryVisitor<'de>) -> Result<(), error::Repr> {
         // https://httpwg.org/specs/rfc9651.html#parse-item-or-list
         // ListEntry represents a tuple (item_or_inner_list, parameters)
 
-        match self.peek() {
-            Some(b'(') => self.parse_inner_list(visitor.inner_list()?),
-            _ => parse_item(self, visitor),
+        if let Some(b'(') = self.peek() {
+            self.parse_inner_list(visitor.inner_list()?)
+        } else {
+            parse_item(self, visitor)?;
+            Ok(())
         }
     }
 
@@ -240,7 +246,8 @@ assert_eq!(
             if Some(b')') == self.peek() {
                 self.next();
                 let param_visitor = visitor.finish()?;
-                return self.parse_parameters(param_visitor);
+                self.parse_parameters(param_visitor)?;
+                return Ok(());
             }
 
             parse_item(self, visitor.item()?)?;
@@ -611,10 +618,10 @@ assert_eq!(
         Err(error::Repr::UnterminatedDisplayString(self.index))
     }
 
-    pub(crate) fn parse_parameters(
-        &mut self,
-        mut visitor: impl ParameterVisitor<'de>,
-    ) -> Result<(), error::Repr> {
+    pub(crate) fn parse_parameters<V>(&mut self, mut visitor: V) -> Result<V::Out, error::Repr>
+    where
+        V: ParameterVisitor<'de>,
+    {
         // https://httpwg.org/specs/rfc9651.html#parse-param
 
         while let Some(b';') = self.peek() {
@@ -633,8 +640,7 @@ assert_eq!(
             visitor.parameter(param_name, param_value)?;
         }
 
-        visitor.finish()?;
-        Ok(())
+        Ok(visitor.finish()?)
     }
 
     pub(crate) fn parse_key(&mut self) -> Result<&'de KeyRef, error::Repr> {

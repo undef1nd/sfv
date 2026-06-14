@@ -150,6 +150,7 @@ impl InnerList {
 }
 
 impl<'de> ParameterVisitor<'de> for &mut Parameters {
+    type Out = ();
     type Error = Infallible;
 
     fn parameter(
@@ -160,26 +161,32 @@ impl<'de> ParameterVisitor<'de> for &mut Parameters {
         self.insert(key.to_owned(), value.into());
         Ok(())
     }
+
+    fn finish(self) -> Result<Self::Out, Self::Error> {
+        Ok(())
+    }
 }
 
 impl<'de> ItemVisitor<'de> for &mut Item {
+    type Out = ();
     type Error = Infallible;
 
     fn bare_item(
         self,
         bare_item: BareItemFromInput<'de>,
-    ) -> Result<impl ParameterVisitor<'de>, Self::Error> {
+    ) -> Result<impl ParameterVisitor<'de, Out = Self::Out>, Self::Error> {
         self.bare_item = bare_item.into();
         Ok(&mut self.params)
     }
 }
 
 impl<'de> ItemVisitor<'de> for &mut InnerList {
+    type Out = ();
     type Error = Infallible;
     fn bare_item(
         self,
         bare_item: BareItemFromInput<'de>,
-    ) -> Result<impl ParameterVisitor<'de>, Self::Error> {
+    ) -> Result<impl ParameterVisitor<'de, Out = Self::Out>, Self::Error> {
         self.items.push(Item::new(bare_item));
         match self.items.last_mut() {
             Some(item) => Ok(&mut item.params),
@@ -214,12 +221,13 @@ struct Entry<'de, 'a> {
 }
 
 impl<'de> ItemVisitor<'de> for Entry<'de, '_> {
+    type Out = ();
     type Error = Infallible;
 
     fn bare_item(
         self,
         bare_item: BareItemFromInput<'de>,
-    ) -> Result<impl ParameterVisitor<'de>, Self::Error> {
+    ) -> Result<impl ParameterVisitor<'de, Out = Self::Out>, Self::Error> {
         match self
             .dict
             .entry(self.key.to_owned())
@@ -247,12 +255,13 @@ impl<'de> EntryVisitor<'de> for Entry<'de, '_> {
 }
 
 impl<'de> ItemVisitor<'de> for &mut List {
+    type Out = ();
     type Error = Infallible;
 
     fn bare_item(
         self,
         bare_item: BareItemFromInput<'de>,
-    ) -> Result<impl ParameterVisitor<'de>, Self::Error> {
+    ) -> Result<impl ParameterVisitor<'de, Out = Self::Out>, Self::Error> {
         self.push(Item::new(bare_item).into());
         match self.last_mut() {
             Some(ListEntry::Item(item)) => Ok(&mut item.params),

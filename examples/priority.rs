@@ -55,12 +55,13 @@ enum PriorityParameter<'a> {
 }
 
 impl<'de> sfv::visitor::ItemVisitor<'de> for PriorityParameter<'_> {
+    type Out = ();
     type Error = std::convert::Infallible;
 
     fn bare_item(
         self,
         bare_item: sfv::BareItemFromInput<'de>,
-    ) -> Result<impl sfv::visitor::ParameterVisitor<'de>, Self::Error> {
+    ) -> Result<impl sfv::visitor::ParameterVisitor<'de, Out = Self::Out>, Self::Error> {
         // Per https://httpwg.org/specs/rfc9218.html#parameters values of
         // unexpected types and out-of-range values are ignored. Since the same
         // dictionary key can appear multiple times in the input, and only the

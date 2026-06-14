@@ -891,6 +891,7 @@ impl Point {
 
 // For when a `Point` is a parameter somewhere.
 impl<'de> ParameterVisitor<'de> for &mut Point {
+    type Out = ();
     type Error = Infallible;
 
     fn parameter(
@@ -907,6 +908,10 @@ impl<'de> ParameterVisitor<'de> for &mut Point {
             _ => return Ok(()),
         };
         *ptr = i64::from(v);
+        Ok(())
+    }
+
+    fn finish(self) -> Result<Self::Out, Self::Error> {
         Ok(())
     }
 }
@@ -929,12 +934,13 @@ struct CoordVisitor<'a> {
 }
 
 impl<'de> ItemVisitor<'de> for CoordVisitor<'_> {
+    type Out = ();
     type Error = Infallible;
 
     fn bare_item(
         self,
         bare_item: BareItemFromInput<'de>,
-    ) -> Result<impl ParameterVisitor<'de>, Self::Error> {
+    ) -> Result<impl ParameterVisitor<'de, Out = Self::Out>, Self::Error> {
         if let Some(v) = bare_item.as_integer() {
             *self.coord = i64::from(v);
         }
@@ -965,12 +971,13 @@ struct Holder {
 }
 
 impl<'de> ItemVisitor<'de> for &mut Holder {
+    type Out = Option<()>;
     type Error = Infallible;
 
     fn bare_item(
         self,
         bare_item: BareItemFromInput<'de>,
-    ) -> Result<impl ParameterVisitor<'de>, Self::Error> {
+    ) -> Result<impl ParameterVisitor<'de, Out = Self::Out>, Self::Error> {
         Ok(if let Some(v) = bare_item.as_integer() {
             self.v = i64::from(v);
             Some(&mut self.point)
@@ -1007,12 +1014,13 @@ fn complex_list_visitor() {
     }
 
     impl<'de> ItemVisitor<'de> for &mut ListHolder {
+        type Out = ();
         type Error = Infallible;
 
         fn bare_item(
             self,
             _bare_item: BareItemFromInput<'de>,
-        ) -> Result<impl ParameterVisitor<'de>, Self::Error> {
+        ) -> Result<impl ParameterVisitor<'de, Out = Self::Out>, Self::Error> {
             Ok(Ignored)
         }
     }
