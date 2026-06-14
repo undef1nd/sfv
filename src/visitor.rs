@@ -691,3 +691,54 @@ where
         (self.finish)(self.visitor.finish()?)
     }
 }
+
+/// A type that can be produced from an [`ItemVisitor`].
+///
+/// Use this with [`crate::Parser::parse_item`].
+pub trait MakeItemVisitor<'de> {
+    /// Returns an item visitor that produces `Self` on success.
+    fn make_item_visitor() -> impl ItemVisitor<'de, Out = Self>;
+}
+
+/// A type that can be produced from a [`ListVisitor`].
+///
+/// Use this with [`crate::Parser::parse_list`].
+pub trait MakeListVisitor<'de> {
+    /// Returns a list visitor that produces `Self` on success.
+    fn make_list_visitor() -> impl ListVisitor<'de, Out = Self>;
+}
+
+/// A type that can be produced from a [`DictionaryVisitor`].
+///
+/// Use this with [`crate::Parser::parse_dictionary`].
+pub trait MakeDictionaryVisitor<'de> {
+    /// Returns a dictionary visitor that produces `Self` on success.
+    fn make_dictionary_visitor() -> impl DictionaryVisitor<'de, Out = Self>;
+}
+
+impl<'de, V> MakeItemVisitor<'de> for V
+where
+    V: ItemVisitor<'de, Out = Self> + Default,
+{
+    fn make_item_visitor() -> impl ItemVisitor<'de, Out = Self> {
+        V::default()
+    }
+}
+
+impl<'de, V> MakeListVisitor<'de> for V
+where
+    V: ListVisitor<'de, Out = Self> + Default,
+{
+    fn make_list_visitor() -> impl ListVisitor<'de, Out = Self> {
+        V::default()
+    }
+}
+
+impl<'de, V> MakeDictionaryVisitor<'de> for V
+where
+    V: DictionaryVisitor<'de, Out = Self> + Default,
+{
+    fn make_dictionary_visitor() -> impl DictionaryVisitor<'de, Out = Self> {
+        V::default()
+    }
+}

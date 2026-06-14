@@ -220,6 +220,19 @@ impl<'de> DictionaryVisitor<'de> for &mut Dictionary {
     }
 }
 
+impl<'de> DictionaryVisitor<'de> for Dictionary {
+    type Out = Self;
+    type Error = Infallible;
+
+    fn entry(&mut self, key: &'de KeyRef) -> Result<impl EntryVisitor<'de>, Self::Error> {
+        Ok(Entry { dict: self, key })
+    }
+
+    fn finish(self) -> Result<Self::Out, Self::Error> {
+        Ok(self)
+    }
+}
+
 struct Entry<'de, 'a> {
     dict: &'a mut Dictionary,
     key: &'de KeyRef,
@@ -298,6 +311,19 @@ impl<'de> ListVisitor<'de> for &mut List {
     }
 }
 
+impl<'de> ListVisitor<'de> for List {
+    type Out = Self;
+    type Error = Infallible;
+
+    fn entry(&mut self) -> Result<impl EntryVisitor<'de>, Self::Error> {
+        Ok(self)
+    }
+
+    fn finish(self) -> Result<Self::Out, Self::Error> {
+        Ok(self)
+    }
+}
+
 /// A structured-field type, supporting parsing and serialization.
 pub trait FieldType: Sealed {
     /// The result of serializing the value into a string.
@@ -363,9 +389,7 @@ impl FieldType for List {
     }
 
     fn parse(parser: Parser<'_>) -> Result<Self, Error> {
-        let mut list = Self::new();
-        parser.parse_list_with_visitor(&mut list)?;
-        Ok(list)
+        parser.parse_list()
     }
 }
 
@@ -381,8 +405,6 @@ impl FieldType for Dictionary {
     }
 
     fn parse(parser: Parser<'_>) -> Result<Self, Error> {
-        let mut dict = Self::new();
-        parser.parse_dictionary_with_visitor(&mut dict)?;
-        Ok(dict)
+        parser.parse_dictionary()
     }
 }

@@ -4,7 +4,7 @@ use crate::{
     error, utils,
     visitor::{
         DictionaryVisitor, EntryVisitor, InnerListVisitor, ItemVisitor, ListVisitor,
-        ParameterVisitor,
+        MakeDictionaryVisitor, MakeItemVisitor, MakeListVisitor, ParameterVisitor,
     },
     BareItemFromInput, Date, Decimal, Integer, KeyRef, Num, SFVResult, String, StringRef, TokenRef,
     Version,
@@ -87,6 +87,18 @@ impl<'de> Parser<'de> {
         T::parse(self)
     }
 
+    /// Parses input into a structured field value of `Dictionary` type,
+    /// returning the result as type `T`.
+    ///
+    /// # Errors
+    /// When the parsing process is unsuccessful, including any error raised by a visitor.
+    pub fn parse_dictionary<T>(self) -> SFVResult<T>
+    where
+        T: MakeDictionaryVisitor<'de>,
+    {
+        self.parse_dictionary_with_visitor(T::make_dictionary_visitor())
+    }
+
     /// Parses input into a structured field value of `Dictionary` type, using
     /// the given visitor.
     #[cfg_attr(
@@ -139,6 +151,18 @@ assert_eq!(
         })
     }
 
+    /// Parses input into a structured field value of `List` type, returning the
+    /// result as type `T`.
+    ///
+    /// # Errors
+    /// When the parsing process is unsuccessful, including any error raised by a visitor.
+    pub fn parse_list<T>(self) -> SFVResult<T>
+    where
+        T: MakeListVisitor<'de>,
+    {
+        self.parse_list_with_visitor(T::make_list_visitor())
+    }
+
     /// Parses input into a structured field value of `List` type, using the
     /// given visitor.
     #[allow(clippy::needless_raw_string_hashes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/11737
@@ -176,6 +200,18 @@ assert_eq!(
             parse_comma_separated(parser, |parser| parser.parse_list_entry(visitor.entry()?))?;
             Ok(visitor.finish()?)
         })
+    }
+
+    /// Parses input into a structured field value of `Item` type, returning the
+    /// result as type `T`.
+    ///
+    /// # Errors
+    /// When the parsing process is unsuccessful, including any error raised by a visitor.
+    pub fn parse_item<T>(self) -> SFVResult<T>
+    where
+        T: MakeItemVisitor<'de>,
+    {
+        self.parse_item_with_visitor(T::make_item_visitor())
     }
 
     /// Parses input into a structured field value of `Item` type, using the

@@ -232,7 +232,7 @@ fn main() -> Result<(), sfv::Error> {
         assert_eq!(
             sfv::Parser::new(input)
                 .with_version(sfv::Version::Rfc8941)
-                .parse_dictionary_with_visitor(Priority::default())?,
+                .parse_dictionary::<Priority>()?,
             expected,
             "{input}"
         );

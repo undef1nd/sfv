@@ -1009,8 +1009,8 @@ fn complex_list_visitor() {
         point: Point,
     }
 
-    impl<'de> ListVisitor<'de> for &mut Vec<ListHolder> {
-        type Out = ();
+    impl<'de> ListVisitor<'de> for Vec<ListHolder> {
+        type Out = Self;
         type Error = Infallible;
 
         fn entry(&mut self) -> Result<impl EntryVisitor<'de>, Self::Error> {
@@ -1019,7 +1019,7 @@ fn complex_list_visitor() {
         }
 
         fn finish(self) -> Result<Self::Out, Self::Error> {
-            Ok(())
+            Ok(self)
         }
     }
 
@@ -1054,9 +1054,8 @@ fn complex_list_visitor() {
         }
     }
 
-    let mut list = Vec::<ListHolder>::default();
-    Parser::new("(1;x=4 2;y=5 3);x=1;y=2,(4;x=12;y=33), ()")
-        .parse_list_with_visitor(&mut list)
+    let list: Vec<ListHolder> = Parser::new("(1;x=4 2;y=5 3);x=1;y=2,(4;x=12;y=33), ()")
+        .parse_list()
         .expect("successful parse");
 
     let expected = vec![
