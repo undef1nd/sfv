@@ -839,40 +839,39 @@ fn parse_display_string() -> Result<(), Error> {
 }
 
 #[test]
-#[cfg(feature = "parsed-types")]
 fn parse_display_string_errors() {
     assert_eq!(
-        Parser::new(" %").parse::<Item>(),
+        Parser::new(" %").parse_item_with_visitor(Ignored),
         Err(error::Repr::ExpectedQuote(2).into())
     );
 
     assert_eq!(
-        Parser::new(r#" %""#).parse::<Item>(),
+        Parser::new(r#" %""#).parse_item_with_visitor(Ignored),
         Err(error::Repr::UnterminatedDisplayString(3).into())
     );
 
     assert_eq!(
-        Parser::new(r#" %"%"#).parse::<Item>(),
+        Parser::new(r#" %"%"#).parse_item_with_visitor(Ignored),
         Err(error::Repr::UnterminatedEscapeSequence(4).into())
     );
 
     assert_eq!(
-        Parser::new(r#" %"%a"#).parse::<Item>(),
+        Parser::new(r#" %"%a"#).parse_item_with_visitor(Ignored),
         Err(error::Repr::UnterminatedEscapeSequence(5).into())
     );
 
     assert_eq!(
-        Parser::new(r#" %"%A"#).parse::<Item>(),
+        Parser::new(r#" %"%A"#).parse_item_with_visitor(Ignored),
         Err(error::Repr::InvalidEscapeSequence(4).into())
     );
 
     assert_eq!(
-        Parser::new(r#" %"%aA"#).parse::<Item>(),
+        Parser::new(r#" %"%aA"#).parse_item_with_visitor(Ignored),
         Err(error::Repr::InvalidEscapeSequence(5).into())
     );
 
     assert_eq!(
-        Parser::new(r#" %"x%aa""#).parse::<Item>(),
+        Parser::new(r#" %"x%aa""#).parse_item_with_visitor(Ignored),
         Err(error::Repr::InvalidUtf8InDisplayString(4).into())
     );
 }
