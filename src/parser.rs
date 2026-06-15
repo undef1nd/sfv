@@ -53,13 +53,40 @@ fn parse_comma_separated<'de>(
     Ok(())
 }
 
+fn parse_base64_conformant(bytes: &[u8]) -> Result<Vec<u8>, usize> {
+    base64::Engine::decode(&utils::BASE64, bytes).map_err(|err| match err {
+        base64::DecodeError::InvalidByte(offset, _)
+        | base64::DecodeError::InvalidLastSymbol(offset, _) => offset,
+        // Report these two at the position of the last base64
+        // character, since they correspond to errors in the input
+        // as a whole.
+        base64::DecodeError::InvalidLength(_) | base64::DecodeError::InvalidPadding => bytes.len(),
+    })
+}
+
 /// Exposes methods for parsing input into a structured field value.
-#[derive(Debug)]
+#[cfg_attr(not(feature = "non-conformant-parsing"), derive(Debug))]
 #[must_use]
 pub struct Parser<'de> {
     input: &'de [u8],
     index: usize,
     version: Version,
+    #[cfg(feature = "non-conformant-parsing")]
+    parse_base64: Box<dyn FnMut(&[u8]) -> Result<Vec<u8>, usize>>,
+    #[cfg(feature = "non-conformant-parsing")]
+    allow_trailing_decimals: bool,
+}
+
+#[cfg(feature = "non-conformant-parsing")]
+impl std::fmt::Debug for Parser<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.debug_struct("Parser")
+            .field("input", &self.input)
+            .field("index", &self.index)
+            .field("version", &self.version)
+            .field("allow_trailing_decimals", &self.allow_trailing_decimals)
+            .finish_non_exhaustive()
+    }
 }
 
 impl<'de> Parser<'de> {
@@ -69,12 +96,41 @@ impl<'de> Parser<'de> {
             input: input.as_ref(),
             index: 0,
             version: Version::Rfc9651,
+            #[cfg(feature = "non-conformant-parsing")]
+            parse_base64: Box::new(parse_base64_conformant),
+            #[cfg(feature = "non-conformant-parsing")]
+            allow_trailing_decimals: false,
         }
     }
 
     /// Sets the parser's version and returns it.
     pub fn with_version(mut self, version: Version) -> Self {
         self.version = version;
+        self
+    }
+
+    /// Sets the parser's base64 parser and returns it.
+    ///
+    /// The given function will be called whenever a byte sequence bare item is
+    /// encountered. The input is the base64-encoded value; the output is either
+    /// the decoded bytes or the position within the slice at which an error
+    /// occurred.
+    ///
+    /// This can be used to handle non-conformant byte sequence values.
+    #[cfg(feature = "non-conformant-parsing")]
+    pub fn with_base64_parser(
+        mut self,
+        parse_base64: impl FnMut(&[u8]) -> Result<Vec<u8>, usize> + 'static,
+    ) -> Self {
+        self.parse_base64 = Box::new(parse_base64);
+        self
+    }
+
+    /// Sets the whether the parser accepts trailing decimals, which is not
+    /// conformant behavior, and returns it.
+    #[cfg(feature = "non-conformant-parsing")]
+    pub fn with_allow_trailing_decimals(mut self, allow_trailing_decimals: bool) -> Self {
+        self.allow_trailing_decimals = allow_trailing_decimals;
         self
     }
 
@@ -458,25 +514,15 @@ assert_eq!(
             }
         }
 
-        let colon_index = self.index - 1;
+        let encoded = &self.input[start..self.index - 1];
 
-        match base64::Engine::decode(&utils::BASE64, &self.input[start..colon_index]) {
-            Ok(content) => Ok(content),
-            Err(err) => {
-                let index = match err {
-                    base64::DecodeError::InvalidByte(offset, _)
-                    | base64::DecodeError::InvalidLastSymbol(offset, _) => start + offset,
-                    // Report these two at the position of the last base64
-                    // character, since they correspond to errors in the input
-                    // as a whole.
-                    base64::DecodeError::InvalidLength(_) | base64::DecodeError::InvalidPadding => {
-                        colon_index - 1
-                    }
-                };
+        #[cfg(feature = "non-conformant-parsing")]
+        let result = (self.parse_base64)(encoded);
 
-                Err(error::Repr::InvalidByteSequence(index))
-            }
-        }
+        #[cfg(not(feature = "non-conformant-parsing"))]
+        let result = parse_base64_conformant(encoded);
+
+        result.map_err(|offset| error::Repr::InvalidByteSequence(start + offset))
     }
 
     pub(crate) fn parse_number(&mut self) -> Result<Num, error::Repr> {
@@ -538,14 +584,22 @@ assert_eq!(
         }
 
         if scale == 100 {
-            // Report the error at the position of the decimal itself, rather
-            // than the next position.
-            Err(error::Repr::TrailingDecimalPoint(self.index - 1))
-        } else {
-            Ok(Num::Decimal(Decimal::from_integer_scaled_1000(
-                Integer::from_validated_i64(sign * magnitude),
-            )))
+            #[cfg(feature = "non-conformant-parsing")]
+            let allow_trailing_decimals = self.allow_trailing_decimals;
+
+            #[cfg(not(feature = "non-conformant-parsing"))]
+            let allow_trailing_decimals = false;
+
+            if !allow_trailing_decimals {
+                // Report the error at the position of the decimal itself, rather
+                // than the next position.
+                return Err(error::Repr::TrailingDecimalPoint(self.index - 1));
+            }
         }
+
+        Ok(Num::Decimal(Decimal::from_integer_scaled_1000(
+            Integer::from_validated_i64(sign * magnitude),
+        )))
     }
 
     pub(crate) fn parse_date(&mut self) -> Result<Date, error::Repr> {

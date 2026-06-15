@@ -148,6 +148,9 @@ assert_eq!(
 - `arbitrary` -- Implements the
   [`Arbitrary`](https://docs.rs/arbitrary/1.4.1/arbitrary/trait.Arbitrary.html)
   trait for this crate's types, making them easier to use with fuzzing.
+
+- `non-conformant-parsing` -- Exposes options on [`Parser`] for allowing certain
+  non-conformant inputs.
 */
 
 #![deny(missing_docs)]

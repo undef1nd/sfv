@@ -1118,3 +1118,35 @@ fn parse_dictionary_lifetime() -> Result<(), Error> {
     );
     Ok(())
 }
+
+#[test]
+fn base64_parser() {
+    let input = ":...:";
+
+    assert!(Parser::new(input).parse_item_with_visitor(Ignored).is_err());
+
+    #[cfg(feature = "non-conformant-parsing")]
+    assert_eq!(
+        vec![1, 2, 3],
+        Parser::new(input)
+            .with_base64_parser(|_| Ok(vec![1, 2, 3]))
+            .parse_item::<Vec<u8>>()
+            .unwrap()
+    );
+}
+
+#[test]
+fn trailing_decimal() {
+    let input = "1.";
+
+    assert!(Parser::new(input).parse_item_with_visitor(Ignored).is_err());
+
+    #[cfg(feature = "non-conformant-parsing")]
+    assert_eq!(
+        Decimal::from_integer_scaled_1000(integer(1000)),
+        Parser::new(input)
+            .with_allow_trailing_decimals(true)
+            .parse_item::<Decimal>()
+            .unwrap()
+    );
+}

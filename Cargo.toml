@@ -36,6 +36,7 @@ required-features = ["parsed-types"]
 [features]
 default = ["parsed-types"]
 arbitrary = ["dep:arbitrary", "indexmap?/arbitrary"]
+non-conformant-parsing = []
 parsed-types = ["dep:indexmap"]
 
 [[example]]
