@@ -83,6 +83,12 @@ impl<'de> sfv::visitor::ItemVisitor<'de> for PriorityParameter<'_> {
 }
 
 impl<'de> sfv::visitor::EntryVisitor<'de> for PriorityParameter<'_> {
+    type Error = std::convert::Infallible;
+
+    fn item(self) -> Result<impl sfv::visitor::ItemVisitor<'de>, Self::Error> {
+        Ok(self)
+    }
+
     fn inner_list(self) -> Result<impl sfv::visitor::InnerListVisitor<'de>, Self::Error> {
         // Per https://httpwg.org/specs/rfc9218.html#parameters values of
         // unexpected types are ignored. Since the same dictionary key can

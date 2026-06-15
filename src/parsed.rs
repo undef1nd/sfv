@@ -277,6 +277,12 @@ impl<'de> ItemVisitor<'de> for Entry<'de, '_> {
 }
 
 impl<'de> EntryVisitor<'de> for Entry<'de, '_> {
+    type Error = Infallible;
+
+    fn item(self) -> Result<impl ItemVisitor<'de>, Self::Error> {
+        Ok(self)
+    }
+
     fn inner_list(self) -> Result<impl InnerListVisitor<'de>, Self::Error> {
         match self
             .dict
@@ -307,6 +313,12 @@ impl<'de> ItemVisitor<'de> for &mut List {
 }
 
 impl<'de> EntryVisitor<'de> for &mut List {
+    type Error = Infallible;
+
+    fn item(self) -> Result<impl ItemVisitor<'de>, Self::Error> {
+        Ok(self)
+    }
+
     fn inner_list(self) -> Result<impl InnerListVisitor<'de>, Self::Error> {
         self.push(InnerList::default().into());
         match self.last_mut() {

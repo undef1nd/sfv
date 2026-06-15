@@ -141,7 +141,9 @@ assert_eq!(
                     parser.next();
                     parser.parse_list_entry(entry_visitor)
                 } else {
-                    let param_visitor = entry_visitor.bare_item(BareItemFromInput::from(true))?;
+                    let param_visitor = entry_visitor
+                        .item()?
+                        .bare_item(BareItemFromInput::from(true))?;
                     parser.parse_parameters(param_visitor)?;
                     Ok(())
                 }
@@ -262,7 +264,7 @@ assert_eq!(
         if let Some(b'(') = self.peek() {
             self.parse_inner_list(visitor.inner_list()?)
         } else {
-            parse_item(self, visitor)?;
+            parse_item(self, visitor.item()?)?;
             Ok(())
         }
     }

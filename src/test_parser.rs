@@ -954,6 +954,12 @@ impl<'de> ItemVisitor<'de> for CoordVisitor<'_> {
 }
 
 impl<'de> EntryVisitor<'de> for CoordVisitor<'_> {
+    type Error = Infallible;
+
+    fn item(self) -> Result<impl ItemVisitor<'de>, Self::Error> {
+        Ok(self)
+    }
+
     fn inner_list(self) -> Result<impl InnerListVisitor<'de>, Self::Error> {
         Ok(Ignored)
     }
@@ -1023,19 +1029,13 @@ fn complex_list_visitor() {
         }
     }
 
-    impl<'de> ItemVisitor<'de> for &mut ListHolder {
-        type Out = ();
+    impl<'de> EntryVisitor<'de> for &mut ListHolder {
         type Error = Infallible;
 
-        fn bare_item(
-            self,
-            _bare_item: BareItemFromInput<'de>,
-        ) -> Result<impl ParameterVisitor<'de, Out = Self::Out>, Self::Error> {
+        fn item(self) -> Result<impl ItemVisitor<'de>, Self::Error> {
             Ok(Ignored)
         }
-    }
 
-    impl<'de> EntryVisitor<'de> for &mut ListHolder {
         fn inner_list(self) -> Result<impl InnerListVisitor<'de>, Self::Error> {
             Ok(self)
         }

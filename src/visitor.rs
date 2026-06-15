@@ -246,30 +246,26 @@ impl std::fmt::Display for NotAnInteger {
 
 impl std::error::Error for NotAnInteger {}
 
-impl<'de> ItemVisitor<'de> for CoordVisitor<'_> {
-    type Out = ();
+impl<'de> EntryVisitor<'de> for CoordVisitor<'_> {
     type Error = NotAnInteger;
 
-    fn bare_item(
-        self,
-        bare_item: BareItemFromInput<'de>,
-    ) -> Result<impl ParameterVisitor<'de, Out = Self::Out>, Self::Error> {
-        if let BareItemFromInput::Integer(v) = bare_item {
-            *self.coord = i64::from(v);
-            // Ignore the item's parameters by returning `Ignored`. The
-            // parameters will still be validated syntactically during parsing,
-            // but we don't need to visit them.
-            //
-            // We could return `None` instead to ignore the parameters only
-            // some of the time, returning `Some(visitor)` otherwise.
-            Ok(Ignored)
-        } else {
-            Err(NotAnInteger)
-        }
+    fn item(self) -> Result<impl ItemVisitor<'de>, Self::Error> {
+        Ok(|bare_item: BareItemFromInput<'de>| {
+            if let BareItemFromInput::Integer(v) = bare_item {
+                *self.coord = i64::from(v);
+                // Ignore the item's parameters by returning `Ignored`. The
+                // parameters will still be validated syntactically during parsing,
+                // but we don't need to visit them.
+                //
+                // We could return `None` instead to ignore the parameters only
+                // some of the time, returning `Some(visitor)` otherwise.
+                Ok(Ignored)
+            } else {
+                Err(NotAnInteger)
+            }
+        })
     }
-}
 
-impl<'de> EntryVisitor<'de> for CoordVisitor<'_> {
     fn inner_list(self) -> Result<impl InnerListVisitor<'de>, Self::Error> {
         // Use `Never` to enforce at the type level that this method will only
         // return `Err`, as our coordinate must be a single integer, not an
@@ -418,7 +414,20 @@ pub trait InnerListVisitor<'de> {
 /// A visitor whose methods are called during entry parsing.
 ///
 /// The lifetime `'de` is the lifetime of the input.
-pub trait EntryVisitor<'de>: ItemVisitor<'de> {
+pub trait EntryVisitor<'de> {
+    /// The error type that can be returned if some error occurs during parsing.
+    type Error: Error;
+
+    /// Called before an item has been parsed.
+    ///
+    /// The returned visitor is used to handle the item.
+    ///
+    /// Parsing will be terminated early if an error is returned.
+    ///
+    /// # Errors
+    /// The error result should report the reason for any failed validation.
+    fn item(self) -> Result<impl ItemVisitor<'de>, Self::Error>;
+
     /// Called before an inner list has been parsed.
     ///
     /// The returned visitor is used to handle the inner list.
@@ -546,6 +555,12 @@ impl<'de> ItemVisitor<'de> for Ignored {
 }
 
 impl<'de> EntryVisitor<'de> for Ignored {
+    type Error = Infallible;
+
+    fn item(self) -> Result<impl ItemVisitor<'de>, Self::Error> {
+        Ok(Ignored)
+    }
+
     fn inner_list(self) -> Result<impl InnerListVisitor<'de>, Self::Error> {
         Ok(Ignored)
     }
@@ -632,6 +647,12 @@ impl<'de, V: ItemVisitor<'de>> ItemVisitor<'de> for Option<V> {
 }
 
 impl<'de, V: EntryVisitor<'de>> EntryVisitor<'de> for Option<V> {
+    type Error = V::Error;
+
+    fn item(self) -> Result<impl ItemVisitor<'de>, Self::Error> {
+        map_visitor(self, V::item)
+    }
+
     fn inner_list(self) -> Result<impl InnerListVisitor<'de>, Self::Error> {
         map_visitor(self, V::inner_list)
     }
@@ -687,6 +708,12 @@ impl<'de> ItemVisitor<'de> for Never {
 }
 
 impl<'de> EntryVisitor<'de> for Never {
+    type Error = Infallible;
+
+    fn item(self) -> Result<impl ItemVisitor<'de>, Self::Error> {
+        Ok(self)
+    }
+
     fn inner_list(self) -> Result<impl InnerListVisitor<'de>, Self::Error> {
         Ok(self)
     }
