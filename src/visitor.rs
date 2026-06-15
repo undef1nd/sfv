@@ -159,6 +159,19 @@ assert_eq!(
 # }
 ```
 
+Or even:
+
+```
+# use sfv::{TokenRef, token_ref};
+# fn main() -> Result<(), sfv::Error> {
+assert_eq!(
+  token_ref("abc"),
+  sfv::Parser::new("abc").parse_item::<&TokenRef>()?,
+);
+# Ok(())
+# }
+```
+
 # Discarding irrelevant parts
 
 Two kinds of helpers are provided for silently discarding structured-field
@@ -791,4 +804,123 @@ where
     fn make_dictionary_visitor() -> impl DictionaryVisitor<'de, Out = Self> {
         V::default()
     }
+}
+
+#[allow(clippy::unnecessary_wraps)]
+fn infallible_bare_item_visitor<'de, T>(
+    bare_item: BareItemFromInput<'de>,
+) -> Result<impl ParameterVisitor<'de, Out = T>, Infallible>
+where
+    T: From<BareItemFromInput<'de>>,
+{
+    Ok(parameter_visitor_with(Ignored, |()| Ok(T::from(bare_item))))
+}
+
+/// Makes an item visitor expecting any bare item and ignoring parameters.
+impl<'de> MakeItemVisitor<'de> for BareItemFromInput<'de> {
+    fn make_item_visitor() -> impl ItemVisitor<'de, Out = Self> {
+        infallible_bare_item_visitor
+    }
+}
+
+/// Makes an item visitor expecting any bare item and ignoring parameters.
+impl<'de> MakeItemVisitor<'de> for super::BareItem {
+    fn make_item_visitor() -> impl ItemVisitor<'de, Out = Self> {
+        infallible_bare_item_visitor
+    }
+}
+
+#[derive(Debug)]
+enum BareItemType {
+    Decimal,
+    Integer,
+    String,
+    ByteSequence,
+    Boolean,
+    Token,
+    Date,
+    DisplayString,
+}
+
+impl BareItemFromInput<'_> {
+    fn ty(&self) -> BareItemType {
+        match *self {
+            Self::Decimal(_) => BareItemType::Decimal,
+            Self::Integer(_) => BareItemType::Integer,
+            Self::String(_) => BareItemType::String,
+            Self::ByteSequence(_) => BareItemType::ByteSequence,
+            Self::Boolean(_) => BareItemType::Boolean,
+            Self::Token(_) => BareItemType::Token,
+            Self::Date(_) => BareItemType::Date,
+            Self::DisplayString(_) => BareItemType::DisplayString,
+        }
+    }
+}
+
+impl std::fmt::Display for BareItemType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_str(match *self {
+            Self::Decimal => "decimal",
+            Self::Integer => "integer",
+            Self::String => "string",
+            Self::ByteSequence => "byte sequence",
+            Self::Boolean => "boolean",
+            Self::Token => "token",
+            Self::Date => "date",
+            Self::DisplayString => "display string",
+        })
+    }
+}
+
+#[derive(Debug)]
+struct UnexpectedBareItemType {
+    expected: BareItemType,
+    got: BareItemType,
+}
+
+impl std::fmt::Display for UnexpectedBareItemType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "unexpected bare item type: expected {}, got {}",
+            self.expected, self.got
+        )
+    }
+}
+
+impl Error for UnexpectedBareItemType {}
+
+macro_rules! impl_make_item_visitor_ignoring_params {
+    ($($var: ident($t: ty) $doc: literal,)+) => {
+        $(
+            /// Makes an item visitor expecting
+            #[doc = $doc]
+            /// bare item and ignoring parameters.
+            impl<'de> MakeItemVisitor<'de> for $t {
+                fn make_item_visitor() -> impl ItemVisitor<'de, Out = Self> {
+                    |v| {
+                        if let BareItemFromInput::$var(v) = v {
+                            Ok(parameter_visitor_with(Ignored, move |()| Ok(v)))
+                        } else {
+                            Err(UnexpectedBareItemType {
+                                expected: BareItemType::$var,
+                                got: v.ty(),
+                            })
+                        }
+                    }
+                }
+            }
+        )+
+    };
+}
+
+impl_make_item_visitor_ignoring_params! {
+    Decimal(super::Decimal) "a decimal",
+    Integer(super::Integer) "an integer",
+    String(std::borrow::Cow<'de, super::StringRef>) "a string",
+    ByteSequence(Vec<u8>) "a byte sequence",
+    Boolean(bool) "a boolean",
+    Token(&'de super::TokenRef) "a token",
+    Date(super::Date) "a date",
+    // deliberately omitted: DisplayString(Cow<'de, str>) "display string",
 }

@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use crate::{
     private::Sealed,
     visitor::{
-        DictionaryVisitor, EntryVisitor, InnerListVisitor, ItemVisitor, ListVisitor,
+        self, DictionaryVisitor, EntryVisitor, InnerListVisitor, ItemVisitor, ListVisitor,
         ParameterVisitor,
     },
     BareItem, BareItemFromInput, Error, Key, KeyRef, Parser,
@@ -164,6 +164,24 @@ impl<'de> ParameterVisitor<'de> for &mut Parameters {
 
     fn finish(self) -> Result<Self::Out, Self::Error> {
         Ok(())
+    }
+}
+
+impl<'de> ParameterVisitor<'de> for Parameters {
+    type Out = Self;
+    type Error = Infallible;
+
+    fn parameter(
+        &mut self,
+        key: &'de KeyRef,
+        value: BareItemFromInput<'de>,
+    ) -> Result<(), Self::Error> {
+        self.insert(key.to_owned(), value.into());
+        Ok(())
+    }
+
+    fn finish(self) -> Result<Self::Out, Self::Error> {
+        Ok(self)
     }
 }
 
@@ -371,9 +389,7 @@ impl FieldType for Item {
     }
 
     fn parse(parser: Parser<'_>) -> Result<Self, Error> {
-        let mut item = Self::new(false);
-        parser.parse_item_with_visitor(&mut item)?;
-        Ok(item)
+        parser.parse_item()
     }
 }
 
@@ -406,5 +422,16 @@ impl FieldType for Dictionary {
 
     fn parse(parser: Parser<'_>) -> Result<Self, Error> {
         parser.parse_dictionary()
+    }
+}
+
+impl<'de> visitor::MakeItemVisitor<'de> for Item {
+    fn make_item_visitor() -> impl ItemVisitor<'de, Out = Self> {
+        |bare_item| {
+            Ok::<_, Infallible>(visitor::parameter_visitor_with(
+                Parameters::new(),
+                |params| Ok(Item::with_params(bare_item, params)),
+            ))
+        }
     }
 }
