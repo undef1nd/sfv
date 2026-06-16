@@ -296,7 +296,11 @@ impl<'de> EntryVisitor<'de> for Entry<'de, '_> {
     }
 }
 
-impl<'de> ItemVisitor<'de> for &mut List {
+// Used to avoid making the `ItemVisitor` and `EntryVisitor` impls for `List`
+// public.
+struct ListWrapper<'a>(&'a mut List);
+
+impl<'de> ItemVisitor<'de> for ListWrapper<'_> {
     type Out = ();
     type Error = Infallible;
 
@@ -304,15 +308,15 @@ impl<'de> ItemVisitor<'de> for &mut List {
         self,
         bare_item: BareItemFromInput<'de>,
     ) -> Result<impl ParameterVisitor<'de, Out = Self::Out>, Self::Error> {
-        self.push(Item::new(bare_item).into());
-        match self.last_mut() {
+        self.0.push(Item::new(bare_item).into());
+        match self.0.last_mut() {
             Some(ListEntry::Item(item)) => Ok(&mut item.params),
             _ => unreachable!(),
         }
     }
 }
 
-impl<'de> EntryVisitor<'de> for &mut List {
+impl<'de> EntryVisitor<'de> for ListWrapper<'_> {
     type Error = Infallible;
 
     fn item(self) -> Result<impl ItemVisitor<'de>, Self::Error> {
@@ -320,8 +324,8 @@ impl<'de> EntryVisitor<'de> for &mut List {
     }
 
     fn inner_list(self) -> Result<impl InnerListVisitor<'de>, Self::Error> {
-        self.push(InnerList::default().into());
-        match self.last_mut() {
+        self.0.push(InnerList::default().into());
+        match self.0.last_mut() {
             Some(ListEntry::InnerList(inner_list)) => Ok(inner_list),
             _ => unreachable!(),
         }
@@ -333,7 +337,7 @@ impl<'de> ListVisitor<'de> for &mut List {
     type Error = Infallible;
 
     fn entry(&mut self) -> Result<impl EntryVisitor<'de>, Self::Error> {
-        Ok(&mut **self)
+        Ok(ListWrapper(self))
     }
 
     fn finish(self) -> Result<Self::Out, Self::Error> {
@@ -346,7 +350,7 @@ impl<'de> ListVisitor<'de> for List {
     type Error = Infallible;
 
     fn entry(&mut self) -> Result<impl EntryVisitor<'de>, Self::Error> {
-        Ok(self)
+        Ok(ListWrapper(self))
     }
 
     fn finish(self) -> Result<Self::Out, Self::Error> {
