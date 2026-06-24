@@ -1,6 +1,6 @@
 use std::borrow::BorrowMut;
 
-use crate::{serializer::Serializer, KeyRef, RefBareItem};
+use crate::{serializer, KeyRef, RefBareItem};
 #[cfg(feature = "parsed-types")]
 use crate::{Item, ListEntry};
 
@@ -64,7 +64,7 @@ impl<W: BorrowMut<String>> ItemSerializer<W> {
         mut self,
         bare_item: impl Into<RefBareItem<'b>>,
     ) -> ParameterSerializer<W> {
-        Serializer::serialize_bare_item(bare_item, self.buffer.borrow_mut());
+        serializer::serialize_bare_item(bare_item, self.buffer.borrow_mut());
         ParameterSerializer {
             buffer: self.buffer,
         }
@@ -83,7 +83,7 @@ impl<W: BorrowMut<String>> ParameterSerializer<W> {
     ///
     /// Returns the serializer.
     pub fn parameter<'b>(mut self, name: &KeyRef, value: impl Into<RefBareItem<'b>>) -> Self {
-        Serializer::serialize_parameter(name, value, self.buffer.borrow_mut());
+        serializer::serialize_parameter(name, value, self.buffer.borrow_mut());
         self
     }
 
@@ -95,7 +95,7 @@ impl<W: BorrowMut<String>> ParameterSerializer<W> {
         params: impl IntoIterator<Item = (impl AsRef<KeyRef>, impl Into<RefBareItem<'b>>)>,
     ) -> Self {
         for (name, value) in params {
-            Serializer::serialize_parameter(name.as_ref(), value, self.buffer.borrow_mut());
+            serializer::serialize_parameter(name.as_ref(), value, self.buffer.borrow_mut());
         }
         self
     }
@@ -197,7 +197,7 @@ impl<W: BorrowMut<String>> ListSerializer<W> {
     ) -> ParameterSerializer<&mut String> {
         let buffer = self.buffer.borrow_mut();
         maybe_write_separator(buffer, &mut self.first);
-        Serializer::serialize_bare_item(bare_item, buffer);
+        serializer::serialize_bare_item(bare_item, buffer);
         ParameterSerializer { buffer }
     }
 
@@ -331,11 +331,11 @@ impl<W: BorrowMut<String>> DictSerializer<W> {
     ) -> ParameterSerializer<&mut String> {
         let buffer = self.buffer.borrow_mut();
         maybe_write_separator(buffer, &mut self.first);
-        Serializer::serialize_key(name, buffer);
+        serializer::serialize_key(name, buffer);
         let value = value.into();
         if value != RefBareItem::Boolean(true) {
             buffer.push('=');
-            Serializer::serialize_bare_item(value, buffer);
+            serializer::serialize_bare_item(value, buffer);
         }
         ParameterSerializer { buffer }
     }
@@ -345,7 +345,7 @@ impl<W: BorrowMut<String>> DictSerializer<W> {
     pub fn inner_list<'a>(&'a mut self, name: &KeyRef) -> InnerListSerializer<'a> {
         let buffer = self.buffer.borrow_mut();
         maybe_write_separator(buffer, &mut self.first);
-        Serializer::serialize_key(name, buffer);
+        serializer::serialize_key(name, buffer);
         buffer.push_str("=(");
         InnerListSerializer {
             buffer: Some(buffer),
@@ -424,7 +424,7 @@ impl<'a> InnerListSerializer<'a> {
         if !buffer.is_empty() && !buffer.ends_with('(') {
             buffer.push(' ');
         }
-        Serializer::serialize_bare_item(bare_item, buffer);
+        serializer::serialize_bare_item(bare_item, buffer);
         ParameterSerializer { buffer }
     }
 
