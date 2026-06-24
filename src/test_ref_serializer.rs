@@ -1,8 +1,8 @@
 use std::borrow::BorrowMut;
 
 use crate::{
-    integer, key_ref, string_ref, token_ref, Decimal, DictSerializer, ItemSerializer,
-    ListSerializer,
+    Decimal, DictSerializer, ItemSerializer, ListSerializer, integer, key_ref, string_ref,
+    token_ref,
 };
 
 #[test]

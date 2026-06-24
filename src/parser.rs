@@ -1,13 +1,12 @@
 use std::{borrow::Cow, string::String as StdString};
 
 use crate::{
-    error, utils,
+    BareItemFromInput, Date, Decimal, Integer, KeyRef, SFVResult, String, StringRef, TokenRef,
+    Version, error, utils,
     visitor::{
         DictionaryVisitor, EntryVisitor, InnerListVisitor, ItemVisitor, ListVisitor,
         MakeDictionaryVisitor, MakeItemVisitor, MakeListVisitor, ParameterVisitor,
     },
-    BareItemFromInput, Date, Decimal, Integer, KeyRef, SFVResult, String, StringRef, TokenRef,
-    Version,
 };
 
 fn parse_item<'de, V>(parser: &mut Parser<'de>, visitor: V) -> Result<V::Out, error::Repr>
@@ -295,10 +294,11 @@ assert_eq!(
 
             parse_item(self, visitor.item()?)?;
 
-            if let Some(c) = self.peek() {
-                if c != b' ' && c != b')' {
-                    return Err(error::Repr::ExpectedInnerListDelimiter(self.index));
-                }
+            if let Some(c) = self.peek()
+                && c != b' '
+                && c != b')'
+            {
+                return Err(error::Repr::ExpectedInnerListDelimiter(self.index));
             }
         }
 
@@ -632,10 +632,12 @@ assert_eq!(
                                     c - b'a' + 10
                                 }
                                 None => {
-                                    return Err(error::Repr::UnterminatedEscapeSequence(self.index))
+                                    return Err(error::Repr::UnterminatedEscapeSequence(
+                                        self.index,
+                                    ));
                                 }
                                 Some(_) => {
-                                    return Err(error::Repr::InvalidEscapeSequence(self.index))
+                                    return Err(error::Repr::InvalidEscapeSequence(self.index));
                                 }
                             };
                     }

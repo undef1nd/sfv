@@ -192,16 +192,16 @@ use std::string::String as StdString;
 pub use date::Date;
 pub use decimal::Decimal;
 pub use error::Error;
-pub use integer::{integer, Integer};
-pub use key::{key_ref, Key, KeyRef};
+pub use integer::{Integer, integer};
+pub use key::{Key, KeyRef, key_ref};
 #[cfg(feature = "parsed-types")]
 pub use parsed::{Dictionary, FieldType, InnerList, Item, List, ListEntry, Parameters};
 pub use parser::Parser;
 pub use ref_serializer::{
     DictSerializer, InnerListSerializer, ItemSerializer, ListSerializer, ParameterSerializer,
 };
-pub use string::{string_ref, String, StringRef};
-pub use token::{token_ref, Token, TokenRef};
+pub use string::{String, StringRef, string_ref};
+pub use token::{Token, TokenRef, token_ref};
 
 type SFVResult<T> = std::result::Result<T, Error>;
 

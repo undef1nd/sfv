@@ -1,6 +1,6 @@
 use std::fmt::Write as _;
 
-use crate::{utils, Date, Decimal, Integer, KeyRef, RefBareItem, StringRef, TokenRef};
+use crate::{Date, Decimal, Integer, KeyRef, RefBareItem, StringRef, TokenRef, utils};
 
 pub(crate) fn serialize_bare_item<'b>(value: impl Into<RefBareItem<'b>>, output: &mut String) {
     // https://httpwg.org/specs/rfc9651.html#ser-bare-item

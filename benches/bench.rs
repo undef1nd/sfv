@@ -3,8 +3,8 @@ extern crate criterion;
 
 use criterion::{Bencher, BenchmarkId, Criterion};
 use sfv::{
-    integer, key_ref, string_ref, token_ref, Decimal, DictSerializer, Dictionary, FieldType, Item,
-    ItemSerializer, List, ListSerializer, Parser,
+    Decimal, DictSerializer, Dictionary, FieldType, Item, ItemSerializer, List, ListSerializer,
+    Parser, integer, key_ref, string_ref, token_ref,
 };
 
 criterion_main!(parsing, serializing, ref_serializing);

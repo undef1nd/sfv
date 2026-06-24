@@ -1,6 +1,6 @@
-use crate::{integer, key_ref, serializer, string_ref, token_ref, Date, Decimal};
 #[cfg(feature = "parsed-types")]
 use crate::{BareItem, Dictionary, FieldType, InnerList, Item, List, Parameters};
+use crate::{Date, Decimal, integer, key_ref, serializer, string_ref, token_ref};
 
 #[test]
 #[cfg(feature = "parsed-types")]

@@ -1,4 +1,4 @@
-use crate::{error, Decimal, Error, Integer};
+use crate::{Decimal, Error, Integer, error};
 
 // Expect a floating point error less than the smallest allowed value of 0.001
 const ABSERR: f64 = 0.000_1_f64;

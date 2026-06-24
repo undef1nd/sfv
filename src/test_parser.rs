@@ -1,15 +1,16 @@
 use std::convert::Infallible;
 
+#[cfg(feature = "parsed-types")]
 use crate::{
-    error, key_ref, token_ref,
+    BareItem, Date, Dictionary, InnerList, Item, List, ListEntry, Parameters, Version, token_ref,
+};
+use crate::{
+    BareItemFromInput, Error, KeyRef, Parser, error, key_ref,
     visitor::{
         DictionaryVisitor, EntryVisitor, Ignored, InnerListVisitor, ItemVisitor, ListVisitor,
         ParameterVisitor,
     },
-    BareItemFromInput, Error, KeyRef, Parser,
 };
-#[cfg(feature = "parsed-types")]
-use crate::{BareItem, Date, Dictionary, InnerList, Item, List, ListEntry, Parameters, Version};
 
 #[cfg(feature = "parsed-types")]
 macro_rules! item {
@@ -278,14 +279,18 @@ fn parse_more_dict() -> Result<(), Error> {
 #[cfg(feature = "parsed-types")]
 fn parse_more_errors() -> Result<(), Error> {
     let mut parsed_dict_header: Dictionary = Parser::new("a=1, b;foo=*").parse()?;
-    assert!(Parser::new(",a")
-        .parse_dictionary_with_visitor(&mut parsed_dict_header)
-        .is_err());
+    assert!(
+        Parser::new(",a")
+            .parse_dictionary_with_visitor(&mut parsed_dict_header)
+            .is_err()
+    );
 
     let mut parsed_list_header: List = Parser::new("a, b;foo=*").parse()?;
-    assert!(Parser::new("(a, 2)")
-        .parse_list_with_visitor(&mut parsed_list_header)
-        .is_err());
+    assert!(
+        Parser::new("(a, 2)")
+            .parse_list_with_visitor(&mut parsed_list_header)
+            .is_err()
+    );
     Ok(())
 }
 
@@ -294,10 +299,12 @@ fn parse_more_errors() -> Result<(), Error> {
 fn parse_date() -> Result<(), Error> {
     let input = "@0";
 
-    assert!(Parser::new(input)
-        .with_version(Version::Rfc8941)
-        .parse::<Item>()
-        .is_err());
+    assert!(
+        Parser::new(input)
+            .with_version(Version::Rfc8941)
+            .parse::<Item>()
+            .is_err()
+    );
 
     assert_eq!(Parser::new(input).parse::<Item>()?, item!(Date::UNIX_EPOCH));
 
@@ -309,10 +316,12 @@ fn parse_date() -> Result<(), Error> {
 fn parse_display_string() -> Result<(), Error> {
     let input = r#"%"This is intended for display to %c3%bcsers.""#;
 
-    assert!(Parser::new(input)
-        .with_version(Version::Rfc8941)
-        .parse::<Item>()
-        .is_err());
+    assert!(
+        Parser::new(input)
+            .with_version(Version::Rfc8941)
+            .parse::<Item>()
+            .is_err()
+    );
 
     assert_eq!(
         Parser::new(input).parse::<Item>()?,
@@ -484,8 +493,7 @@ fn complex_list_visitor() {
         type Error = Infallible;
 
         fn entry(&mut self) -> Result<impl EntryVisitor<'de>, Self::Error> {
-            self.push(ListHolder::default());
-            Ok(self.last_mut().unwrap()) // cannot fail
+            Ok(self.push_mut(ListHolder::default()))
         }
 
         fn finish(self) -> Result<Self::Out, Self::Error> {
@@ -509,8 +517,7 @@ fn complex_list_visitor() {
         type Error = Infallible;
 
         fn item(&mut self) -> Result<impl ItemVisitor<'de>, Self::Error> {
-            self.list.push(Holder::default());
-            Ok(self.list.last_mut().unwrap()) // cannot fail
+            Ok(self.list.push_mut(Holder::default()))
         }
 
         fn finish(self) -> Result<impl ParameterVisitor<'de>, Self::Error> {
