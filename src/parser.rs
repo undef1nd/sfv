@@ -321,7 +321,7 @@ assert_eq!(
             Some(c) if utils::is_allowed_start_token_char(c) => {
                 BareItemFromInput::Token(self.parse_token()?)
             }
-            Some(c) if c == b'-' || c.is_ascii_digit() => match self.parse_number()? {
+            Some(b'-' | b'0'..=b'9') => match self.parse_number()? {
                 Num::Decimal(val) => BareItemFromInput::Decimal(val),
                 Num::Integer(val) => BareItemFromInput::Integer(val),
             },
