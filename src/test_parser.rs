@@ -1,12 +1,14 @@
 use std::convert::Infallible;
 
 use crate::{
-    error, integer, key_ref, string_ref, token_ref,
+    error, integer, key_ref,
+    parser::Num,
+    string_ref, token_ref,
     visitor::{
         DictionaryVisitor, EntryVisitor, Ignored, InnerListVisitor, ItemVisitor, ListVisitor,
         ParameterVisitor,
     },
-    BareItemFromInput, Decimal, Error, KeyRef, Num, Parser, RefBareItem,
+    BareItemFromInput, Decimal, Error, KeyRef, Parser, RefBareItem,
 };
 #[cfg(feature = "parsed-types")]
 use crate::{BareItem, Date, Dictionary, InnerList, Item, List, ListEntry, Parameters, Version};

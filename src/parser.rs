@@ -6,7 +6,7 @@ use crate::{
         DictionaryVisitor, EntryVisitor, InnerListVisitor, ItemVisitor, ListVisitor,
         MakeDictionaryVisitor, MakeItemVisitor, MakeListVisitor, ParameterVisitor,
     },
-    BareItemFromInput, Date, Decimal, Integer, KeyRef, Num, SFVResult, String, StringRef, TokenRef,
+    BareItemFromInput, Date, Decimal, Integer, KeyRef, SFVResult, String, StringRef, TokenRef,
     Version,
 };
 
@@ -51,6 +51,12 @@ fn parse_comma_separated<'de>(
     }
 
     Ok(())
+}
+
+#[derive(Debug, PartialEq)]
+pub(crate) enum Num {
+    Decimal(Decimal),
+    Integer(Integer),
 }
 
 /// Exposes methods for parsing input into a structured field value.

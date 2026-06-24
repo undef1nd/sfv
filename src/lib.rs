@@ -420,12 +420,6 @@ impl<'a, B, T, D> From<&'a StringRef> for GenericBareItem<String, B, T, D> {
     }
 }
 
-#[derive(Debug, PartialEq)]
-pub(crate) enum Num {
-    Decimal(Decimal),
-    Integer(Integer),
-}
-
 /// A [bare item] that owns its data.
 ///
 /// [bare item]: <https://httpwg.org/specs/rfc9651.html#item>
