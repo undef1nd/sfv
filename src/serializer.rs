@@ -95,13 +95,10 @@ pub(crate) fn serialize_display_string(value: &str, output: &mut String) {
 
     output.push_str(r#"%""#);
     for c in value.bytes() {
-        match c {
-            b'%' | b'"' | 0x00..=0x1f | 0x7f..=0xff => {
-                output.push('%');
-                output.push(char::from_digit((u32::from(c) >> 4) & 0xf, 16).unwrap());
-                output.push(char::from_digit(u32::from(c) & 0xf, 16).unwrap());
-            }
-            _ => output.push(c as char),
+        if let b'%' | b'"' | 0x00..=0x1f | 0x7f..=0xff = c {
+            write!(output, "%{c:02x}").unwrap();
+        } else {
+            output.push(c as char);
         }
     }
     output.push('"');
