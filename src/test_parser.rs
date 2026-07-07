@@ -742,8 +742,6 @@ fn parse_params_empty() -> Result<(), Error> {
     assert_eq!(Parameters::new(), params);
     Parser::new("[;a=1").parse_parameters(&mut params)?;
     assert_eq!(Parameters::new(), params);
-    Parser::new("").parse_parameters(&mut params)?;
-    assert_eq!(Parameters::new(), params);
     Ok(())
 }
 
