@@ -703,9 +703,4 @@ assert_eq!(
             self.next();
         }
     }
-
-    #[cfg(test)]
-    pub(crate) fn remaining(&self) -> &[u8] {
-        &self.input[self.index..]
-    }
 }
