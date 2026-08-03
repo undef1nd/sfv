@@ -4,7 +4,7 @@ use std::{
     string::String as StdString,
 };
 
-use crate::{error, Error};
+use crate::{Error, error};
 
 /// An owned structured field value [string].
 ///

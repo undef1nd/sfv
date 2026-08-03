@@ -267,7 +267,7 @@ fn run_tests<T: TestCase>(dir_path: impl AsRef<Path>) -> Result<(), Box<dyn Erro
             continue;
         }
 
-        println!("\n## Test suite file: {:?}\n", entry.file_name());
+        println!("\n## Test suite file: {}\n", entry.file_name().display());
 
         let test_cases: Vec<T> =
             serde_json::from_reader(io::BufReader::new(fs::File::open(entry.path())?))?;

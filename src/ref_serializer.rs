@@ -1,8 +1,8 @@
 use std::borrow::BorrowMut;
 
-use crate::{serializer, KeyRef, RefBareItem};
 #[cfg(feature = "parsed-types")]
 use crate::{Item, ListEntry};
+use crate::{KeyRef, RefBareItem, serializer};
 
 /// Serializes `Item` field value components incrementally.
 ///
@@ -236,11 +236,7 @@ impl<W: BorrowMut<String>> ListSerializer<W> {
     /// all](https://httpwg.org/specs/rfc9651.html#text-serialize).
     #[must_use]
     pub fn finish(self) -> Option<W> {
-        if self.first {
-            None
-        } else {
-            Some(self.buffer)
-        }
+        if self.first { None } else { Some(self.buffer) }
     }
 }
 
@@ -381,11 +377,7 @@ impl<W: BorrowMut<String>> DictSerializer<W> {
     /// all](https://httpwg.org/specs/rfc9651.html#text-serialize).
     #[must_use]
     pub fn finish(self) -> Option<W> {
-        if self.first {
-            None
-        } else {
-            Some(self.buffer)
-        }
+        if self.first { None } else { Some(self.buffer) }
     }
 }
 

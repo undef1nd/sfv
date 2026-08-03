@@ -3,12 +3,12 @@ use std::convert::Infallible;
 use indexmap::IndexMap;
 
 use crate::{
+    BareItem, BareItemFromInput, Error, Key, KeyRef, Parser,
     private::Sealed,
     visitor::{
         self, DictionaryVisitor, EntryVisitor, InnerListVisitor, ItemVisitor, ListVisitor,
         ParameterVisitor,
     },
-    BareItem, BareItemFromInput, Error, Key, KeyRef, Parser,
 };
 
 /// An [item]-type structured field value.
@@ -205,11 +205,8 @@ impl<'de> ItemVisitor<'de> for &mut InnerList {
         self,
         bare_item: BareItemFromInput<'de>,
     ) -> Result<impl ParameterVisitor<'de, Out = Self::Out>, Self::Error> {
-        self.items.push(Item::new(bare_item));
-        match self.items.last_mut() {
-            Some(item) => Ok(&mut item.params),
-            None => unreachable!(),
-        }
+        let item = self.items.push_mut(Item::new(bare_item));
+        Ok(&mut item.params)
     }
 }
 
@@ -308,10 +305,10 @@ impl<'de> ItemVisitor<'de> for ListWrapper<'_> {
         self,
         bare_item: BareItemFromInput<'de>,
     ) -> Result<impl ParameterVisitor<'de, Out = Self::Out>, Self::Error> {
-        self.0.push(Item::new(bare_item).into());
-        match self.0.last_mut() {
-            Some(ListEntry::Item(item)) => Ok(&mut item.params),
-            _ => unreachable!(),
+        let item = self.0.push_mut(Item::new(bare_item).into());
+        match item {
+            ListEntry::Item(item) => Ok(&mut item.params),
+            ListEntry::InnerList(_) => unreachable!(),
         }
     }
 }
@@ -324,10 +321,10 @@ impl<'de> EntryVisitor<'de> for ListWrapper<'_> {
     }
 
     fn inner_list(self) -> Result<impl InnerListVisitor<'de>, Self::Error> {
-        self.0.push(InnerList::default().into());
-        match self.0.last_mut() {
-            Some(ListEntry::InnerList(inner_list)) => Ok(inner_list),
-            _ => unreachable!(),
+        let inner_list = self.0.push_mut(InnerList::default().into());
+        match inner_list {
+            ListEntry::InnerList(inner_list) => Ok(inner_list),
+            ListEntry::Item(_) => unreachable!(),
         }
     }
 }
