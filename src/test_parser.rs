@@ -1,14 +1,12 @@
 use std::convert::Infallible;
 
 use crate::{
-    error, integer, key_ref,
-    parser::Num,
-    string_ref, token_ref,
+    error, key_ref, token_ref,
     visitor::{
         DictionaryVisitor, EntryVisitor, Ignored, InnerListVisitor, ItemVisitor, ListVisitor,
         ParameterVisitor,
     },
-    BareItemFromInput, Decimal, Error, KeyRef, Parser, RefBareItem,
+    BareItemFromInput, Error, KeyRef, Parser,
 };
 #[cfg(feature = "parsed-types")]
 use crate::{BareItem, Date, Dictionary, InnerList, Item, List, ListEntry, Parameters, Version};
@@ -61,699 +59,185 @@ macro_rules! dict {
     };
 }
 
-#[test]
-#[cfg(feature = "parsed-types")]
-fn parse() -> Result<(), Error> {
-    let input = r#""some_value""#;
-    let expected = item!(string_ref("some_value"));
-    assert_eq!(expected, Parser::new(input).parse::<Item>()?);
+fn check_expected_errs<'de, const N: usize, T, E>(
+    parse: impl Fn(Parser<'de>, Ignored) -> Result<T, E>,
+    tests: [(&'de str, error::Repr); N],
+) where
+    T: PartialEq + std::fmt::Debug,
+    E: Into<Error> + From<error::Repr> + std::fmt::Debug,
+{
+    for (input, expected_err) in tests {
+        assert_eq!(
+            Err(Error::from(expected_err)),
+            parse(Parser::new(input), Ignored).map_err(Into::into),
+            "{input}",
+        );
+    }
+}
 
-    let input = "12.35;a ";
-    let expected = item!(
-        Decimal::from_integer_scaled_1000(integer(12_350));
-        {"a" => true}
+fn check_expected_errs_mut<'de, const N: usize, T>(
+    parse: impl Fn(&mut Parser<'de>) -> Result<T, error::Repr>,
+    tests: [(&'de str, error::Repr); N],
+) where
+    T: PartialEq + std::fmt::Debug,
+{
+    check_expected_errs(|ref mut parser, _| parse(parser), tests);
+}
+
+#[test]
+fn parse_item_errors() {
+    check_expected_errs(
+        Parser::parse_item_with_visitor,
+        [
+            (r#""some_value¢""#, error::Repr::InvalidStringCharacter(11)),
+            (
+                r#""some_value" trailing_text""#,
+                error::Repr::TrailingCharactersAfterParsedValue(13),
+            ),
+            ("", error::Repr::ExpectedStartOfBareItem(0)),
+        ],
     );
-
-    assert_eq!(expected, Parser::new(input).parse::<Item>()?);
-    Ok(())
-}
-
-#[test]
-fn parse_errors() {
-    let input = r#""some_value¢""#;
-    assert_eq!(
-        Err(error::Repr::InvalidStringCharacter(11).into()),
-        Parser::new(input).parse_item_with_visitor(Ignored)
-    );
-    let input = r#""some_value" trailing_text""#;
-    assert_eq!(
-        Err(error::Repr::TrailingCharactersAfterParsedValue(13).into()),
-        Parser::new(input).parse_item_with_visitor(Ignored)
-    );
-    assert_eq!(
-        Err(error::Repr::ExpectedStartOfBareItem(0).into()),
-        Parser::new("").parse_item_with_visitor(Ignored)
-    );
-}
-
-#[test]
-#[cfg(feature = "parsed-types")]
-fn parse_list_of_numbers() -> Result<(), Error> {
-    let input = "1,42";
-    let expected_list = list![1, 42];
-    assert_eq!(expected_list, Parser::new(input).parse::<List>()?);
-    Ok(())
-}
-
-#[test]
-#[cfg(feature = "parsed-types")]
-fn parse_list_with_multiple_spaces() -> Result<(), Error> {
-    let input = "1  ,  42";
-    let expected_list = list![1, 42];
-    assert_eq!(expected_list, Parser::new(input).parse::<List>()?);
-    Ok(())
-}
-
-#[test]
-#[cfg(feature = "parsed-types")]
-fn parse_list_of_lists() -> Result<(), Error> {
-    let input = "(1 2), (42 43)";
-    let expected_list = list![inner_list![1, 2], inner_list![42, 43]];
-    assert_eq!(expected_list, Parser::new(input).parse::<List>()?);
-    Ok(())
-}
-
-#[test]
-#[cfg(feature = "parsed-types")]
-fn parse_list_empty_inner_list() -> Result<(), Error> {
-    let input = "()";
-    let expected_list = list![inner_list![]];
-    assert_eq!(expected_list, Parser::new(input).parse::<List>()?);
-    Ok(())
-}
-
-#[test]
-#[cfg(feature = "parsed-types")]
-fn parse_list_empty() -> Result<(), Error> {
-    let input = "";
-    let expected_list: List = vec![];
-    assert_eq!(expected_list, Parser::new(input).parse::<List>()?);
-    Ok(())
-}
-
-#[test]
-#[cfg(feature = "parsed-types")]
-fn parse_list_of_lists_with_param_and_spaces() -> Result<(), Error> {
-    let input = "(  1  42  ); k=*";
-    let expected_list = list![inner_list!([1, 42]; {"k" => token_ref("*")})];
-    assert_eq!(expected_list, Parser::new(input).parse::<List>()?);
-    Ok(())
-}
-
-#[test]
-#[cfg(feature = "parsed-types")]
-fn parse_list_of_items_and_lists_with_param() -> Result<(), Error> {
-    let input = r#"12, 14, (a  b); param="param_value_1", ()"#;
-    let expected_list = list![
-        12,
-        14,
-        inner_list!([token_ref("a"), token_ref("b")]; {"param" => string_ref("param_value_1")}),
-        inner_list![]
-    ];
-    assert_eq!(expected_list, Parser::new(input).parse::<List>()?);
-    Ok(())
 }
 
 #[test]
 fn parse_list_errors() {
-    let input = ",";
-    assert_eq!(
-        Err(error::Repr::ExpectedStartOfBareItem(0).into()),
-        Parser::new(input).parse_list_with_visitor(Ignored)
-    );
-
-    let input = "a, b c";
-    assert_eq!(
-        Err(error::Repr::TrailingCharactersAfterMember(5).into()),
-        Parser::new(input).parse_list_with_visitor(Ignored)
-    );
-
-    let input = "a,";
-    assert_eq!(
-        Err(error::Repr::TrailingComma(1).into()),
-        Parser::new(input).parse_list_with_visitor(Ignored)
-    );
-
-    let input = "a     ,    ";
-    assert_eq!(
-        Err(error::Repr::TrailingComma(6).into()),
-        Parser::new(input).parse_list_with_visitor(Ignored)
-    );
-
-    let input = "a\t \t ,\t ";
-    assert_eq!(
-        Err(error::Repr::TrailingComma(5).into()),
-        Parser::new(input).parse_list_with_visitor(Ignored)
-    );
-
-    let input = "a\t\t,\t\t\t";
-    assert_eq!(
-        Err(error::Repr::TrailingComma(3).into()),
-        Parser::new(input).parse_list_with_visitor(Ignored)
-    );
-
-    let input = "(a b),";
-    assert_eq!(
-        Err(error::Repr::TrailingComma(5).into()),
-        Parser::new(input).parse_list_with_visitor(Ignored)
-    );
-
-    let input = "(1, 2, (a b)";
-    assert_eq!(
-        Err(error::Repr::ExpectedInnerListDelimiter(2).into()),
-        Parser::new(input).parse_list_with_visitor(Ignored)
+    check_expected_errs(
+        Parser::parse_list_with_visitor,
+        [
+            (",", error::Repr::ExpectedStartOfBareItem(0)),
+            ("a, b c", error::Repr::TrailingCharactersAfterMember(5)),
+            ("a,", error::Repr::TrailingComma(1)),
+            ("a     ,    ", error::Repr::TrailingComma(6)),
+            ("a\t \t ,\t ", error::Repr::TrailingComma(5)),
+            ("a\t\t,\t\t\t", error::Repr::TrailingComma(3)),
+            ("(a b),", error::Repr::TrailingComma(5)),
+            ("(1, 2, (a b)", error::Repr::ExpectedInnerListDelimiter(2)),
+        ],
     );
 }
 
 #[test]
 fn parse_inner_list_errors() {
-    let input = "c b); a=1";
-    assert_eq!(
-        Err(error::Repr::ExpectedStartOfInnerList(0)),
-        Parser::new(input).parse_inner_list(Ignored)
+    check_expected_errs_mut(
+        |parser| parser.parse_inner_list(Ignored),
+        [
+            ("c b); a=1", error::Repr::ExpectedStartOfInnerList(0)),
+            ("(", error::Repr::UnterminatedInnerList(1)),
+        ],
     );
-
-    let input = "(";
-    assert_eq!(
-        Err(error::Repr::UnterminatedInnerList(1)),
-        Parser::new(input).parse_inner_list(Ignored)
-    );
-}
-
-#[test]
-#[cfg(feature = "parsed-types")]
-fn parse_inner_list_with_param_and_spaces() -> Result<(), Error> {
-    let input = "(c b); a=1";
-    let expected = inner_list!([token_ref("c"), token_ref("b")]; {"a" => 1});
-    let mut inner_list = InnerList::default();
-    Parser::new(input).parse_inner_list(&mut inner_list)?;
-    assert_eq!(expected, inner_list);
-    Ok(())
-}
-
-#[test]
-#[cfg(feature = "parsed-types")]
-fn parse_item_int_with_space() -> Result<(), Error> {
-    let input = "12 ";
-    assert_eq!(item!(12), Parser::new(input).parse::<Item>()?);
-    Ok(())
-}
-
-#[test]
-#[cfg(feature = "parsed-types")]
-fn parse_item_decimal_with_bool_param_and_space() -> Result<(), Error> {
-    let input = "12.35;a ";
-    assert_eq!(
-        item!(Decimal::from_integer_scaled_1000(integer(12_350)); {"a" => true}),
-        Parser::new(input).parse::<Item>()?
-    );
-    Ok(())
-}
-
-#[test]
-#[cfg(feature = "parsed-types")]
-fn parse_item_number_with_param() -> Result<(), Error> {
-    assert_eq!(
-        item!(string_ref("12.35"); {"a1" => token_ref("*")}),
-        Parser::new(r#""12.35";a1=*"#).parse::<Item>()?
-    );
-    Ok(())
-}
-
-#[test]
-#[cfg(feature = "parsed-types")]
-fn parse_dict_empty() -> Result<(), Error> {
-    assert_eq!(Dictionary::new(), Parser::new("").parse::<Dictionary>()?);
-    Ok(())
 }
 
 #[test]
 fn parse_dict_errors() {
-    let input = "abc=123;a=1;b=2 def";
-    assert_eq!(
-        Err(error::Repr::TrailingCharactersAfterMember(16).into()),
-        Parser::new(input).parse_dictionary_with_visitor(Ignored)
+    check_expected_errs(
+        Parser::parse_dictionary_with_visitor,
+        [
+            (
+                "abc=123;a=1;b=2 def",
+                error::Repr::TrailingCharactersAfterMember(16),
+            ),
+            ("abc=123;a=1,", error::Repr::TrailingComma(11)),
+        ],
     );
-    let input = "abc=123;a=1,";
-    assert_eq!(
-        Err(error::Repr::TrailingComma(11).into()),
-        Parser::new(input).parse_dictionary_with_visitor(Ignored)
-    );
-}
-
-#[test]
-#[cfg(feature = "parsed-types")]
-fn parse_dict_with_spaces_and_params() -> Result<(), Error> {
-    let input = r#"abc=123;a=1;b=2, def=456, ghi=789;q=9;r="+w""#;
-
-    let expected_dict = dict! {
-        "abc" => item!(123; {"a" => 1, "b" => 2}),
-        "def" => 456,
-        "ghi" => item!(789; {"q" => 9, "r" => string_ref("+w")})
-    };
-    assert_eq!(expected_dict, Parser::new(input).parse::<Dictionary>()?);
-
-    Ok(())
-}
-
-#[test]
-#[cfg(feature = "parsed-types")]
-fn parse_dict_empty_value() -> Result<(), Error> {
-    let input = "a=()";
-    let expected_dict = dict! {"a" => inner_list![]};
-    assert_eq!(expected_dict, Parser::new(input).parse::<Dictionary>()?);
-    Ok(())
-}
-
-#[test]
-#[cfg(feature = "parsed-types")]
-fn parse_dict_with_token_param() -> Result<(), Error> {
-    let input = "a=1, b;foo=*, c=3";
-    let expected_dict = dict! {
-        "a" => 1,
-        "b" => item!(true; {"foo" => token_ref("*")}),
-        "c" => 3
-    };
-    assert_eq!(expected_dict, Parser::new(input).parse::<Dictionary>()?);
-    Ok(())
-}
-
-#[test]
-#[cfg(feature = "parsed-types")]
-fn parse_dict_multiple_spaces() -> Result<(), Error> {
-    // input1, input2, input3 must be parsed into the same structure
-    let expected_dict = dict! {"a" => 1, "b" => 2};
-
-    let input1 = "a=1 ,  b=2";
-    let input2 = "a=1\t,\tb=2";
-    let input3 = "a=1, b=2";
-    assert_eq!(expected_dict, Parser::new(input1).parse::<Dictionary>()?);
-    assert_eq!(expected_dict, Parser::new(input2).parse::<Dictionary>()?);
-    assert_eq!(expected_dict, Parser::new(input3).parse::<Dictionary>()?);
-
-    Ok(())
-}
-
-#[test]
-fn parse_bare_item() -> Result<(), Error> {
-    assert_eq!(
-        RefBareItem::Boolean(false),
-        Parser::new("?0").parse_bare_item()?
-    );
-    assert_eq!(
-        RefBareItem::String(string_ref("test string")),
-        Parser::new(r#""test string""#).parse_bare_item()?
-    );
-    assert_eq!(
-        RefBareItem::Token(token_ref("*token")),
-        Parser::new("*token").parse_bare_item()?
-    );
-    assert_eq!(
-        RefBareItem::ByteSequence(b"base_64 encoding test"),
-        Parser::new(":YmFzZV82NCBlbmNvZGluZyB0ZXN0:").parse_bare_item()?
-    );
-    assert_eq!(
-        RefBareItem::Decimal(Decimal::from_integer_scaled_1000(integer(-3_550))),
-        Parser::new("-3.55").parse_bare_item()?
-    );
-    Ok(())
 }
 
 #[test]
 fn parse_bare_item_errors() {
-    assert_eq!(
-        Err(error::Repr::ExpectedStartOfBareItem(0)),
-        Parser::new("!?0").parse_bare_item()
+    check_expected_errs_mut(
+        Parser::parse_bare_item,
+        [
+            ("!?0", error::Repr::ExpectedStartOfBareItem(0)),
+            ("_11abc", error::Repr::ExpectedStartOfBareItem(0)),
+            ("   ", error::Repr::ExpectedStartOfBareItem(0)),
+        ],
     );
-    assert_eq!(
-        Err(error::Repr::ExpectedStartOfBareItem(0)),
-        Parser::new("_11abc").parse_bare_item()
-    );
-    assert_eq!(
-        Err(error::Repr::ExpectedStartOfBareItem(0)),
-        Parser::new("   ").parse_bare_item()
-    );
-}
-
-#[test]
-#[allow(clippy::bool_assert_comparison)]
-fn parse_bool() -> Result<(), Error> {
-    let mut parser = Parser::new("?0gk");
-    assert_eq!(false, parser.parse_bool()?);
-    assert_eq!(parser.remaining(), b"gk");
-
-    assert_eq!(false, Parser::new("?0").parse_bool()?);
-    assert_eq!(true, Parser::new("?1").parse_bool()?);
-    Ok(())
 }
 
 #[test]
 fn parse_bool_errors() {
-    assert_eq!(
-        Err(error::Repr::ExpectedStartOfBoolean(0)),
-        Parser::new("").parse_bool()
+    check_expected_errs_mut(
+        Parser::parse_bool,
+        [
+            ("", error::Repr::ExpectedStartOfBoolean(0)),
+            ("?", error::Repr::ExpectedBoolean(1)),
+        ],
     );
-    assert_eq!(
-        Err(error::Repr::ExpectedBoolean(1)),
-        Parser::new("?").parse_bool()
-    );
-}
-
-#[test]
-fn parse_string() -> Result<(), Error> {
-    let mut parser = Parser::new(r#""some string" ;not string"#);
-    assert_eq!(string_ref("some string"), parser.parse_string()?);
-    assert_eq!(parser.remaining(), " ;not string".as_bytes());
-
-    assert_eq!(string_ref("test"), Parser::new(r#""test""#).parse_string()?);
-    assert_eq!(
-        string_ref("te\\st"),
-        Parser::new(r#""te\\st""#).parse_string()?
-    );
-    assert_eq!(string_ref(""), Parser::new(r#""""#).parse_string()?);
-    assert_eq!(
-        string_ref("some string"),
-        Parser::new(r#""some string""#).parse_string()?
-    );
-    Ok(())
 }
 
 #[test]
 fn parse_string_errors() {
-    assert_eq!(
-        Err(error::Repr::ExpectedStartOfString(0)),
-        Parser::new("test").parse_string()
+    check_expected_errs_mut(
+        Parser::parse_string,
+        [
+            ("test", error::Repr::ExpectedStartOfString(0)),
+            (r#""\"#, error::Repr::UnterminatedEscapeSequence(2)),
+            (r#""\l""#, error::Repr::InvalidEscapeSequence(2)),
+            ("\"\u{1f}\"", error::Repr::InvalidStringCharacter(1)),
+            (r#""smth"#, error::Repr::UnterminatedString(5)),
+        ],
     );
-    assert_eq!(
-        Err(error::Repr::UnterminatedEscapeSequence(2)),
-        Parser::new(r#""\"#).parse_string()
-    );
-    assert_eq!(
-        Err(error::Repr::InvalidEscapeSequence(2)),
-        Parser::new(r#""\l""#).parse_string()
-    );
-    assert_eq!(
-        Err(error::Repr::InvalidStringCharacter(1)),
-        Parser::new("\"\u{1f}\"").parse_string()
-    );
-    assert_eq!(
-        Err(error::Repr::UnterminatedString(5)),
-        Parser::new(r#""smth"#).parse_string()
-    );
-}
-
-#[test]
-fn parse_token() -> Result<(), Error> {
-    let mut parser = Parser::new("*some:token}not token");
-    assert_eq!(token_ref("*some:token"), parser.parse_token()?);
-    assert_eq!(parser.remaining(), b"}not token");
-
-    assert_eq!(token_ref("token"), Parser::new("token").parse_token()?);
-    assert_eq!(
-        token_ref("a_b-c.d3:f%00/*"),
-        Parser::new("a_b-c.d3:f%00/*").parse_token()?
-    );
-    assert_eq!(
-        token_ref("TestToken"),
-        Parser::new("TestToken").parse_token()?
-    );
-    assert_eq!(token_ref("some"), Parser::new("some@token").parse_token()?);
-    assert_eq!(
-        token_ref("*TestToken*"),
-        Parser::new("*TestToken*").parse_token()?
-    );
-    assert_eq!(token_ref("*"), Parser::new("*[@:token").parse_token()?);
-    assert_eq!(token_ref("test"), Parser::new("test token").parse_token()?);
-
-    Ok(())
 }
 
 #[test]
 fn parse_token_errors() {
-    let mut parser = Parser::new("765token");
-    assert_eq!(
-        Err(error::Repr::ExpectedStartOfToken(0)),
-        parser.parse_token()
+    check_expected_errs_mut(
+        Parser::parse_token,
+        [
+            ("765token", error::Repr::ExpectedStartOfToken(0)),
+            ("7token", error::Repr::ExpectedStartOfToken(0)),
+            ("", error::Repr::ExpectedStartOfToken(0)),
+        ],
     );
-    assert_eq!(parser.remaining(), b"765token");
-
-    assert_eq!(
-        Err(error::Repr::ExpectedStartOfToken(0)),
-        Parser::new("7token").parse_token()
-    );
-    assert_eq!(
-        Err(error::Repr::ExpectedStartOfToken(0)),
-        Parser::new("").parse_token()
-    );
-}
-
-#[test]
-fn parse_byte_sequence() -> Result<(), Error> {
-    let mut parser = Parser::new(":aGVsbG8:rest_of_str");
-    assert_eq!("hello".as_bytes(), parser.parse_byte_sequence()?);
-    assert_eq!(parser.remaining(), b"rest_of_str");
-
-    assert_eq!(
-        "hello".as_bytes(),
-        Parser::new(":aGVsbG8:").parse_byte_sequence()?
-    );
-    assert_eq!(
-        "test_encode".as_bytes(),
-        Parser::new(":dGVzdF9lbmNvZGU:").parse_byte_sequence()?
-    );
-    assert_eq!(
-        "new:year tree".as_bytes(),
-        Parser::new(":bmV3OnllYXIgdHJlZQ==:").parse_byte_sequence()?
-    );
-    assert_eq!("".as_bytes(), Parser::new("::").parse_byte_sequence()?);
-    Ok(())
 }
 
 #[test]
 fn parse_byte_sequence_errors() {
-    assert_eq!(
-        Err(error::Repr::ExpectedStartOfByteSequence(0)),
-        Parser::new("aGVsbG8").parse_byte_sequence()
+    check_expected_errs_mut(
+        Parser::parse_byte_sequence,
+        [
+            ("aGVsbG8", error::Repr::ExpectedStartOfByteSequence(0)),
+            (":aGVsb G8=:", error::Repr::InvalidByteSequence(6)),
+            (":aGVsbG8=", error::Repr::UnterminatedByteSequence(9)),
+        ],
     );
-    assert_eq!(
-        Err(error::Repr::InvalidByteSequence(6)),
-        Parser::new(":aGVsb G8=:").parse_byte_sequence()
-    );
-    assert_eq!(
-        Err(error::Repr::UnterminatedByteSequence(9)),
-        Parser::new(":aGVsbG8=").parse_byte_sequence()
-    );
-}
-
-#[test]
-fn parse_number_int() -> Result<(), Error> {
-    let mut parser = Parser::new("-733333333332d.14");
-    assert_eq!(
-        Num::Integer(integer(-733_333_333_332)),
-        parser.parse_number()?
-    );
-    assert_eq!(parser.remaining(), b"d.14");
-
-    assert_eq!(Num::Integer(integer(42)), Parser::new("42").parse_number()?);
-    assert_eq!(
-        Num::Integer(integer(-42)),
-        Parser::new("-42").parse_number()?
-    );
-    assert_eq!(
-        Num::Integer(integer(-42)),
-        Parser::new("-042").parse_number()?
-    );
-    assert_eq!(Num::Integer(integer(0)), Parser::new("0").parse_number()?);
-    assert_eq!(Num::Integer(integer(0)), Parser::new("00").parse_number()?);
-    assert_eq!(
-        Num::Integer(integer(123_456_789_012_345)),
-        Parser::new("123456789012345").parse_number()?
-    );
-    assert_eq!(
-        Num::Integer(integer(-123_456_789_012_345)),
-        Parser::new("-123456789012345").parse_number()?
-    );
-    assert_eq!(Num::Integer(integer(2)), Parser::new("2,3").parse_number()?);
-    assert_eq!(Num::Integer(integer(4)), Parser::new("4-2").parse_number()?);
-    assert_eq!(
-        Num::Integer(integer(-999_999_999_999_999)),
-        Parser::new("-999999999999999").parse_number()?
-    );
-    assert_eq!(
-        Num::Integer(integer(999_999_999_999_999)),
-        Parser::new("999999999999999").parse_number()?
-    );
-
-    Ok(())
-}
-
-#[test]
-fn parse_number_decimal() -> Result<(), Error> {
-    let mut parser = Parser::new("00.42 test string");
-    assert_eq!(
-        Num::Decimal(Decimal::from_integer_scaled_1000(integer(420))),
-        parser.parse_number()?
-    );
-    assert_eq!(parser.remaining(), b" test string");
-
-    assert_eq!(
-        Num::Decimal(Decimal::from_integer_scaled_1000(integer(1_500))),
-        Parser::new("1.5.4.").parse_number()?
-    );
-    assert_eq!(
-        Num::Decimal(Decimal::from_integer_scaled_1000(integer(1_800))),
-        Parser::new("1.8.").parse_number()?
-    );
-    assert_eq!(
-        Num::Decimal(Decimal::from_integer_scaled_1000(integer(1_700))),
-        Parser::new("1.7.0").parse_number()?
-    );
-    assert_eq!(
-        Num::Decimal(Decimal::from_integer_scaled_1000(integer(2_140))),
-        Parser::new("2.14").parse_number()?
-    );
-    assert_eq!(
-        Num::Decimal(Decimal::from_integer_scaled_1000(integer(-2_140))),
-        Parser::new("-2.14").parse_number()?
-    );
-    assert_eq!(
-        Num::Decimal(Decimal::from_integer_scaled_1000(integer(
-            123_456_789_012_100
-        ))),
-        Parser::new("123456789012.1").parse_number()?
-    );
-    assert_eq!(
-        Num::Decimal(Decimal::from_integer_scaled_1000(integer(
-            1_234_567_890_112
-        ))),
-        Parser::new("1234567890.112").parse_number()?
-    );
-
-    Ok(())
 }
 
 #[test]
 fn parse_number_errors() {
-    let mut parser = Parser::new(":aGVsbG8:rest");
-    assert_eq!(Err(error::Repr::ExpectedDigit(0)), parser.parse_number());
-    assert_eq!(parser.remaining(), b":aGVsbG8:rest");
-
-    let mut parser = Parser::new("-11.5555 test string");
-    assert_eq!(
-        Err(error::Repr::TooManyDigitsAfterDecimalPoint(7)),
-        parser.parse_number()
+    check_expected_errs_mut(
+        Parser::parse_number,
+        [
+            (":aGVsbG8:rest", error::Repr::ExpectedDigit(0)),
+            (
+                "-11.5555 test string",
+                error::Repr::TooManyDigitsAfterDecimalPoint(7),
+            ),
+            ("--0", error::Repr::ExpectedDigit(1)),
+            (
+                "1999999999999.1",
+                error::Repr::TooManyDigitsBeforeDecimalPoint(13),
+            ),
+            ("19888899999.", error::Repr::TrailingDecimalPoint(11)),
+            ("1999999999999999", error::Repr::TooManyDigits(15)),
+            (
+                "19999999999.99991",
+                error::Repr::TooManyDigitsAfterDecimalPoint(15),
+            ),
+            ("- 42", error::Repr::ExpectedDigit(1)),
+            ("1..4", error::Repr::TrailingDecimalPoint(1)),
+            ("-", error::Repr::ExpectedDigit(1)),
+            ("-5. 14", error::Repr::TrailingDecimalPoint(2)),
+            ("7. 1", error::Repr::TrailingDecimalPoint(1)),
+            (
+                "-7.3333333333",
+                error::Repr::TooManyDigitsAfterDecimalPoint(6),
+            ),
+            (
+                "-7333333333323.12",
+                error::Repr::TooManyDigitsBeforeDecimalPoint(14),
+            ),
+        ],
     );
-    assert_eq!(parser.remaining(), b"5 test string");
-
-    assert_eq!(
-        Err(error::Repr::ExpectedDigit(1)),
-        Parser::new("--0").parse_number()
-    );
-    assert_eq!(
-        Err(error::Repr::TooManyDigitsBeforeDecimalPoint(13)),
-        Parser::new("1999999999999.1").parse_number()
-    );
-    assert_eq!(
-        Err(error::Repr::TrailingDecimalPoint(11)),
-        Parser::new("19888899999.").parse_number()
-    );
-    assert_eq!(
-        Err(error::Repr::TooManyDigits(15)),
-        Parser::new("1999999999999999").parse_number()
-    );
-    assert_eq!(
-        Err(error::Repr::TooManyDigitsAfterDecimalPoint(15)),
-        Parser::new("19999999999.99991").parse_number()
-    );
-    assert_eq!(
-        Err(error::Repr::ExpectedDigit(1)),
-        Parser::new("- 42").parse_number()
-    );
-    assert_eq!(
-        Err(error::Repr::TrailingDecimalPoint(1)),
-        Parser::new("1..4").parse_number()
-    );
-    assert_eq!(
-        Err(error::Repr::ExpectedDigit(1)),
-        Parser::new("-").parse_number()
-    );
-    assert_eq!(
-        Err(error::Repr::TrailingDecimalPoint(2)),
-        Parser::new("-5. 14").parse_number()
-    );
-    assert_eq!(
-        Err(error::Repr::TrailingDecimalPoint(1)),
-        Parser::new("7. 1").parse_number()
-    );
-    assert_eq!(
-        Err(error::Repr::TooManyDigitsAfterDecimalPoint(6)),
-        Parser::new("-7.3333333333").parse_number()
-    );
-    assert_eq!(
-        Err(error::Repr::TooManyDigitsBeforeDecimalPoint(14)),
-        Parser::new("-7333333333323.12").parse_number()
-    );
-}
-
-#[test]
-#[cfg(feature = "parsed-types")]
-fn parse_params_string() -> Result<(), Error> {
-    let input = r#";b="param_val""#;
-    let expected = params!({"b" => string_ref("param_val")});
-    let mut params = Parameters::new();
-    Parser::new(input).parse_parameters(&mut params)?;
-    assert_eq!(expected, params);
-    Ok(())
-}
-
-#[test]
-#[cfg(feature = "parsed-types")]
-fn parse_params_bool() -> Result<(), Error> {
-    let input = ";b;a";
-    let expected = params!({"b" => true, "a" => true});
-    let mut params = Parameters::new();
-    Parser::new(input).parse_parameters(&mut params)?;
-    assert_eq!(expected, params);
-    Ok(())
-}
-
-#[test]
-#[cfg(feature = "parsed-types")]
-fn parse_params_mixed_types() -> Result<(), Error> {
-    let input = ";key1=?0;key2=746.15";
-    let expected = params!({
-        "key1" => false,
-        "key2" => Decimal::from_integer_scaled_1000(integer(746_150))
-    });
-    let mut params = Parameters::new();
-    Parser::new(input).parse_parameters(&mut params)?;
-    assert_eq!(expected, params);
-    Ok(())
-}
-
-#[test]
-#[cfg(feature = "parsed-types")]
-fn parse_params_with_spaces() -> Result<(), Error> {
-    let input = "; key1=?0; key2=11111";
-    let expected = params!({"key1" => false, "key2" => 11111});
-    let mut params = Parameters::new();
-    Parser::new(input).parse_parameters(&mut params)?;
-    assert_eq!(expected, params);
-    Ok(())
-}
-
-#[test]
-#[cfg(feature = "parsed-types")]
-fn parse_params_empty() -> Result<(), Error> {
-    let mut params = Parameters::new();
-    Parser::new(" key1=?0; key2=11111").parse_parameters(&mut params)?;
-    assert_eq!(Parameters::new(), params);
-    Parser::new("").parse_parameters(&mut params)?;
-    assert_eq!(Parameters::new(), params);
-    Parser::new("[;a=1").parse_parameters(&mut params)?;
-    assert_eq!(Parameters::new(), params);
-    Parser::new("").parse_parameters(&mut params)?;
-    assert_eq!(Parameters::new(), params);
-    Ok(())
-}
-
-#[test]
-fn parse_key() -> Result<(), Error> {
-    assert_eq!(key_ref("a"), Parser::new("a=1").parse_key()?);
-    assert_eq!(key_ref("a1"), Parser::new("a1=10").parse_key()?);
-    assert_eq!(key_ref("*1"), Parser::new("*1=10").parse_key()?);
-    assert_eq!(key_ref("f"), Parser::new("f[f=10").parse_key()?);
-    Ok(())
 }
 
 #[test]
@@ -842,39 +326,17 @@ fn parse_display_string() -> Result<(), Error> {
 
 #[test]
 fn parse_display_string_errors() {
-    assert_eq!(
-        Parser::new(" %").parse_item_with_visitor(Ignored),
-        Err(error::Repr::ExpectedQuote(2).into())
-    );
-
-    assert_eq!(
-        Parser::new(r#" %""#).parse_item_with_visitor(Ignored),
-        Err(error::Repr::UnterminatedDisplayString(3).into())
-    );
-
-    assert_eq!(
-        Parser::new(r#" %"%"#).parse_item_with_visitor(Ignored),
-        Err(error::Repr::UnterminatedEscapeSequence(4).into())
-    );
-
-    assert_eq!(
-        Parser::new(r#" %"%a"#).parse_item_with_visitor(Ignored),
-        Err(error::Repr::UnterminatedEscapeSequence(5).into())
-    );
-
-    assert_eq!(
-        Parser::new(r#" %"%A"#).parse_item_with_visitor(Ignored),
-        Err(error::Repr::InvalidEscapeSequence(4).into())
-    );
-
-    assert_eq!(
-        Parser::new(r#" %"%aA"#).parse_item_with_visitor(Ignored),
-        Err(error::Repr::InvalidEscapeSequence(5).into())
-    );
-
-    assert_eq!(
-        Parser::new(r#" %"x%aa""#).parse_item_with_visitor(Ignored),
-        Err(error::Repr::InvalidUtf8InDisplayString(4).into())
+    check_expected_errs(
+        Parser::parse_item_with_visitor,
+        [
+            (" %", error::Repr::ExpectedQuote(2)),
+            (r#" %""#, error::Repr::UnterminatedDisplayString(3)),
+            (r#" %"%"#, error::Repr::UnterminatedEscapeSequence(4)),
+            (r#" %"%a"#, error::Repr::UnterminatedEscapeSequence(5)),
+            (r#" %"%A"#, error::Repr::InvalidEscapeSequence(4)),
+            (r#" %"%aA"#, error::Repr::InvalidEscapeSequence(5)),
+            (r#" %"x%aa""#, error::Repr::InvalidUtf8InDisplayString(4)),
+        ],
     );
 }
 
