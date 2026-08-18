@@ -222,19 +222,6 @@ impl<'de> InnerListVisitor<'de> for &mut InnerList {
     }
 }
 
-impl<'de> DictionaryVisitor<'de> for &mut Dictionary {
-    type Out = ();
-    type Error = Infallible;
-
-    fn entry(&mut self, key: &'de KeyRef) -> Result<impl EntryVisitor<'de>, Self::Error> {
-        Ok(Entry { dict: self, key })
-    }
-
-    fn finish(self) -> Result<Self::Out, Self::Error> {
-        Ok(())
-    }
-}
-
 impl<'de> DictionaryVisitor<'de> for Dictionary {
     type Out = Self;
     type Error = Infallible;
@@ -326,19 +313,6 @@ impl<'de> EntryVisitor<'de> for ListWrapper<'_> {
             ListEntry::InnerList(inner_list) => Ok(inner_list),
             ListEntry::Item(_) => unreachable!(),
         }
-    }
-}
-
-impl<'de> ListVisitor<'de> for &mut List {
-    type Out = ();
-    type Error = Infallible;
-
-    fn entry(&mut self) -> Result<impl EntryVisitor<'de>, Self::Error> {
-        Ok(ListWrapper(self))
-    }
-
-    fn finish(self) -> Result<Self::Out, Self::Error> {
-        Ok(())
     }
 }
 

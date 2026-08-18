@@ -114,7 +114,7 @@ them into an existing structure:
 # fn main() -> Result<(), sfv::Error> {
 let mut dict: Dictionary = Parser::new("a=1").parse()?;
 
-Parser::new("b=2").parse_dictionary_with_visitor(&mut dict)?;
+dict = Parser::new("b=2").parse_dictionary_with_visitor(dict)?;
 
 assert_eq!(
     dict.serialize().as_deref(),
@@ -180,7 +180,7 @@ into an existing structure:
 # fn main() -> Result<(), sfv::Error> {
 let mut list: List = Parser::new("11, (12 13)").parse()?;
 
-Parser::new(r#""foo",        "bar""#).parse_list_with_visitor(&mut list)?;
+list = Parser::new(r#""foo",        "bar""#).parse_list_with_visitor(list)?;
 
 assert_eq!(
     list.serialize().as_deref(),
