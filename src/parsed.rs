@@ -185,19 +185,6 @@ impl<'de> ParameterVisitor<'de> for Parameters {
     }
 }
 
-impl<'de> ItemVisitor<'de> for &mut Item {
-    type Out = ();
-    type Error = Infallible;
-
-    fn bare_item(
-        self,
-        bare_item: BareItemFromInput<'de>,
-    ) -> Result<impl ParameterVisitor<'de, Out = Self::Out>, Self::Error> {
-        self.bare_item = bare_item.into();
-        Ok(&mut self.params)
-    }
-}
-
 impl<'de> ItemVisitor<'de> for &mut InnerList {
     type Out = ();
     type Error = Infallible;
