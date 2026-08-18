@@ -265,12 +265,12 @@ fn parse_more_list() -> Result<(), Error> {
 fn parse_more_dict() -> Result<(), Error> {
     let expected_dict = dict! {
         "a" => 1,
-        "b" => item!(true; {"foo" => token_ref("*")}),
+        "b" => item!(token_ref("a"); {"bar" => true}),
         "c" => 3
     };
 
     let mut parsed_header: Dictionary = Parser::new("a=1, b;foo=*\t\t").parse()?;
-    Parser::new(" c=3").parse_dictionary_with_visitor(&mut parsed_header)?;
+    Parser::new(" c=3, b=a;bar").parse_dictionary_with_visitor(&mut parsed_header)?;
     assert_eq!(expected_dict, parsed_header);
     Ok(())
 }
