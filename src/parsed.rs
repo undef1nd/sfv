@@ -149,7 +149,10 @@ impl InnerList {
     }
 }
 
-impl<'de> ParameterVisitor<'de> for &mut Parameters {
+// Used to hide the visitor impls for public types.
+struct Wrapper<T>(T);
+
+impl<'de> ParameterVisitor<'de> for Wrapper<&mut Parameters> {
     type Out = ();
     type Error = Infallible;
 
@@ -158,7 +161,7 @@ impl<'de> ParameterVisitor<'de> for &mut Parameters {
         key: &'de KeyRef,
         value: BareItemFromInput<'de>,
     ) -> Result<(), Self::Error> {
-        self.insert(key.to_owned(), value.into());
+        self.0.insert(key.to_owned(), value.into());
         Ok(())
     }
 
@@ -167,8 +170,8 @@ impl<'de> ParameterVisitor<'de> for &mut Parameters {
     }
 }
 
-impl<'de> ParameterVisitor<'de> for Parameters {
-    type Out = Self;
+impl<'de> ParameterVisitor<'de> for Wrapper<Parameters> {
+    type Out = Parameters;
     type Error = Infallible;
 
     fn parameter(
@@ -176,36 +179,37 @@ impl<'de> ParameterVisitor<'de> for Parameters {
         key: &'de KeyRef,
         value: BareItemFromInput<'de>,
     ) -> Result<(), Self::Error> {
-        self.insert(key.to_owned(), value.into());
+        self.0.insert(key.to_owned(), value.into());
         Ok(())
     }
 
     fn finish(self) -> Result<Self::Out, Self::Error> {
-        Ok(self)
+        Ok(self.0)
     }
 }
 
-impl<'de> ItemVisitor<'de> for &mut InnerList {
+impl<'de> ItemVisitor<'de> for Wrapper<&mut InnerList> {
     type Out = ();
     type Error = Infallible;
+
     fn bare_item(
         self,
         bare_item: BareItemFromInput<'de>,
     ) -> Result<impl ParameterVisitor<'de, Out = Self::Out>, Self::Error> {
-        let item = self.items.push_mut(Item::new(bare_item));
-        Ok(&mut item.params)
+        let item = self.0.items.push_mut(Item::new(bare_item));
+        Ok(Wrapper(&mut item.params))
     }
 }
 
-impl<'de> InnerListVisitor<'de> for &mut InnerList {
+impl<'de> InnerListVisitor<'de> for Wrapper<&mut InnerList> {
     type Error = Infallible;
 
     fn item(&mut self) -> Result<impl ItemVisitor<'de>, Self::Error> {
-        Ok(&mut **self)
+        Ok(Wrapper(&mut *self.0))
     }
 
     fn finish(self) -> Result<impl ParameterVisitor<'de>, Self::Error> {
-        Ok(&mut self.params)
+        Ok(Wrapper(&mut self.0.params))
     }
 }
 
@@ -241,7 +245,7 @@ impl<'de> ItemVisitor<'de> for Entry<'de, '_> {
             .insert_entry(Item::new(bare_item).into())
             .into_mut()
         {
-            ListEntry::Item(item) => Ok(&mut item.params),
+            ListEntry::Item(item) => Ok(Wrapper(&mut item.params)),
             ListEntry::InnerList(_) => unreachable!(),
         }
     }
@@ -261,17 +265,13 @@ impl<'de> EntryVisitor<'de> for Entry<'de, '_> {
             .insert_entry(InnerList::default().into())
             .into_mut()
         {
-            ListEntry::InnerList(inner_list) => Ok(inner_list),
+            ListEntry::InnerList(inner_list) => Ok(Wrapper(inner_list)),
             ListEntry::Item(_) => unreachable!(),
         }
     }
 }
 
-// Used to avoid making the `ItemVisitor` and `EntryVisitor` impls for `List`
-// public.
-struct ListWrapper<'a>(&'a mut List);
-
-impl<'de> ItemVisitor<'de> for ListWrapper<'_> {
+impl<'de> ItemVisitor<'de> for Wrapper<&mut List> {
     type Out = ();
     type Error = Infallible;
 
@@ -281,13 +281,13 @@ impl<'de> ItemVisitor<'de> for ListWrapper<'_> {
     ) -> Result<impl ParameterVisitor<'de, Out = Self::Out>, Self::Error> {
         let item = self.0.push_mut(Item::new(bare_item).into());
         match item {
-            ListEntry::Item(item) => Ok(&mut item.params),
+            ListEntry::Item(item) => Ok(Wrapper(&mut item.params)),
             ListEntry::InnerList(_) => unreachable!(),
         }
     }
 }
 
-impl<'de> EntryVisitor<'de> for ListWrapper<'_> {
+impl<'de> EntryVisitor<'de> for Wrapper<&mut List> {
     type Error = Infallible;
 
     fn item(self) -> Result<impl ItemVisitor<'de>, Self::Error> {
@@ -297,7 +297,7 @@ impl<'de> EntryVisitor<'de> for ListWrapper<'_> {
     fn inner_list(self) -> Result<impl InnerListVisitor<'de>, Self::Error> {
         let inner_list = self.0.push_mut(InnerList::default().into());
         match inner_list {
-            ListEntry::InnerList(inner_list) => Ok(inner_list),
+            ListEntry::InnerList(inner_list) => Ok(Wrapper(inner_list)),
             ListEntry::Item(_) => unreachable!(),
         }
     }
@@ -308,7 +308,7 @@ impl<'de> ListVisitor<'de> for List {
     type Error = Infallible;
 
     fn entry(&mut self) -> Result<impl EntryVisitor<'de>, Self::Error> {
-        Ok(ListWrapper(self))
+        Ok(Wrapper(self))
     }
 
     fn finish(self) -> Result<Self::Out, Self::Error> {
@@ -403,7 +403,7 @@ impl<'de> visitor::MakeItemVisitor<'de> for Item {
     fn make_item_visitor() -> impl ItemVisitor<'de, Out = Self> {
         |bare_item| {
             Ok::<_, Infallible>(visitor::parameter_visitor_with(
-                Parameters::new(),
+                Wrapper(Parameters::new()),
                 |params| Ok(Item::with_params(bare_item, params)),
             ))
         }
