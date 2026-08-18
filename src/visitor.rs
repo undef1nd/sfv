@@ -1,59 +1,276 @@
 /*!
 Contains traits for parsing structured-field values incrementally.
 
-These can be used to borrow data from the input without copies in some cases.
-
 The various visitor methods are invoked *during* parsing, i.e. before validation
-of the entire input is complete. Therefore, users of these traits should
-carefully consider whether they want to induce side effects or perform expensive
-operations *before* knowing whether the entire input is valid.
+of the entire input is complete. Therefore, users of these traits must carefully
+consider whether they want to induce side effects or perform expensive
+operations *before* knowing whether the entire input is valid, and must
+*especially* avoid breaking RFC 8941/9651 requirements around the handling of
+duplicate parameter/dictionary keys. Specifically, validation of parameters and
+keys typically needs to be done as part of the `finish` method of
+`ParameterVisitor`, `ListVisitor`, or `DictionaryVisitor`, in order to ensure
+that all but the last instance of a given dictionary or parameter key is
+ignored from a semantic perspective.
 
-For example, it may make sense to defer storage of these values in a database
-until after validation is complete, in order to avoid the need for rollbacks in
-the event that a later error occurs. In this case, the visitor could retain the
-relevant state in its fields, before using that state to perform the operation
-*after* parsing is complete:
+For example, consider a fictitious dictionary header `Foo` defined to contain
+a single required top-level key, `color`, which is either the token `blue` or
+the token `red`, with an optional boolean parameter `strong`, defaulting to
+`false`. If `color` or `strong` has the wrong type, the entire header is
+considered invalid.
 
 ```
-# use sfv::visitor::{Ignored, ItemVisitor, ParameterVisitor};
-# use sfv::{BareItemFromInput, TokenRef, token_ref};
-# fn main() -> Result<(), sfv::Error> {
-struct Visitor<'de> {
-    token: Option<&'de TokenRef>,
+use std::convert::Infallible;
+
+use sfv::{BareItem, BareItemFromInput, KeyRef, visitor};
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Color {
+    Red,
+    Blue,
 }
 
-impl<'de> ItemVisitor<'de> for &mut Visitor<'de> {
-  type Out = ();
-  type Error = std::convert::Infallible;
+struct InvalidColor;
 
-  fn bare_item(self, bare_item: BareItemFromInput<'de>) -> Result<impl ParameterVisitor<'de, Out = Self::Out>, Self::Error> {
-      self.token =
-          if let BareItemFromInput::Token(token) = bare_item {
-              Some(token)
-          } else {
-              None
-          };
+impl TryFrom<&sfv::TokenRef> for Color {
+    type Error = InvalidColor;
 
-      Ok(Ignored)
-  }
+    fn try_from(v: &sfv::TokenRef) -> Result<Self, Self::Error> {
+        match v.as_str() {
+            "red" => Ok(Self::Red),
+            "blue" => Ok(Self::Blue),
+            _ => Err(InvalidColor),
+        }
+    }
 }
 
-let mut visitor = Visitor { token: None };
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Foo {
+    color: Color,
+    strong: bool,
+}
 
-sfv::Parser::new("abc").parse_item_with_visitor(&mut visitor)?;
+#[derive(Debug, PartialEq)]
+enum Error {
+    ColorMissing,
+    ColorWrongType,
+    ColorInvalid,
+    StrongWrongType,
+}
 
-assert_eq!(visitor.token, Some(token_ref("abc")));
+impl From<InvalidColor> for Error {
+    fn from(_: InvalidColor) -> Self {
+        Self::ColorInvalid
+    }
+}
 
-// Use `visitor.token` to do something expensive or with side effects now that
-// we know the entire input is valid.
-# Ok(())
-# }
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::ColorMissing => "color missing",
+            Self::ColorWrongType => "color wrong type",
+            Self::ColorInvalid => "color invalid",
+            Self::StrongWrongType => "strong wrong type",
+        })
+    }
+}
+
+impl std::error::Error for Error {}
+
+const KEY_COLOR: &KeyRef = sfv::key_ref("color");
+const KEY_STRONG: &KeyRef = sfv::key_ref("strong");
+
+impl TryFrom<&sfv::Dictionary> for Foo {
+    type Error = Error;
+
+    fn try_from(dict: &sfv::Dictionary) -> Result<Self, Error> {
+        let Some(v) = dict.get(KEY_COLOR) else {
+            return Err(Error::ColorMissing);
+        };
+
+        let sfv::ListEntry::Item(sfv::Item { bare_item: BareItem::Token(v), params }) = v else {
+            return Err(Error::ColorWrongType);
+        };
+
+        let color = Color::try_from(&**v)?;
+
+        let strong = match params.get(KEY_STRONG) {
+            None => false,
+            Some(BareItem::Boolean(v)) => *v,
+            Some(_) => return Err(Error::StrongWrongType),
+        };
+
+        Ok(Self { color, strong })
+    }
+}
+
+struct Visitor {
+    color: Result<Color, Error>,
+    strong: Result<bool, Error>,
+}
+
+impl Visitor {
+    fn new() -> Self {
+        Self { color: Err(Error::ColorMissing), strong: Ok(false) }
+    }
+}
+
+impl<'de> visitor::DictionaryVisitor<'de> for Visitor {
+    type Out = Foo;
+    type Error = Error;
+
+    fn entry(&mut self, key: &'de KeyRef) -> Result<impl visitor::EntryVisitor<'de>, Self::Error> {
+        Ok(if key == KEY_COLOR {
+            // Reset the values to ensure that multiple instances of `color` do
+            // not have their values and parameters mixed.
+            *self = Self::new();
+            Some(self)
+        } else {
+            // Ignore other keys.
+            None
+        })
+    }
+
+    fn finish(self) -> Result<Self::Out, Self::Error> {
+        Ok(Foo { color: self.color?, strong: self.strong? })
+    }
+}
+
+impl<'de> visitor::EntryVisitor<'de> for &mut Visitor {
+    type Error = Infallible;
+
+    fn item(self) -> Result<impl visitor::ItemVisitor<'de>, Self::Error> {
+        Ok(self)
+    }
+
+    fn inner_list(self) -> Result<impl visitor::InnerListVisitor<'de>, Self::Error> {
+        // It would be incorrect to return an error here: If the `color` key
+        // appears more than once, doing so would cause the entire visitation to
+        // fail even if the later key has the correct type. Instead, we record
+        // the error so it can be returned from `DictionaryVisitor::finish`.
+        self.color = Err(Error::ColorWrongType);
+        Ok(visitor::Ignored)
+    }
+}
+
+impl<'de> visitor::ItemVisitor<'de> for &mut Visitor {
+    type Out = Option<()>;
+    type Error = Infallible;
+
+    fn bare_item(self, v: BareItemFromInput<'de>) -> Result<impl visitor::ParameterVisitor<'de, Out = Self::Out>, Self::Error> {
+        // It would be incorrect to return the errors here: If the `color` key
+        // appears more than once, doing so would cause the entire visitation to
+        // fail even if the later key has the correct type and a valid value.
+        // Instead, we record the errors so they can be returned from
+        // `DictionaryVisitor::finish`.
+
+        if let BareItemFromInput::Token(v) = v {
+            self.color = Color::try_from(v).map_err(Error::from);
+            // Visit the parameters.
+            Ok(Some(self))
+        } else {
+            self.color = Err(Error::ColorWrongType);
+            // No need to visit the parameters if the type is wrong.
+            Ok(None)
+        }
+    }
+}
+
+impl<'de> visitor::ParameterVisitor<'de> for &mut Visitor {
+    type Out = ();
+    type Error = Error;
+
+    fn parameter(&mut self, key: &'de KeyRef, v: BareItemFromInput<'de>) -> Result<(), Self::Error> {
+        // Ignore other parameters.
+        if key == KEY_STRONG {
+            // It would be incorrect to return an error here: If the `strong`
+            // key appears more than once, doing so would cause the entire
+            // visitation to fail even if the later key has the correct type.
+            // Instead, we record the error so it can be returned from
+            // `DictionaryVisitor::finish`.
+            self.strong = if let BareItemFromInput::Boolean(v) = v {
+                Ok(v)
+            } else {
+                Err(Error::StrongWrongType)
+            };
+        }
+        Ok(())
+    }
+
+    fn finish(self) -> Result<Self::Out, Self::Error> {
+        Ok(())
+    }
+}
+
+for (input, expected) in [
+    (
+        "color=red",
+        Ok(Foo { color: Color::Red, strong: false }),
+    ),
+    (
+        "color=blue;strong",
+        Ok(Foo { color: Color::Blue, strong: true }),
+    ),
+    (
+        "",
+        Err(Error::ColorMissing),
+    ),
+    (
+        "color=123",
+        Err(Error::ColorWrongType),
+    ),
+    (
+        "color=(red)",
+        Err(Error::ColorWrongType),
+    ),
+    (
+        "color=green",
+        Err(Error::ColorInvalid),
+    ),
+    (
+        "color=red;strong=a",
+        Err(Error::StrongWrongType),
+    ),
+    // Cases involving duplicate keys:
+    (
+        "color=123;strong, color=red",
+        Ok(Foo { color: Color::Red, strong: false }),
+    ),
+    (
+        "color=(blue);strong, color=red",
+        Ok(Foo { color: Color::Red, strong: false }),
+    ),
+    (
+        "color=green, color=blue",
+        Ok(Foo { color: Color::Blue, strong: false }),
+    ),
+    (
+        "color=blue;strong=a, color=red",
+        Ok(Foo { color: Color::Red, strong: false }),
+    ),
+    (
+        "color=red;strong, color=red",
+        Ok(Foo { color: Color::Red, strong: false }),
+    ),
+] {
+    println!("{input}");
+
+    // This works, but has the downsides of requiring the `parsed-types` Cargo
+    // feature (which entails an additional crate dependency) and allocating a
+    // `Dictionary`.
+    let dict = sfv::Parser::new(input).parse_dictionary().unwrap();
+    assert_eq!(Foo::try_from(&dict), expected);
+
+    // This records the minimal information needed to parse and validate the
+    // header, and allows the `parsed-types` Cargo feature to be disabled.
+    assert_eq!(
+        sfv::Parser::new(input).parse_dictionary_with_visitor(Visitor::new()).ok(),
+        expected.as_ref().ok().cloned());
+}
 ```
 
 # Returning a value from `ItemVisitor`
 
-If a top-level item is being parsed, the visitor can return the value directly.
-The previous example can be written more concisely as:
+If a top-level item is being parsed, the visitor can return the value directly:
 
 ```
 # use sfv::visitor::{Ignored, ItemVisitor, ParameterVisitor, parameter_visitor_with};
@@ -195,92 +412,7 @@ Note that the discarded parts are still validated during parsing: syntactic
 errors in the input still cause parsing to fail even when these helpers are
 used, [as required by RFC 9651](https://httpwg.org/specs/rfc9651.html#strict).
 
-The following example demonstrates usage of both kinds of helpers:
-
-```
-# use sfv::{BareItemFromInput, KeyRef, Parser, visitor::*};
-#[derive(Debug, Default, PartialEq)]
-struct Point {
-    x: i64,
-    y: i64,
-}
-
-struct CoordVisitor<'a> {
-    coord: &'a mut i64,
-}
-
-impl<'de> DictionaryVisitor<'de> for Point {
-    type Out = Self;
-    type Error = std::convert::Infallible;
-
-    fn entry(
-        &mut self,
-        key: &'de KeyRef,
-    ) -> Result<impl EntryVisitor<'de>, Self::Error>
-    {
-        let coord = match key.as_str() {
-            "x" => &mut self.x,
-            "y" => &mut self.y,
-            // Ignore this key by returning `None`. Its value will still be
-            // validated syntactically during parsing, but we don't need to
-            // visit it.
-            _ => return Ok(None),
-        };
-        // Visit this key's value by returning `Some`.
-        Ok(Some(CoordVisitor { coord }))
-    }
-
-    fn finish(self) -> Result<Self::Out, Self::Error> {
-        Ok(self)
-    }
-}
-
-#[derive(Debug)]
-struct NotAnInteger;
-
-impl std::fmt::Display for NotAnInteger {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.write_str("must be an integer")
-    }
-}
-
-impl std::error::Error for NotAnInteger {}
-
-impl<'de> EntryVisitor<'de> for CoordVisitor<'_> {
-    type Error = NotAnInteger;
-
-    fn item(self) -> Result<impl ItemVisitor<'de>, Self::Error> {
-        Ok(|bare_item: BareItemFromInput<'de>| {
-            if let BareItemFromInput::Integer(v) = bare_item {
-                *self.coord = i64::from(v);
-                // Ignore the item's parameters by returning `Ignored`. The
-                // parameters will still be validated syntactically during parsing,
-                // but we don't need to visit them.
-                //
-                // We could return `None` instead to ignore the parameters only
-                // some of the time, returning `Some(visitor)` otherwise.
-                Ok(Ignored)
-            } else {
-                Err(NotAnInteger)
-            }
-        })
-    }
-
-    fn inner_list(self) -> Result<impl InnerListVisitor<'de>, Self::Error> {
-        // Use `Never` to enforce at the type level that this method will only
-        // return `Err`, as our coordinate must be a single integer, not an
-        // inner list.
-        Err::<Never, _>(NotAnInteger)
-    }
-}
-
-# fn main() -> Result<(), sfv::Error> {
-assert_eq!(
-    Parser::new("x=10, z=abc, y=3").parse_dictionary_with_visitor(Point::default())?,
-    Point { x: 10, y: 3 });
-# Ok(())
-# }
-```
+The `Foo` header example above demonstrates usage of both kinds of helpers.
 */
 
 use std::{convert::Infallible, error::Error};
