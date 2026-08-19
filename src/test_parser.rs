@@ -255,7 +255,7 @@ fn parse_more_list() -> Result<(), Error> {
     let expected_list = list![inner_list![1, 2], 42];
 
     let mut parsed_header: List = Parser::new("(1 2)").parse()?;
-    Parser::new("42").parse_list_with_visitor(&mut parsed_header)?;
+    parsed_header = Parser::new("42").parse_list_with_visitor(parsed_header)?;
     assert_eq!(expected_list, parsed_header);
     Ok(())
 }
@@ -265,12 +265,12 @@ fn parse_more_list() -> Result<(), Error> {
 fn parse_more_dict() -> Result<(), Error> {
     let expected_dict = dict! {
         "a" => 1,
-        "b" => item!(true; {"foo" => token_ref("*")}),
+        "b" => item!(token_ref("a"); {"bar" => true}),
         "c" => 3
     };
 
     let mut parsed_header: Dictionary = Parser::new("a=1, b;foo=*\t\t").parse()?;
-    Parser::new(" c=3").parse_dictionary_with_visitor(&mut parsed_header)?;
+    parsed_header = Parser::new(" c=3, b=a;bar").parse_dictionary_with_visitor(parsed_header)?;
     assert_eq!(expected_dict, parsed_header);
     Ok(())
 }
@@ -278,17 +278,17 @@ fn parse_more_dict() -> Result<(), Error> {
 #[test]
 #[cfg(feature = "parsed-types")]
 fn parse_more_errors() -> Result<(), Error> {
-    let mut parsed_dict_header: Dictionary = Parser::new("a=1, b;foo=*").parse()?;
+    let parsed_dict_header: Dictionary = Parser::new("a=1, b;foo=*").parse()?;
     assert!(
         Parser::new(",a")
-            .parse_dictionary_with_visitor(&mut parsed_dict_header)
+            .parse_dictionary_with_visitor(parsed_dict_header)
             .is_err()
     );
 
-    let mut parsed_list_header: List = Parser::new("a, b;foo=*").parse()?;
+    let parsed_list_header: List = Parser::new("a, b;foo=*").parse()?;
     assert!(
         Parser::new("(a, 2)")
-            .parse_list_with_visitor(&mut parsed_list_header)
+            .parse_list_with_visitor(parsed_list_header)
             .is_err()
     );
     Ok(())

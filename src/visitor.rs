@@ -79,6 +79,7 @@ impl std::error::Error for Error {}
 const KEY_COLOR: &KeyRef = sfv::key_ref("color");
 const KEY_STRONG: &KeyRef = sfv::key_ref("strong");
 
+#[cfg(feature = "parsed-types")]
 impl TryFrom<&sfv::Dictionary> for Foo {
     type Error = Error;
 
@@ -257,8 +258,11 @@ for (input, expected) in [
     // This works, but has the downsides of requiring the `parsed-types` Cargo
     // feature (which entails an additional crate dependency) and allocating a
     // `Dictionary`.
-    let dict = sfv::Parser::new(input).parse_dictionary().unwrap();
-    assert_eq!(Foo::try_from(&dict), expected);
+    #[cfg(feature = "parsed-types")]
+    {
+        let dict = sfv::Parser::new(input).parse_dictionary().unwrap();
+        assert_eq!(Foo::try_from(&dict), expected);
+    }
 
     // This records the minimal information needed to parse and validate the
     // header, and allows the `parsed-types` Cargo feature to be disabled.
