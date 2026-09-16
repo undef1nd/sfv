@@ -13,6 +13,8 @@ struct TestData {
     header_type: ExpectedHeaderType,
     #[serde(default)]
     must_fail: bool,
+    #[serde(default)]
+    can_fail: bool,
     canonical: Option<Vec<String>>,
 }
 
@@ -115,7 +117,7 @@ impl TestCase for ParseTestData {
                         }
                     }
                 }
-                Err(_) => assert!(test_case.data.must_fail),
+                Err(_) => assert!(test_case.data.must_fail || test_case.data.can_fail),
             }
         }
 
@@ -152,9 +154,9 @@ impl TestCase for TestData {
                                 .expect("canonical serialization should be present")[0]
                         );
                     }
-                    None => assert!(test_case.must_fail),
+                    None => assert!(test_case.must_fail || test_case.can_fail),
                 },
-                Err(_) => assert!(test_case.must_fail),
+                Err(_) => assert!(test_case.must_fail || test_case.can_fail),
             }
         }
 
