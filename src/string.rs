@@ -67,6 +67,20 @@ impl StringRef {
         Ok(Self::cast(v))
     }
 
+    /// Creates a `&StringRef` from a `&[u8]`.
+    ///
+    /// # Errors
+    /// The error reports the cause of any failed string validation.
+    pub fn from_bytes(v: &[u8]) -> Result<&Self, Error> {
+        validate(v)?;
+        // TODO: The UTF-8 validation is redundant with the preceding character checks, but
+        // its removal is only possible with unsafe code.
+        let Ok(s) = std::str::from_utf8(v) else {
+            unreachable!()
+        };
+        Ok(Self::cast(s))
+    }
+
     // Like `from_str`, but assumes that the contents of the string have already
     // been validated as a string.
     pub(crate) fn from_validated_str(v: &str) -> &Self {
@@ -210,6 +224,14 @@ impl<'a> TryFrom<&'a str> for &'a StringRef {
 
     fn try_from(v: &'a str) -> Result<&'a StringRef, Error> {
         StringRef::from_str(v)
+    }
+}
+
+impl<'a> TryFrom<&'a [u8]> for &'a StringRef {
+    type Error = Error;
+
+    fn try_from(v: &'a [u8]) -> Result<&'a StringRef, Error> {
+        StringRef::from_bytes(v)
     }
 }
 
