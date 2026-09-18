@@ -364,14 +364,22 @@ assert_eq!(
                 b'"' => {
                     let end = self.index;
                     self.next();
-                    // TODO: The UTF-8 validation is redundant with the preceding character checks, but
-                    // its removal is only possible with unsafe code.
                     return Ok(if output.is_empty() {
                         let slice = &self.input[start..end];
-                        let output = std::str::from_utf8(slice).unwrap();
+                        let output = cfg_select! {
+                            feature = "unsafe-code" =>
+                                 // SAFETY: Preceding character checks guarantee that `slice` contains only ASCII bytes in 0x20..=0x7e, which is valid UTF-8.
+                                unsafe { std::str::from_utf8_unchecked(slice) },
+                            _ => std::str::from_utf8(slice).unwrap(),
+                        };
                         Cow::Borrowed(StringRef::from_validated_str(output))
                     } else {
-                        let output = StdString::from_utf8(output).unwrap();
+                        let output = cfg_select! {
+                            feature = "unsafe-code" =>
+                                // SAFETY: Preceding character checks guarantee that `output` contains only ASCII bytes in 0x20..=0x7e, which is valid UTF-8.
+                                unsafe { StdString::from_utf8_unchecked(output) },
+                            _ => StdString::from_utf8(output).unwrap(),
+                        };
                         Cow::Owned(String::from_validated_string(output))
                     });
                 }
@@ -421,9 +429,13 @@ assert_eq!(
             self.next();
         }
 
-        // TODO: The UTF-8 validation is redundant with the preceding character checks, but
-        // its removal is only possible with unsafe code.
-        Some(std::str::from_utf8(&self.input[start..self.index]).unwrap())
+        let slice = &self.input[start..self.index];
+        Some(cfg_select! {
+            feature = "unsafe-code" =>
+                // SAFETY: Preceding character checks guarantee that `slice` contains only ASCII token or key characters, which is valid UTF-8.
+                unsafe { std::str::from_utf8_unchecked(slice) },
+            _ => std::str::from_utf8(slice).unwrap(),
+        })
     }
 
     pub(crate) fn parse_token(&mut self) -> Result<&'de TokenRef, error::Repr> {

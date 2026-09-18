@@ -37,6 +37,7 @@ required-features = ["parsed-types"]
 default = ["parsed-types"]
 arbitrary = ["dep:arbitrary", "indexmap?/arbitrary"]
 parsed-types = ["dep:indexmap"]
+unsafe-code = []
 
 [[example]]
 name = "priority"

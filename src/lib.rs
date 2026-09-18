@@ -145,6 +145,10 @@ assert_eq!(
   feature can avoid that dependency if parsing using a visitor
   ([`Parser::parse_item_with_visitor`], etc.) is sufficient.
 
+- `unsafe-code` -- When enabled, allows the use of `unsafe` code to eliminate
+  redundant UTF-8 validation checks when parsing strings, tokens, and keys.
+  When disabled (the default), unsafe code is forbidden/denied.
+
 - `arbitrary` -- Implements the
   [`Arbitrary`](https://docs.rs/arbitrary/1.4.1/arbitrary/trait.Arbitrary.html)
   trait for this crate's types, making them easier to use with fuzzing.
@@ -152,6 +156,7 @@ assert_eq!(
 
 #![deny(missing_docs)]
 #![deny(missing_debug_implementations)]
+#![cfg_attr(not(feature = "unsafe-code"), deny(unsafe_code))]
 
 mod date;
 mod decimal;

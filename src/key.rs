@@ -71,12 +71,14 @@ impl KeyRef {
     ///
     /// # Errors
     /// If the input byte slice validation fails.
+    #[allow(clippy::missing_panics_doc)]
     pub fn from_bytes(v: &[u8]) -> Result<&Self, Error> {
         validate(v)?;
-        // TODO: The UTF-8 validation is redundant with the preceding character checks, but
-        // its removal is only possible with unsafe code.
-        let Ok(s) = std::str::from_utf8(v) else {
-            unreachable!()
+        let s = cfg_select! {
+            feature = "unsafe-code" =>
+                // SAFETY: `validate` guarantees that all bytes are ASCII key characters, which is valid UTF-8.
+                unsafe { std::str::from_utf8_unchecked(v) },
+            _ => std::str::from_utf8(v).unwrap(),
         };
         Ok(Self::cast(s))
     }
