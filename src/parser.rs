@@ -595,19 +595,21 @@ assert_eq!(
                     let end = self.index;
                     self.next();
                     return if output.is_empty() {
+                        // TODO: The UTF-8 validation is redundant with the preceding character checks, but
+                        // its removal is only possible with unsafe code.
                         let slice = &self.input[start..end];
-                        match std::str::from_utf8(slice) {
-                            Ok(output) => Ok(Cow::Borrowed(output)),
-                            Err(err) => Err(error::Repr::InvalidUtf8InDisplayString(
-                                start + err.valid_up_to(),
-                            )),
-                        }
+                        let output = std::str::from_utf8(slice).unwrap();
+                        Ok(Cow::Borrowed(output))
                     } else {
                         match StdString::from_utf8(output) {
                             Ok(output) => Ok(Cow::Owned(output)),
-                            Err(err) => Err(error::Repr::InvalidUtf8InDisplayString(
-                                start + err.utf8_error().valid_up_to(),
-                            )),
+                            Err(err) => {
+                                let mut index = start;
+                                for _ in 0..err.utf8_error().valid_up_to() {
+                                    index += if self.input[index] == b'%' { 3 } else { 1 };
+                                }
+                                Err(error::Repr::InvalidUtf8InDisplayString(index))
+                            }
                         }
                     };
                 }
