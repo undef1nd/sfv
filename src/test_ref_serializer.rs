@@ -22,19 +22,16 @@ fn test_fast_serialize_item() {
 #[test]
 fn test_fast_serialize_list() {
     fn check(mut ser: ListSerializer<impl BorrowMut<String>>) {
-        _ = ser
-            .bare_item(token_ref("hello"))
+        ser.bare_item(token_ref("hello"))
             .parameter(key_ref("key1"), true)
             .parameter(key_ref("key2"), false);
 
         {
             let mut ser = ser.inner_list();
-            _ = ser.bare_item(string_ref("some_string"));
-            _ = ser
-                .bare_item(12)
+            ser.bare_item(string_ref("some_string"));
+            ser.bare_item(12)
                 .parameter(key_ref("inner-member-key"), true);
-            _ = ser
-                .finish()
+            ser.finish()
                 .parameter(key_ref("inner-list-param"), token_ref("*"));
         }
 
@@ -51,13 +48,11 @@ fn test_fast_serialize_list() {
 #[test]
 fn test_fast_serialize_dict() {
     fn check(mut ser: DictSerializer<impl BorrowMut<String>>) {
-        _ = ser
-            .bare_item(key_ref("member1"), token_ref("hello"))
+        ser.bare_item(key_ref("member1"), token_ref("hello"))
             .parameter(key_ref("key1"), true)
             .parameter(key_ref("key2"), false);
 
-        _ = ser
-            .bare_item(key_ref("member2"), true)
+        ser.bare_item(key_ref("member2"), true)
             .parameter(
                 key_ref("key3"),
                 Decimal::from_integer_scaled_1000(integer(45_459)),
@@ -66,20 +61,20 @@ fn test_fast_serialize_dict() {
 
         {
             let mut ser = ser.inner_list(key_ref("key5"));
-            _ = ser.bare_item(45);
-            _ = ser.bare_item(0);
+            ser.bare_item(45);
+            ser.bare_item(0);
         }
 
-        _ = ser.bare_item(key_ref("key6"), string_ref("foo"));
+        ser.bare_item(key_ref("key6"), string_ref("foo"));
 
         {
             let mut ser = ser.inner_list(key_ref("key7"));
-            _ = ser.bare_item("some_string".as_bytes());
-            _ = ser.bare_item("other_string".as_bytes());
-            _ = ser.finish().parameter(key_ref("lparam"), 10);
+            ser.bare_item("some_string".as_bytes());
+            ser.bare_item("other_string".as_bytes());
+            ser.finish().parameter(key_ref("lparam"), 10);
         }
 
-        _ = ser.bare_item(key_ref("key8"), true);
+        ser.bare_item(key_ref("key8"), true);
 
         assert_eq!(
             Some(
@@ -109,10 +104,10 @@ fn test_serialize_empty() {
 #[test]
 fn test_with_buffer_separator() {
     let mut output = String::from(" ");
-    _ = ListSerializer::with_buffer(&mut output).bare_item(1);
+    ListSerializer::with_buffer(&mut output).bare_item(1);
     assert_eq!(output, " 1");
 
     let mut output = String::from(" ");
-    _ = DictSerializer::with_buffer(&mut output).bare_item(key_ref("key1"), 1);
+    DictSerializer::with_buffer(&mut output).bare_item(key_ref("key1"), 1);
     assert_eq!(output, " key1=1");
 }
