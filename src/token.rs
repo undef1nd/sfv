@@ -10,7 +10,7 @@ use crate::{
 /// Tokens must match the following regular expression:
 ///
 /// ```re
-/// ^[A-Za-z*][A-Za-z*0-9!#$%&'+\-.^_`|~]*$
+/// ^[A-Za-z*][A-Za-z*0-9!#$%&'+\-.^_`|~:/]*$
 /// ```
 ///
 /// [token]: <https://httpwg.org/specs/rfc9651.html#token>
@@ -22,7 +22,7 @@ pub struct Token(String);
 /// Tokens must match the following regular expression:
 ///
 /// ```re
-/// ^[A-Za-z*][A-Za-z*0-9!#$%&'+\-.^_`|~]*$
+/// ^[A-Za-z*][A-Za-z*0-9!#$%&'+\-.^_`|~:/]*$
 /// ```
 ///
 /// This type is to [`Token`] as [`str`] is to [`String`].

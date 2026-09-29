@@ -10,7 +10,7 @@ use crate::{
 /// Keys must match the following regular expression:
 ///
 /// ```re
-/// ^[A-Za-z*][A-Za-z*0-9!#$%&'+\-.^_`|~]*$
+/// ^[a-z*][a-z*0-9_\-.]*$
 /// ```
 ///
 /// [key]: <https://httpwg.org/specs/rfc9651.html#key>
@@ -22,7 +22,7 @@ pub struct Key(String);
 /// Keys must match the following regular expression:
 ///
 /// ```re
-/// ^[A-Za-z*][A-Za-z*0-9!#$%&'+\-.^_`|~]*$
+/// ^[a-z*][a-z*0-9_\-.]*$
 /// ```
 ///
 /// This type is to [`Key`] as [`str`] is to [`String`].
