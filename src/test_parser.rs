@@ -345,6 +345,10 @@ fn parse_display_string_errors() {
             (r#" %"%A"#, error::Repr::InvalidEscapeSequence(4)),
             (r#" %"%aA"#, error::Repr::InvalidEscapeSequence(5)),
             (r#" %"x%aa""#, error::Repr::InvalidUtf8InDisplayString(4)),
+            (
+                r#" %"%c3%bc%aa""#,
+                error::Repr::InvalidUtf8InDisplayString(9),
+            ),
         ],
     );
 }
