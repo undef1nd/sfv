@@ -73,7 +73,6 @@ impl<W: BorrowMut<String>> ItemSerializer<W> {
 
 /// Serializes parameters incrementally.
 #[derive(Debug)]
-#[must_use]
 pub struct ParameterSerializer<W> {
     buffer: W,
 }
@@ -82,6 +81,7 @@ impl<W: BorrowMut<String>> ParameterSerializer<W> {
     /// Serializes a parameter with the given name and value.
     ///
     /// Returns the serializer.
+    #[allow(clippy::return_self_not_must_use)]
     pub fn parameter<'b>(mut self, name: &KeyRef, value: impl Into<RefBareItem<'b>>) -> Self {
         serializer::serialize_parameter(name, value, self.buffer.borrow_mut());
         self
@@ -90,6 +90,7 @@ impl<W: BorrowMut<String>> ParameterSerializer<W> {
     /// Serializes the given parameters.
     ///
     /// Returns the serializer.
+    #[allow(clippy::return_self_not_must_use)]
     pub fn parameters<'b>(
         mut self,
         params: impl IntoIterator<Item = (impl AsRef<KeyRef>, impl Into<RefBareItem<'b>>)>,
@@ -218,12 +219,12 @@ impl<W: BorrowMut<String>> ListSerializer<W> {
         for value in members {
             match value {
                 ListEntry::Item(value) => {
-                    _ = self.bare_item(&value.bare_item).parameters(&value.params);
+                    self.bare_item(&value.bare_item).parameters(&value.params);
                 }
                 ListEntry::InnerList(value) => {
                     let mut ser = self.inner_list();
                     ser.items(&value.items);
-                    _ = ser.finish().parameters(&value.params);
+                    ser.finish().parameters(&value.params);
                 }
             }
         }
@@ -357,14 +358,13 @@ impl<W: BorrowMut<String>> DictSerializer<W> {
         for (name, value) in members {
             match value {
                 ListEntry::Item(value) => {
-                    _ = self
-                        .bare_item(name.as_ref(), &value.bare_item)
+                    self.bare_item(name.as_ref(), &value.bare_item)
                         .parameters(&value.params);
                 }
                 ListEntry::InnerList(value) => {
                     let mut ser = self.inner_list(name.as_ref());
                     ser.items(&value.items);
-                    _ = ser.finish().parameters(&value.params);
+                    ser.finish().parameters(&value.params);
                 }
             }
         }
@@ -424,11 +424,12 @@ impl<'a> InnerListSerializer<'a> {
     #[cfg(feature = "parsed-types")]
     pub fn items<'b>(&mut self, items: impl IntoIterator<Item = &'b Item>) {
         for item in items {
-            _ = self.bare_item(&item.bare_item).parameters(&item.params);
+            self.bare_item(&item.bare_item).parameters(&item.params);
         }
     }
 
     /// Closes the inner list and returns a serializer for its parameters.
+    #[must_use]
     #[allow(clippy::missing_panics_doc)]
     pub fn finish(mut self) -> ParameterSerializer<&'a mut String> {
         let buffer = self.buffer.take().unwrap();
