@@ -146,23 +146,22 @@ fn serializing_ref_list(c: &mut Criterion) {
     c.bench_function("serializing_ref_list", move |bench| {
         bench.iter(|| {
             let mut ser = ListSerializer::new();
-            _ = ser.bare_item(token_ref("a"));
-            _ = ser.bare_item(token_ref("abcdefghigklmnoprst"));
-            _ = ser.bare_item(integer(123_456_785_686_457));
-            _ = ser.bare_item(Decimal::from_integer_scaled_1000(integer(
+            ser.bare_item(token_ref("a"));
+            ser.bare_item(token_ref("abcdefghigklmnoprst"));
+            ser.bare_item(integer(123_456_785_686_457));
+            ser.bare_item(Decimal::from_integer_scaled_1000(integer(
                 99_999_999_999_999,
             )));
             _ = ser.inner_list();
             {
                 let mut ser = ser.inner_list();
-                _ = ser.bare_item(string_ref("somelongstringvalue"));
-                _ = ser
-                    .bare_item(string_ref("anotherlongstringvalue"))
+                ser.bare_item(string_ref("somelongstringvalue"));
+                ser.bare_item(string_ref("anotherlongstringvalue"))
                     .parameter(
                         key_ref("key"),
                         "somever longstringvaluerepresentedasbytes".as_bytes(),
                     );
-                _ = ser.bare_item(145);
+                ser.bare_item(145);
             }
             ser.finish()
         });
@@ -173,15 +172,14 @@ fn serializing_ref_dict(c: &mut Criterion) {
     c.bench_function("serializing_ref_dict", move |bench| {
         bench.iter(|| {
             let mut ser = DictSerializer::new();
-            _ = ser.bare_item(key_ref("a"), true);
-            _ = ser.bare_item(key_ref("dict_key2"), token_ref("abcdefghigklmnoprst"));
-            _ = ser.bare_item(key_ref("dict_key3"), integer(123_456_785_686_457));
+            ser.bare_item(key_ref("a"), true);
+            ser.bare_item(key_ref("dict_key2"), token_ref("abcdefghigklmnoprst"));
+            ser.bare_item(key_ref("dict_key3"), integer(123_456_785_686_457));
             {
                 let mut ser = ser.inner_list(key_ref("dict_key4"));
-                _ = ser.bare_item(string_ref("inner-list-member"));
-                _ = ser.bare_item("inner-list-member".as_bytes());
-                _ = ser
-                    .finish()
+                ser.bare_item(string_ref("inner-list-member"));
+                ser.bare_item("inner-list-member".as_bytes());
+                ser.finish()
                     .parameter(key_ref("key"), token_ref("aW5uZXItbGlzdC1wYXJhbWV0ZXJz"));
             }
             ser.finish()
