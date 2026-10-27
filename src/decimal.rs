@@ -159,12 +159,29 @@ impl TryFrom<f32> for Decimal {
 impl TryFrom<f64> for Decimal {
     type Error = Error;
 
+    #[allow(clippy::float_cmp)]
     fn try_from(v: f64) -> Result<Decimal, Error> {
         if v.is_nan() {
             return Err(error::Repr::NaN.into());
         }
 
-        let v = (v * 1000.0).round_ties_even();
+        // Exact decimal ties like 0.5015 and 2.0005 are not exact in binary
+        // floating point, so `v * 1000.0` can land 1 ULP below or above the
+        // half-integer midpoint (e.g. 501.49999999999994 or 2000.5000000000002).
+        // For all in-range decimals (`|v| < 10^12`), the candidate half-integer
+        // `midpoint = N + 0.5` and `1000.0` are both exact in `f64`, so IEEE 754
+        // division `midpoint / 1000.0` produces the exact same `f64` as the
+        // decimal tie `(N + 0.5) / 1000`. If it matches `v`, snap to `midpoint`
+        // before rounding ties to even.
+        // See https://github.com/httpwg/structured-field-tests/issues/113.
+        let scaled = v * 1000.0;
+        let midpoint = scaled.floor() + 0.5;
+        let v = if midpoint / 1000.0 == v {
+            midpoint
+        } else {
+            scaled
+        }
+        .round_ties_even();
         // Only excessively clever options exist for this conversion, so use "as"
         // Note that this relies on saturating casts for values > i64::MAX
         // See https://github.com/rust-lang/rust/issues/10184

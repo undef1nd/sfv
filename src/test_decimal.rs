@@ -98,6 +98,48 @@ fn test_try_from_f64() {
             Ok(Decimal::from_integer_scaled_1000(Integer::constant(-124))),
             -0.1236,
         ),
+        (
+            Ok(Decimal::from_integer_scaled_1000(Integer::constant(124))),
+            0.1245,
+        ),
+        (
+            Ok(Decimal::from_integer_scaled_1000(Integer::constant(-124))),
+            -0.1245,
+        ),
+        (
+            Ok(Decimal::from_integer_scaled_1000(Integer::constant(502))),
+            0.5015,
+        ),
+        (
+            Ok(Decimal::from_integer_scaled_1000(Integer::constant(-502))),
+            -0.5015,
+        ),
+        (
+            Ok(Decimal::from_integer_scaled_1000(Integer::constant(504))),
+            0.5035,
+        ),
+        (
+            Ok(Decimal::from_integer_scaled_1000(Integer::constant(-504))),
+            -0.5035,
+        ),
+        (
+            Ok(Decimal::from_integer_scaled_1000(Integer::constant(2000))),
+            2.0005,
+        ),
+        (
+            Ok(Decimal::from_integer_scaled_1000(Integer::constant(-2000))),
+            -2.0005,
+        ),
+        (Ok(Decimal::ZERO), 0.0005),
+        (Ok(Decimal::ZERO), -0.0005),
+        (
+            Ok(Decimal::from_integer_scaled_1000(Integer::constant(1))),
+            0.00051,
+        ),
+        (
+            Ok(Decimal::from_integer_scaled_1000(Integer::constant(-1))),
+            -0.00051,
+        ),
     ] {
         assert_eq!(expected.map_err(Error::from), Decimal::try_from(input));
     }
