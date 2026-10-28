@@ -10,10 +10,11 @@ use sfv::{
 };
 
 #[derive(Deserialize)]
-struct Test<C> {
+#[serde(bound = "")]
+struct Test<C: TestCase> {
     name: String,
     #[serde(flatten)]
-    header_type: ExpectedHeaderType,
+    header_type: ExpectedHeaderType<C>,
     #[serde(flatten)]
     case: C,
 }
@@ -34,13 +35,18 @@ struct ParseTestData {
     raw: Vec<String>,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "lowercase", tag = "header_type", content = "expected")]
+#[derive(Deserialize)]
+#[serde(
+    rename_all = "lowercase",
+    tag = "header_type",
+    content = "expected",
+    bound = ""
+)]
 // https://github.com/httpwg/structured-field-tests/blob/main/README.md#test-format
-enum ExpectedHeaderType {
-    Item(Option<ExpectedItem>),
-    List(Option<ExpectedList>),
-    Dictionary(Option<ExpectedDict>),
+enum ExpectedHeaderType<C: TestCase> {
+    Item(C::Expected<ExpectedItem>),
+    List(C::Expected<ExpectedList>),
+    Dictionary(C::Expected<ExpectedDict>),
 }
 
 #[derive(Debug, Deserialize)]
@@ -88,10 +94,14 @@ type ExpectedList = Vec<ExpectedListEntry>;
 type ExpectedDict = Vec<(String, ExpectedListEntry)>;
 
 trait TestCase: DeserializeOwned {
-    fn check<T: PartialEq + fmt::Debug + FieldType>(self, expected: Option<impl Build<T>>);
+    type Expected<T: DeserializeOwned>: DeserializeOwned;
+
+    fn check<T: PartialEq + fmt::Debug + FieldType>(self, expected: Self::Expected<impl Build<T>>);
 }
 
 impl TestCase for ParseTestData {
+    type Expected<T: DeserializeOwned> = Option<T>;
+
     fn check<T: PartialEq + fmt::Debug + FieldType>(self, expected: Option<impl Build<T>>) {
         let input = self.raw.join(", ");
 
@@ -123,8 +133,10 @@ impl TestCase for ParseTestData {
 }
 
 impl TestCase for TestData {
-    fn check<T: PartialEq + fmt::Debug + FieldType>(self, expected: Option<impl Build<T>>) {
-        match expected.expect("expected value should be present").build() {
+    type Expected<T: DeserializeOwned> = T;
+
+    fn check<T: PartialEq + fmt::Debug + FieldType>(self, expected: impl Build<T>) {
+        match expected.build() {
             Ok(value) => match value.serialize().into() {
                 Some(serialized) => {
                     assert!(!self.must_fail);
@@ -142,7 +154,7 @@ impl TestCase for TestData {
     }
 }
 
-trait Build<O> {
+trait Build<O>: DeserializeOwned {
     fn build(self) -> Result<O, sfv::Error>;
 }
 
