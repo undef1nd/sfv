@@ -25,13 +25,23 @@ struct TestData {
     must_fail: bool,
     #[serde(default)]
     can_fail: bool,
-    canonical: Option<Vec<String>>,
+    canonical: Option<[String; 1]>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum Canonical {
+    Empty([String; 0]),
+    Single([String; 1]),
 }
 
 #[derive(Debug, Deserialize)]
 struct ParseTestData {
-    #[serde(flatten)]
-    data: TestData,
+    #[serde(default)]
+    must_fail: bool,
+    #[serde(default)]
+    can_fail: bool,
+    canonical: Option<Canonical>,
     raw: Vec<String>,
 }
 
@@ -107,7 +117,7 @@ impl TestCase for ParseTestData {
 
         match Parser::new(&input).parse::<T>() {
             Ok(actual) => {
-                assert!(!self.data.must_fail);
+                assert!(!self.must_fail);
                 assert_eq!(
                     actual,
                     expected
@@ -120,14 +130,15 @@ impl TestCase for ParseTestData {
                 // If the canonical field is an empty list, the serialization should be
                 // omitted, which corresponds to `None` from `serialize`.
                 assert_eq!(
-                    actual.serialize().into().as_ref(),
-                    self.data
-                        .canonical
-                        .as_deref()
-                        .map_or(Some(&input), <[String]>::first),
+                    actual.serialize().into(),
+                    match self.canonical {
+                        None => Some(input),
+                        Some(Canonical::Empty([])) => None,
+                        Some(Canonical::Single([canonical])) => Some(canonical),
+                    },
                 );
             }
-            Err(_) => assert!(self.data.must_fail || self.data.can_fail),
+            Err(_) => assert!(self.must_fail || self.can_fail),
         }
     }
 }
@@ -140,12 +151,10 @@ impl TestCase for TestData {
             Ok(value) => match value.serialize().into() {
                 Some(serialized) => {
                     assert!(!self.must_fail);
-                    assert_eq!(
-                        serialized,
-                        self.canonical
-                            .as_ref()
-                            .expect("canonical serialization should be present")[0]
-                    );
+                    let [canonical] = self
+                        .canonical
+                        .expect("canonical serialization should be present");
+                    assert_eq!(serialized, canonical);
                 }
                 None => assert!(self.must_fail || self.can_fail),
             },
