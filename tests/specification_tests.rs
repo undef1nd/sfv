@@ -102,26 +102,17 @@ impl TestCase for ParseTestData {
                             .expect("build should succeed")
                     );
 
-                    let serialized: Option<String> = actual.serialize().into();
-
-                    match test_case.data.canonical {
-                        // If the canonical field is omitted, the canonical form is the input.
-                        None => {
-                            assert_eq!(serialized.expect("serialization should succeed"), input);
-                        }
-                        Some(ref canonical) => {
-                            // If the canonical field is an empty list, the serialization
-                            // should be omitted, which corresponds to `None` from `serialize`.
-                            if canonical.is_empty() {
-                                assert!(serialized.is_none());
-                            } else {
-                                assert_eq!(
-                                    serialized.expect("serialization should succeed"),
-                                    canonical[0]
-                                );
-                            }
-                        }
-                    }
+                    // If the canonical field is omitted, the canonical form is the input.
+                    // If the canonical field is an empty list, the serialization should be
+                    // omitted, which corresponds to `None` from `serialize`.
+                    assert_eq!(
+                        actual.serialize().into().as_ref(),
+                        test_case
+                            .data
+                            .canonical
+                            .as_deref()
+                            .map_or(Some(&input), <[String]>::first),
+                    );
                 }
                 Err(_) => assert!(test_case.data.must_fail || test_case.data.can_fail),
             }
