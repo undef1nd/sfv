@@ -10,8 +10,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  check:
-    name: Run check and clippy
+  stable:
+    name: Check, clippy, and test (stable)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,14 +26,14 @@ jobs:
       - run: cargo check --all-targets --no-default-features
       - run: cargo check --all-targets --all-features
       - run: cargo clippy --all-targets --all-features
+      - run: cargo test
+      - run: cargo run --example priority
 
   msrv:
     name: Check MSRV
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: 'true'
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: 1.95
@@ -41,44 +41,17 @@ jobs:
       - name: Build with MSRV
         run: cargo build
 
-  test:
-    name: Run tests
+  nightly:
+    name: Format and fuzz check (nightly)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: 'true'
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - run: cargo test
-      - run: cargo run --example priority
-
-  format:
-    name: Run fmt
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: 'true'
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: nightly
           components: rustfmt
-      - run: cargo fmt -- --check
-
-  fuzz-check:
-    name: Run fuzz check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly
           override: true
+      - run: cargo fmt -- --check
       - run: cargo install cargo-fuzz
       - run: cargo fuzz check
