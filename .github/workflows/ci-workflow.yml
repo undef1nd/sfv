@@ -14,14 +14,12 @@ jobs:
     name: Check, clippy, and test (stable)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: 'true'
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          profile: minimal
-          toolchain: stable
-          override: true
+          components: clippy
       - run: cargo check --all-targets
       - run: cargo check --all-targets --no-default-features
       - run: cargo check --all-targets --all-features
@@ -33,11 +31,10 @@ jobs:
     name: Check MSRV
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.95
-          override: true
       - name: Build with MSRV
         run: cargo build
 
@@ -45,13 +42,10 @@ jobs:
     name: Format and fuzz check (nightly)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@nightly
         with:
-          profile: minimal
-          toolchain: nightly
           components: rustfmt
-          override: true
       - run: cargo fmt -- --check
       - run: cargo install cargo-fuzz
       - run: cargo fuzz check
