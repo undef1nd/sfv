@@ -144,3 +144,109 @@ fn test_try_from_f64() {
         assert_eq!(expected.map_err(Error::from), Decimal::try_from(input));
     }
 }
+
+#[test]
+fn test_from_integer() {
+    let expected = Decimal::from_integer_scaled_1000(Integer::constant(123_000));
+    assert_eq!(Decimal::from(123_i8), expected);
+    assert_eq!(Decimal::from(123_i16), expected);
+    assert_eq!(Decimal::from(123_i32), expected);
+    assert_eq!(Decimal::try_from(123_i64), Ok(expected));
+    assert_eq!(Decimal::try_from(123_i128), Ok(expected));
+    assert_eq!(Decimal::try_from(123_isize), Ok(expected));
+
+    assert_eq!(Decimal::from(123_u8), expected);
+    assert_eq!(Decimal::from(123_u16), expected);
+    assert_eq!(Decimal::from(123_u32), expected);
+    assert_eq!(Decimal::try_from(123_u64), Ok(expected));
+    assert_eq!(Decimal::try_from(123_u128), Ok(expected));
+    assert_eq!(Decimal::try_from(123_usize), Ok(expected));
+    assert_eq!(Decimal::try_from(Integer::constant(123)), Ok(expected));
+
+    let expected_neg = Decimal::from_integer_scaled_1000(Integer::constant(-123_000));
+    assert_eq!(Decimal::from(-123_i8), expected_neg);
+    assert_eq!(Decimal::from(-123_i16), expected_neg);
+    assert_eq!(Decimal::from(-123_i32), expected_neg);
+    assert_eq!(Decimal::try_from(-123_i64), Ok(expected_neg));
+    assert_eq!(Decimal::try_from(-123_i128), Ok(expected_neg));
+    assert_eq!(Decimal::try_from(-123_isize), Ok(expected_neg));
+    assert_eq!(Decimal::try_from(Integer::constant(-123)), Ok(expected_neg));
+
+    assert_eq!(
+        Decimal::from(i8::MIN),
+        Decimal::from_integer_scaled_1000(Integer::constant(-128_000)),
+    );
+    assert_eq!(
+        Decimal::from(i8::MAX),
+        Decimal::from_integer_scaled_1000(Integer::constant(127_000)),
+    );
+    assert_eq!(
+        Decimal::from(i16::MIN),
+        Decimal::from_integer_scaled_1000(Integer::constant(-32_768_000)),
+    );
+    assert_eq!(
+        Decimal::from(i16::MAX),
+        Decimal::from_integer_scaled_1000(Integer::constant(32_767_000)),
+    );
+    assert_eq!(
+        Decimal::from(i32::MIN),
+        Decimal::from_integer_scaled_1000(Integer::constant(-2_147_483_648_000)),
+    );
+    assert_eq!(
+        Decimal::from(i32::MAX),
+        Decimal::from_integer_scaled_1000(Integer::constant(2_147_483_647_000)),
+    );
+
+    assert_eq!(Decimal::from(u8::MIN), Decimal::ZERO);
+    assert_eq!(
+        Decimal::from(u8::MAX),
+        Decimal::from_integer_scaled_1000(Integer::constant(255_000)),
+    );
+    assert_eq!(Decimal::from(u16::MIN), Decimal::ZERO);
+    assert_eq!(
+        Decimal::from(u16::MAX),
+        Decimal::from_integer_scaled_1000(Integer::constant(65_535_000)),
+    );
+    assert_eq!(Decimal::from(u32::MIN), Decimal::ZERO);
+    assert_eq!(
+        Decimal::from(u32::MAX),
+        Decimal::from_integer_scaled_1000(Integer::constant(4_294_967_295_000)),
+    );
+
+    assert_eq!(
+        Decimal::try_from(-999_999_999_999_i64),
+        Ok(Decimal::from_integer_scaled_1000(Integer::constant(
+            -999_999_999_999_000
+        ))),
+    );
+    assert_eq!(
+        Decimal::try_from(999_999_999_999_i64),
+        Ok(Decimal::from_integer_scaled_1000(Integer::constant(
+            999_999_999_999_000
+        ))),
+    );
+    assert_eq!(
+        Decimal::try_from(-1_000_000_000_000_i64),
+        Err(error::Repr::OutOfRange.into()),
+    );
+    assert_eq!(
+        Decimal::try_from(1_000_000_000_000_i64),
+        Err(error::Repr::OutOfRange.into()),
+    );
+    assert_eq!(
+        Decimal::try_from(i64::MIN),
+        Err(error::Repr::OutOfRange.into()),
+    );
+    assert_eq!(
+        Decimal::try_from(i64::MAX),
+        Err(error::Repr::OutOfRange.into()),
+    );
+    assert_eq!(
+        Decimal::try_from(Integer::MIN),
+        Err(error::Repr::OutOfRange.into()),
+    );
+    assert_eq!(
+        Decimal::try_from(Integer::MAX),
+        Err(error::Repr::OutOfRange.into()),
+    );
+}

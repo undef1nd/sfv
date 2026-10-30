@@ -76,22 +76,25 @@ impl fmt::Display for Decimal {
     }
 }
 
-impl From<i8> for Decimal {
-    fn from(v: i8) -> Decimal {
-        Self(Integer::from(i16::from(v) * 1000))
+macro_rules! impl_from_integer {
+    ($($from: ty,)+) => {
+        $(
+            impl From<$from> for Decimal {
+                fn from(v: $from) -> Decimal {
+                    Self(Integer::from_validated_i64(i64::from(v) * 1000))
+                }
+            }
+        )+
     }
 }
 
-impl From<i16> for Decimal {
-    fn from(v: i16) -> Decimal {
-        Self(Integer::from(i32::from(v) * 1000))
-    }
-}
-
-impl From<i32> for Decimal {
-    fn from(v: i32) -> Decimal {
-        Self(Integer::try_from(i64::from(v) * 1000).unwrap())
-    }
+impl_from_integer! {
+    i8,
+    i16,
+    i32,
+    u8,
+    u16,
+    u32,
 }
 
 macro_rules! impl_try_from_integer {
@@ -118,24 +121,6 @@ impl_try_from_integer! {
     u64,
     u128,
     usize,
-}
-
-impl From<u8> for Decimal {
-    fn from(v: u8) -> Decimal {
-        Self(Integer::from(u16::from(v) * 1000))
-    }
-}
-
-impl From<u16> for Decimal {
-    fn from(v: u16) -> Decimal {
-        Self(Integer::from(u32::from(v) * 1000))
-    }
-}
-
-impl From<u32> for Decimal {
-    fn from(v: u32) -> Decimal {
-        Self(Integer::try_from(u64::from(v) * 1000).unwrap())
-    }
 }
 
 impl From<Decimal> for f64 {

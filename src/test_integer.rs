@@ -48,5 +48,24 @@ fn test_conversions() -> Result<(), Error> {
     assert!(u128::try_from(Integer::constant(-123)).is_err());
     assert!(usize::try_from(Integer::constant(-123)).is_err());
 
+    assert_eq!(Integer::from(i8::MIN), Integer::constant(-128));
+    assert_eq!(Integer::from(i8::MAX), Integer::constant(127));
+    assert_eq!(Integer::from(i16::MIN), Integer::constant(-32_768));
+    assert_eq!(Integer::from(i16::MAX), Integer::constant(32_767));
+    assert_eq!(Integer::from(i32::MIN), Integer::constant(-2_147_483_648));
+    assert_eq!(Integer::from(i32::MAX), Integer::constant(2_147_483_647));
+
+    assert_eq!(Integer::from(u8::MIN), Integer::ZERO);
+    assert_eq!(Integer::from(u8::MAX), Integer::constant(255));
+    assert_eq!(Integer::from(u16::MIN), Integer::ZERO);
+    assert_eq!(Integer::from(u16::MAX), Integer::constant(65_535));
+    assert_eq!(Integer::from(u32::MIN), Integer::ZERO);
+    assert_eq!(Integer::from(u32::MAX), Integer::constant(4_294_967_295));
+
+    assert_eq!(i64::from(Integer::MIN), -999_999_999_999_999);
+    assert_eq!(i64::from(Integer::MAX), 999_999_999_999_999);
+    assert_eq!(i128::from(Integer::MIN), -999_999_999_999_999);
+    assert_eq!(i128::from(Integer::MAX), 999_999_999_999_999);
+
     Ok(())
 }
