@@ -247,20 +247,6 @@ impl Borrow<str> for StringRef {
     }
 }
 
-#[cfg(feature = "arbitrary")]
-impl<'a> arbitrary::Arbitrary<'a> for &'a StringRef {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        StringRef::from_str(<&str>::arbitrary(u)?).map_err(|_| arbitrary::Error::IncorrectFormat)
-    }
-}
-
-#[cfg(feature = "arbitrary")]
-impl<'a> arbitrary::Arbitrary<'a> for String {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        <&StringRef>::arbitrary(u).map(ToOwned::to_owned)
-    }
-}
-
 impl Default for &StringRef {
     fn default() -> Self {
         StringRef::EMPTY
