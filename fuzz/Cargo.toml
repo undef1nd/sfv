@@ -16,22 +16,8 @@ path = ".."
 features = ["arbitrary"]
 
 [[bin]]
-name = "parse_dictionary"
-path = "fuzz_targets/parse_dictionary.rs"
-test = false
-doc = false
-bench = false
-
-[[bin]]
-name = "parse_list"
-path = "fuzz_targets/parse_list.rs"
-test = false
-doc = false
-bench = false
-
-[[bin]]
-name = "parse_item"
-path = "fuzz_targets/parse_item.rs"
+name = "parse"
+path = "fuzz_targets/parse.rs"
 test = false
 doc = false
 bench = false
