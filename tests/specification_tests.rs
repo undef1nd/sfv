@@ -104,18 +104,23 @@ type ExpectedList = Vec<ExpectedListEntry>;
 type ExpectedDict = Vec<(String, ExpectedListEntry)>;
 
 trait TestCase: DeserializeOwned {
-    type Expected<T: DeserializeOwned>: DeserializeOwned;
+    type Expected<E: Build>: DeserializeOwned;
 
-    fn check<T: PartialEq + fmt::Debug + FieldType>(self, expected: Self::Expected<impl Build<T>>);
+    fn check<E: Build>(self, expected: Self::Expected<E>)
+    where
+        E::Output: PartialEq + fmt::Debug + FieldType;
 }
 
 impl TestCase for ParseTestData {
-    type Expected<T: DeserializeOwned> = Option<T>;
+    type Expected<E: Build> = Option<E>;
 
-    fn check<T: PartialEq + fmt::Debug + FieldType>(self, expected: Option<impl Build<T>>) {
+    fn check<E: Build>(self, expected: Option<E>)
+    where
+        E::Output: PartialEq + fmt::Debug + FieldType,
+    {
         let input = self.raw.join(", ");
 
-        match Parser::new(&input).parse::<T>() {
+        match Parser::new(&input).parse::<E::Output>() {
             Ok(actual) => {
                 assert!(!self.must_fail);
                 assert_eq!(
@@ -144,9 +149,12 @@ impl TestCase for ParseTestData {
 }
 
 impl TestCase for TestData {
-    type Expected<T: DeserializeOwned> = T;
+    type Expected<E: Build> = E;
 
-    fn check<T: PartialEq + fmt::Debug + FieldType>(self, expected: impl Build<T>) {
+    fn check<E: Build>(self, expected: E)
+    where
+        E::Output: PartialEq + fmt::Debug + FieldType,
+    {
         match expected.build() {
             Ok(value) => match value.serialize().into() {
                 Some(serialized) => {
@@ -163,11 +171,15 @@ impl TestCase for TestData {
     }
 }
 
-trait Build<O>: DeserializeOwned {
-    fn build(self) -> Result<O, sfv::Error>;
+trait Build: DeserializeOwned {
+    type Output;
+
+    fn build(self) -> Result<Self::Output, sfv::Error>;
 }
 
-impl Build<ListEntry> for ExpectedListEntry {
+impl Build for ExpectedListEntry {
+    type Output = ListEntry;
+
     fn build(self) -> Result<ListEntry, sfv::Error> {
         match self {
             Self::Item(value) => value.build().map(ListEntry::from),
@@ -176,7 +188,9 @@ impl Build<ListEntry> for ExpectedListEntry {
     }
 }
 
-impl Build<Dictionary> for ExpectedDict {
+impl Build for ExpectedDict {
+    type Output = Dictionary;
+
     fn build(self) -> Result<Dictionary, sfv::Error> {
         let mut dict = Dictionary::new();
         for (key, value) in self {
@@ -188,26 +202,32 @@ impl Build<Dictionary> for ExpectedDict {
     }
 }
 
-impl Build<List> for ExpectedList {
+impl Build for ExpectedList {
+    type Output = List;
+
     fn build(self) -> Result<List, sfv::Error> {
         self.into_iter().map(Build::build).collect()
     }
 }
 
-impl Build<InnerList> for ExpectedInnerList {
+impl Build for ExpectedInnerList {
+    type Output = InnerList;
+
     fn build(self) -> Result<InnerList, sfv::Error> {
         Ok(InnerList {
             items: self
                 .0
                 .into_iter()
                 .map(Build::build)
-                .collect::<Result<Vec<Item>, sfv::Error>>()?,
+                .collect::<Result<_, _>>()?,
             params: self.1.build()?,
         })
     }
 }
 
-impl Build<Item> for ExpectedItem {
+impl Build for ExpectedItem {
+    type Output = Item;
+
     fn build(self) -> Result<Item, sfv::Error> {
         Ok(Item {
             bare_item: self.0.build()?,
@@ -216,7 +236,9 @@ impl Build<Item> for ExpectedItem {
     }
 }
 
-impl Build<BareItem> for ExpectedBareItem {
+impl Build for ExpectedBareItem {
+    type Output = BareItem;
+
     fn build(self) -> Result<BareItem, sfv::Error> {
         Ok(match self {
             Self::Integer(value) => value.try_into()?,
@@ -231,7 +253,9 @@ impl Build<BareItem> for ExpectedBareItem {
     }
 }
 
-impl Build<Parameters> for ExpectedParameters {
+impl Build for ExpectedParameters {
+    type Output = Parameters;
+
     fn build(self) -> Result<Parameters, sfv::Error> {
         let mut parameters = Parameters::new();
         for (key, value) in self {
