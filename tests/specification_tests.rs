@@ -1,13 +1,11 @@
 use std::{env, error::Error, fmt, fs, io, path::Path};
 
+use indexmap::IndexMap;
 use serde::{
     Deserialize, Deserializer,
     de::{self, DeserializeOwned},
 };
-use sfv::{
-    BareItem, Date, Dictionary, FieldType, InnerList, Item, Key, List, ListEntry, Parameters,
-    Parser,
-};
+use sfv::{BareItem, Date, FieldType, InnerList, Item, Key, ListEntry, Parser};
 
 #[derive(Deserialize)]
 #[serde(bound = "")]
@@ -285,6 +283,24 @@ trait Build: DeserializeOwned {
     fn build(self) -> Result<Self::Output, sfv::Error>;
 }
 
+impl<T: Build> Build for Vec<(String, T)> {
+    type Output = IndexMap<Key, T::Output>;
+
+    fn build(self) -> Result<Self::Output, sfv::Error> {
+        self.into_iter()
+            .map(|(key, value)| Ok((Key::try_from(key)?, value.build()?)))
+            .collect()
+    }
+}
+
+impl<T: Build> Build for Vec<T> {
+    type Output = Vec<T::Output>;
+
+    fn build(self) -> Result<Self::Output, sfv::Error> {
+        self.into_iter().map(Build::build).collect()
+    }
+}
+
 impl Build for ExpectedListEntry {
     type Output = ListEntry;
 
@@ -296,38 +312,12 @@ impl Build for ExpectedListEntry {
     }
 }
 
-impl Build for ExpectedDict {
-    type Output = Dictionary;
-
-    fn build(self) -> Result<Dictionary, sfv::Error> {
-        let mut dict = Dictionary::new();
-        for (key, value) in self {
-            let key = Key::try_from(key)?;
-            let value = value.build()?;
-            dict.insert(key, value);
-        }
-        Ok(dict)
-    }
-}
-
-impl Build for ExpectedList {
-    type Output = List;
-
-    fn build(self) -> Result<List, sfv::Error> {
-        self.into_iter().map(Build::build).collect()
-    }
-}
-
 impl Build for ExpectedInnerList {
     type Output = InnerList;
 
     fn build(self) -> Result<InnerList, sfv::Error> {
         Ok(InnerList {
-            items: self
-                .0
-                .into_iter()
-                .map(Build::build)
-                .collect::<Result<_, _>>()?,
+            items: self.0.build()?,
             params: self.1.build()?,
         })
     }
@@ -358,20 +348,6 @@ impl Build for ExpectedBareItem {
             Self::Date(value) => Date::from_unix_seconds(value.try_into()?).into(),
             Self::DisplayString(value) => BareItem::DisplayString(value),
         })
-    }
-}
-
-impl Build for ExpectedParameters {
-    type Output = Parameters;
-
-    fn build(self) -> Result<Parameters, sfv::Error> {
-        let mut parameters = Parameters::new();
-        for (key, value) in self {
-            let key = Key::try_from(key)?;
-            let value = value.build()?;
-            parameters.insert(key, value);
-        }
-        Ok(parameters)
     }
 }
 
