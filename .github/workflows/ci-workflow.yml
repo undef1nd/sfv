@@ -39,7 +39,7 @@ jobs:
         run: cargo build
 
   nightly:
-    name: Format and fuzz check (nightly)
+    name: Format and fuzz (nightly)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -48,4 +48,8 @@ jobs:
           components: rustfmt
       - run: cargo fmt -- --check
       - run: cargo install cargo-fuzz
-      - run: cargo fuzz check
+      - run: cargo fuzz build
+      - run: |
+          for target in $(cargo fuzz list); do
+            cargo fuzz run "$target" -- -max_total_time=5 -verbosity=0 -print_funcs=0
+          done
