@@ -1,37 +1,104 @@
 use std::{env, error::Error, fmt, fs, io, path::Path};
 
-use serde::{Deserialize, Deserializer, de};
-use sfv::{
-    BareItem, Date, Dictionary, FieldType, InnerList, Item, Key, List, ListEntry, Parameters,
-    Parser,
+use indexmap::IndexMap;
+use serde::{
+    Deserialize, Deserializer,
+    de::{self, DeserializeOwned},
 };
+use sfv::{BareItem, Date, FieldType, InnerList, Item, Key, ListEntry, Parser};
 
-#[derive(Debug, Deserialize)]
-struct TestData {
+#[derive(Deserialize)]
+#[serde(bound = "")]
+struct RawTest<C: TestCase> {
     name: String,
     #[serde(flatten)]
-    header_type: ExpectedHeaderType,
+    header_type: HeaderType<
+        C::RawExpected<ExpectedItem>,
+        C::RawExpected<ExpectedList>,
+        C::RawExpected<ExpectedDict>,
+    >,
     #[serde(default)]
     must_fail: bool,
     #[serde(default)]
     can_fail: bool,
-    canonical: Option<Vec<String>>,
+    canonical: Option<C::RawCanonical>,
+    #[serde(flatten)]
+    case: C,
+}
+
+#[derive(Deserialize)]
+#[serde(try_from = "RawTest<C>", bound = "")]
+struct Test<C: TestCase> {
+    name: String,
+    header_type: HeaderType<
+        C::Validated<ExpectedItem>,
+        C::Validated<ExpectedList>,
+        C::Validated<ExpectedDict>,
+    >,
+    case: C,
+}
+
+impl<C: TestCase> TryFrom<RawTest<C>> for Test<C> {
+    type Error = Box<dyn Error>;
+
+    fn try_from(raw: RawTest<C>) -> Result<Self, Self::Error> {
+        let expectation = if raw.must_fail {
+            if raw.can_fail {
+                return Err("must_fail and can_fail cannot both be true".into());
+            }
+            if raw.canonical.is_some() {
+                return Err("canonical should be omitted when must_fail is true".into());
+            }
+            Expectation::MustFail
+        } else {
+            Expectation::Valid {
+                expected: raw.canonical,
+                can_fail: raw.can_fail,
+            }
+        };
+
+        let header_type = match raw.header_type {
+            HeaderType::Item(expected) => HeaderType::Item(C::validate(expectation, expected)?),
+            HeaderType::List(expected) => HeaderType::List(C::validate(expectation, expected)?),
+            HeaderType::Dictionary(expected) => {
+                HeaderType::Dictionary(C::validate(expectation, expected)?)
+            }
+        };
+        Ok(Self {
+            name: raw.name,
+            header_type,
+            case: raw.case,
+        })
+    }
+}
+
+enum Expectation<T> {
+    MustFail,
+    Valid { expected: T, can_fail: bool },
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum Canonical {
+    Empty([String; 0]),
+    Single([String; 1]),
 }
 
 #[derive(Debug, Deserialize)]
 struct ParseTestData {
-    #[serde(flatten)]
-    data: TestData,
     raw: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
+struct SerializeTestData {}
+
+#[derive(Deserialize)]
 #[serde(rename_all = "lowercase", tag = "header_type", content = "expected")]
 // https://github.com/httpwg/structured-field-tests/blob/main/README.md#test-format
-enum ExpectedHeaderType {
-    Item(Option<ExpectedItem>),
-    List(Option<ExpectedList>),
-    Dictionary(Option<ExpectedDict>),
+enum HeaderType<I, L, D> {
+    Item(I),
+    List(L),
+    Dictionary(D),
 }
 
 #[derive(Debug, Deserialize)]
@@ -78,116 +145,165 @@ type ExpectedList = Vec<ExpectedListEntry>;
 
 type ExpectedDict = Vec<(String, ExpectedListEntry)>;
 
-trait TestCase: for<'de> Deserialize<'de> {
-    fn run(self);
+trait TestCase: DeserializeOwned {
+    type RawCanonical: DeserializeOwned;
+    type RawExpected<E: Build>: DeserializeOwned;
+    type Validated<E: Build>;
+
+    fn validate<E: Build>(
+        expectation: Expectation<Option<Self::RawCanonical>>,
+        expected: Self::RawExpected<E>,
+    ) -> Result<Self::Validated<E>, Box<dyn Error>>
+    where
+        E::Output: PartialEq + fmt::Debug + FieldType;
+
+    fn check<E: Build>(self, validated: Self::Validated<E>)
+    where
+        E::Output: PartialEq + fmt::Debug + FieldType;
 }
 
 impl TestCase for ParseTestData {
-    fn run(mut self) {
-        fn check<T: PartialEq + fmt::Debug + FieldType>(
-            test_case: &ParseTestData,
-            expected: Option<impl Build<T>>,
-        ) {
-            println!("- {}", test_case.data.name);
-            let input = test_case.raw.join(", ");
+    type RawCanonical = Canonical;
+    type RawExpected<E: Build> = Option<E>;
+    type Validated<E: Build> = Expectation<(E::Output, Option<Canonical>)>;
 
-            match Parser::new(&input).parse::<T>() {
-                Ok(actual) => {
-                    assert!(!test_case.data.must_fail);
-                    assert_eq!(
-                        actual,
-                        expected
-                            .expect("expected value should be present")
-                            .build()
-                            .expect("build should succeed")
-                    );
-
-                    let serialized: Option<String> = actual.serialize().into();
-
-                    match test_case.data.canonical {
-                        // If the canonical field is omitted, the canonical form is the input.
-                        None => {
-                            assert_eq!(serialized.expect("serialization should succeed"), input);
-                        }
-                        Some(ref canonical) => {
-                            // If the canonical field is an empty list, the serialization
-                            // should be omitted, which corresponds to `None` from `serialize`.
-                            if canonical.is_empty() {
-                                assert!(serialized.is_none());
-                            } else {
-                                assert_eq!(
-                                    serialized.expect("serialization should succeed"),
-                                    canonical[0]
-                                );
-                            }
-                        }
-                    }
+    fn validate<E: Build>(
+        expectation: Expectation<Option<Canonical>>,
+        expected: Option<E>,
+    ) -> Result<Self::Validated<E>, Box<dyn Error>>
+    where
+        E::Output: PartialEq + fmt::Debug + FieldType,
+    {
+        match expectation {
+            Expectation::MustFail => {
+                if expected.is_some() {
+                    return Err("expected should be omitted when must_fail is true".into());
                 }
-                Err(_) => assert!(test_case.data.must_fail || test_case.data.can_fail),
+                Ok(Expectation::MustFail)
+            }
+            Expectation::Valid {
+                expected: canonical,
+                can_fail,
+            } => {
+                let expected = expected
+                    .ok_or("expected value should be present")?
+                    .build()?;
+                Ok(Expectation::Valid {
+                    expected: (expected, canonical),
+                    can_fail,
+                })
             }
         }
+    }
 
-        match self.data.header_type {
-            ExpectedHeaderType::Item(ref mut expected) => {
-                let expected = expected.take();
-                check(&self, expected);
-            }
-            ExpectedHeaderType::List(ref mut expected) => {
-                let expected = expected.take();
-                check(&self, expected);
-            }
-            ExpectedHeaderType::Dictionary(ref mut expected) => {
-                let expected = expected.take();
-                check(&self, expected);
-            }
+    fn check<E: Build>(self, expectation: Self::Validated<E>)
+    where
+        E::Output: PartialEq + fmt::Debug + FieldType,
+    {
+        let input = self.raw.join(", ");
+        let parsed = Parser::new(&input).parse::<E::Output>();
+
+        match expectation {
+            Expectation::MustFail => assert!(parsed.is_err()),
+            Expectation::Valid {
+                expected: (expected, canonical),
+                can_fail,
+            } => match parsed {
+                Ok(actual) => {
+                    assert_eq!(actual, expected);
+
+                    // If the canonical field is omitted, the canonical form is the input.
+                    // If the canonical field is an empty list, the serialization should be
+                    // omitted, which corresponds to `None` from `serialize`.
+                    assert_eq!(
+                        actual.serialize().into(),
+                        match canonical {
+                            None => Some(input),
+                            Some(Canonical::Empty([])) => None,
+                            Some(Canonical::Single([canonical])) => Some(canonical),
+                        },
+                    );
+                }
+                Err(_) => assert!(can_fail),
+            },
         }
     }
 }
 
-impl TestCase for TestData {
-    fn run(mut self) {
-        fn check<T: FieldType>(test_case: &TestData, value: Option<impl Build<T>>) {
-            println!("- {}", test_case.name);
-            match value.expect("expected value should be present").build() {
-                Ok(value) => match value.serialize().into() {
-                    Some(serialized) => {
-                        assert!(!test_case.must_fail);
-                        assert_eq!(
-                            serialized,
-                            test_case
-                                .canonical
-                                .as_ref()
-                                .expect("canonical serialization should be present")[0]
-                        );
-                    }
-                    None => assert!(test_case.must_fail || test_case.can_fail),
-                },
-                Err(_) => assert!(test_case.must_fail || test_case.can_fail),
-            }
-        }
+impl TestCase for SerializeTestData {
+    type RawCanonical = [String; 1];
+    type RawExpected<E: Build> = E;
+    type Validated<E: Build> = (E, Expectation<String>);
 
-        match self.header_type {
-            ExpectedHeaderType::Item(ref mut expected) => {
-                let expected = expected.take();
-                check(&self, expected);
+    fn validate<E: Build>(
+        expectation: Expectation<Option<[String; 1]>>,
+        expected: E,
+    ) -> Result<Self::Validated<E>, Box<dyn Error>>
+    where
+        E::Output: PartialEq + fmt::Debug + FieldType,
+    {
+        let expectation = match expectation {
+            Expectation::MustFail => Expectation::MustFail,
+            Expectation::Valid {
+                expected: canonical,
+                can_fail,
+            } => {
+                let [canonical] = canonical.ok_or("canonical serialization should be present")?;
+                Expectation::Valid {
+                    expected: canonical,
+                    can_fail,
+                }
             }
-            ExpectedHeaderType::List(ref mut expected) => {
-                let expected = expected.take();
-                check(&self, expected);
-            }
-            ExpectedHeaderType::Dictionary(ref mut expected) => {
-                let expected = expected.take();
-                check(&self, expected);
-            }
+        };
+        Ok((expected, expectation))
+    }
+
+    fn check<E: Build>(self, (expected, expectation): Self::Validated<E>)
+    where
+        E::Output: PartialEq + fmt::Debug + FieldType,
+    {
+        let serialized = expected.build().ok().and_then(|v| v.serialize().into());
+
+        match expectation {
+            Expectation::MustFail => assert!(serialized.is_none()),
+            Expectation::Valid {
+                expected: canonical,
+                can_fail,
+            } => match serialized {
+                Some(serialized) => assert_eq!(serialized, canonical),
+                None => assert!(can_fail),
+            },
         }
     }
 }
 
-trait Build<O> {
-    fn build(self) -> Result<O, sfv::Error>;
+trait Build: DeserializeOwned {
+    type Output;
+
+    fn build(self) -> Result<Self::Output, sfv::Error>;
 }
 
-impl Build<ListEntry> for ExpectedListEntry {
+impl<T: Build> Build for Vec<(String, T)> {
+    type Output = IndexMap<Key, T::Output>;
+
+    fn build(self) -> Result<Self::Output, sfv::Error> {
+        self.into_iter()
+            .map(|(key, value)| Ok((Key::try_from(key)?, value.build()?)))
+            .collect()
+    }
+}
+
+impl<T: Build> Build for Vec<T> {
+    type Output = Vec<T::Output>;
+
+    fn build(self) -> Result<Self::Output, sfv::Error> {
+        self.into_iter().map(Build::build).collect()
+    }
+}
+
+impl Build for ExpectedListEntry {
+    type Output = ListEntry;
+
     fn build(self) -> Result<ListEntry, sfv::Error> {
         match self {
             Self::Item(value) => value.build().map(ListEntry::from),
@@ -196,38 +312,20 @@ impl Build<ListEntry> for ExpectedListEntry {
     }
 }
 
-impl Build<Dictionary> for ExpectedDict {
-    fn build(self) -> Result<Dictionary, sfv::Error> {
-        let mut dict = Dictionary::new();
-        for (key, value) in self {
-            let key = Key::try_from(key)?;
-            let value = value.build()?;
-            dict.insert(key, value);
-        }
-        Ok(dict)
-    }
-}
+impl Build for ExpectedInnerList {
+    type Output = InnerList;
 
-impl Build<List> for ExpectedList {
-    fn build(self) -> Result<List, sfv::Error> {
-        self.into_iter().map(Build::build).collect()
-    }
-}
-
-impl Build<InnerList> for ExpectedInnerList {
     fn build(self) -> Result<InnerList, sfv::Error> {
         Ok(InnerList {
-            items: self
-                .0
-                .into_iter()
-                .map(Build::build)
-                .collect::<Result<Vec<Item>, sfv::Error>>()?,
+            items: self.0.build()?,
             params: self.1.build()?,
         })
     }
 }
 
-impl Build<Item> for ExpectedItem {
+impl Build for ExpectedItem {
+    type Output = Item;
+
     fn build(self) -> Result<Item, sfv::Error> {
         Ok(Item {
             bare_item: self.0.build()?,
@@ -236,7 +334,9 @@ impl Build<Item> for ExpectedItem {
     }
 }
 
-impl Build<BareItem> for ExpectedBareItem {
+impl Build for ExpectedBareItem {
+    type Output = BareItem;
+
     fn build(self) -> Result<BareItem, sfv::Error> {
         Ok(match self {
             Self::Integer(value) => value.try_into()?,
@@ -251,18 +351,6 @@ impl Build<BareItem> for ExpectedBareItem {
     }
 }
 
-impl Build<Parameters> for ExpectedParameters {
-    fn build(self) -> Result<Parameters, sfv::Error> {
-        let mut parameters = Parameters::new();
-        for (key, value) in self {
-            let key = Key::try_from(key)?;
-            let value = value.build()?;
-            parameters.insert(key, value);
-        }
-        Ok(parameters)
-    }
-}
-
 fn run_tests<T: TestCase>(dir_path: impl AsRef<Path>) -> Result<(), Box<dyn Error>> {
     for entry in fs::read_dir(env::current_dir()?.join(dir_path))? {
         let entry = entry?;
@@ -273,11 +361,16 @@ fn run_tests<T: TestCase>(dir_path: impl AsRef<Path>) -> Result<(), Box<dyn Erro
 
         println!("\n## Test suite file: {}\n", entry.file_name().display());
 
-        let test_cases: Vec<T> =
+        let tests: Vec<Test<T>> =
             serde_json::from_reader(io::BufReader::new(fs::File::open(entry.path())?))?;
 
-        for test_case in test_cases {
-            test_case.run();
+        for test in tests {
+            println!("- {}", test.name);
+            match test.header_type {
+                HeaderType::Item(validated) => test.case.check(validated),
+                HeaderType::List(validated) => test.case.check(validated),
+                HeaderType::Dictionary(validated) => test.case.check(validated),
+            }
         }
     }
     Ok(())
@@ -290,5 +383,5 @@ fn run_spec_parse_serialize_tests() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn run_spec_serialize_only_tests() -> Result<(), Box<dyn Error>> {
-    run_tests::<TestData>("tests/spec_tests/serialisation-tests")
+    run_tests::<SerializeTestData>("tests/spec_tests/serialisation-tests")
 }
