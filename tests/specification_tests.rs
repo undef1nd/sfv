@@ -1,6 +1,6 @@
 use std::{env, error::Error, fmt, fs, io, path::Path};
 
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer, de};
 use sfv::{
     BareItem, Date, Dictionary, FieldType, InnerList, Item, Key, List, ListEntry, Parameters,
     Parser,
@@ -37,8 +37,8 @@ enum ExpectedHeaderType {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "__type", content = "value")]
 enum ExpectedBareItem {
-    #[serde(rename = "binary")]
-    ByteSequence(String),
+    #[serde(rename = "binary", deserialize_with = "deserialize_base32")]
+    ByteSequence(Vec<u8>),
     #[serde(rename = "token")]
     Token(String),
     #[serde(rename = "date")]
@@ -53,6 +53,12 @@ enum ExpectedBareItem {
     Decimal(f64),
     #[serde(untagged)]
     String(String),
+}
+
+fn deserialize_base32<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<u8>, D::Error> {
+    let str = String::deserialize(deserializer)?;
+    base32::decode(base32::Alphabet::Rfc4648 { padding: true }, &str)
+        .ok_or_else(|| de::Error::custom("invalid base32"))
 }
 
 type ExpectedParameters = Vec<(String, ExpectedBareItem)>;
@@ -178,11 +184,11 @@ impl TestCase for TestData {
 }
 
 trait Build<O> {
-    fn build(self) -> Result<O, Box<dyn Error>>;
+    fn build(self) -> Result<O, sfv::Error>;
 }
 
 impl Build<ListEntry> for ExpectedListEntry {
-    fn build(self) -> Result<ListEntry, Box<dyn Error>> {
+    fn build(self) -> Result<ListEntry, sfv::Error> {
         match self {
             Self::Item(value) => value.build().map(ListEntry::from),
             Self::InnerList(value) => value.build().map(ListEntry::from),
@@ -191,7 +197,7 @@ impl Build<ListEntry> for ExpectedListEntry {
 }
 
 impl Build<Dictionary> for ExpectedDict {
-    fn build(self) -> Result<Dictionary, Box<dyn Error>> {
+    fn build(self) -> Result<Dictionary, sfv::Error> {
         let mut dict = Dictionary::new();
         for (key, value) in self {
             let key = Key::try_from(key)?;
@@ -203,26 +209,26 @@ impl Build<Dictionary> for ExpectedDict {
 }
 
 impl Build<List> for ExpectedList {
-    fn build(self) -> Result<List, Box<dyn Error>> {
+    fn build(self) -> Result<List, sfv::Error> {
         self.into_iter().map(Build::build).collect()
     }
 }
 
 impl Build<InnerList> for ExpectedInnerList {
-    fn build(self) -> Result<InnerList, Box<dyn Error>> {
+    fn build(self) -> Result<InnerList, sfv::Error> {
         Ok(InnerList {
             items: self
                 .0
                 .into_iter()
                 .map(Build::build)
-                .collect::<Result<Vec<Item>, Box<dyn Error>>>()?,
+                .collect::<Result<Vec<Item>, sfv::Error>>()?,
             params: self.1.build()?,
         })
     }
 }
 
 impl Build<Item> for ExpectedItem {
-    fn build(self) -> Result<Item, Box<dyn Error>> {
+    fn build(self) -> Result<Item, sfv::Error> {
         Ok(Item {
             bare_item: self.0.build()?,
             params: self.1.build()?,
@@ -231,18 +237,14 @@ impl Build<Item> for ExpectedItem {
 }
 
 impl Build<BareItem> for ExpectedBareItem {
-    fn build(self) -> Result<BareItem, Box<dyn Error>> {
+    fn build(self) -> Result<BareItem, sfv::Error> {
         Ok(match self {
             Self::Integer(value) => value.try_into()?,
             Self::Decimal(value) => value.try_into()?,
             Self::Boolean(value) => value.into(),
             Self::String(value) => BareItem::String(value.try_into()?),
             Self::Token(value) => BareItem::Token(value.try_into()?),
-            Self::ByteSequence(ref value) => {
-                base32::decode(base32::Alphabet::Rfc4648 { padding: true }, value)
-                    .ok_or("invalid base32")?
-                    .into()
-            }
+            Self::ByteSequence(value) => value.into(),
             Self::Date(value) => Date::from_unix_seconds(value.try_into()?).into(),
             Self::DisplayString(value) => BareItem::DisplayString(value),
         })
@@ -250,7 +252,7 @@ impl Build<BareItem> for ExpectedBareItem {
 }
 
 impl Build<Parameters> for ExpectedParameters {
-    fn build(self) -> Result<Parameters, Box<dyn Error>> {
+    fn build(self) -> Result<Parameters, sfv::Error> {
         let mut parameters = Parameters::new();
         for (key, value) in self {
             let key = Key::try_from(key)?;
