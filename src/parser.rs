@@ -375,7 +375,7 @@ assert_eq!(
                         Cow::Owned(String::from_validated_string(output))
                     });
                 }
-                0x00..=0x1f | 0x7f..=0xff => {
+                c if !utils::is_allowed_string_char(c) => {
                     return Err(error::Repr::InvalidStringCharacter(self.index));
                 }
                 b'\\' => {
@@ -404,37 +404,15 @@ assert_eq!(
         Err(error::Repr::UnterminatedString(self.index))
     }
 
-    fn parse_non_empty_str(
-        &mut self,
-        is_allowed_start_char: impl FnOnce(u8) -> bool,
-        is_allowed_inner_char: impl Fn(u8) -> bool,
-    ) -> Option<&'de str> {
-        let start = self.index;
-
-        if !self.peek().is_some_and(is_allowed_start_char) {
-            return None;
-        }
-
-        self.next();
-
-        while self.peek().is_some_and(&is_allowed_inner_char) {
-            self.next();
-        }
-
-        // TODO: The UTF-8 validation is redundant with the preceding character checks, but
-        // its removal is only possible with unsafe code.
-        Some(std::str::from_utf8(&self.input[start..self.index]).unwrap())
-    }
-
     pub(crate) fn parse_token(&mut self) -> Result<&'de TokenRef, error::Repr> {
         // https://httpwg.org/specs/rfc9651.html#parse-token
 
-        match self.parse_non_empty_str(
-            utils::is_allowed_start_token_char,
-            utils::is_allowed_inner_token_char,
-        ) {
-            None => Err(error::Repr::ExpectedStartOfToken(self.index)),
-            Some(str) => Ok(TokenRef::from_validated_str(str)),
+        match TokenRef::validate_prefix(&self.input[self.index..]) {
+            Err(_) => Err(error::Repr::ExpectedStartOfToken(self.index)),
+            Ok(token) => {
+                self.index += token.as_str().len();
+                Ok(token)
+            }
         }
     }
 
@@ -613,7 +591,7 @@ assert_eq!(
                         }
                     };
                 }
-                0x00..=0x1f | 0x7f..=0xff => {
+                c if !utils::is_allowed_string_char(c) => {
                     return Err(error::Repr::InvalidDisplayStringCharacter(self.index));
                 }
                 b'%' => {
@@ -687,12 +665,12 @@ assert_eq!(
     pub(crate) fn parse_key(&mut self) -> Result<&'de KeyRef, error::Repr> {
         // https://httpwg.org/specs/rfc9651.html#parse-key
 
-        match self.parse_non_empty_str(
-            utils::is_allowed_start_key_char,
-            utils::is_allowed_inner_key_char,
-        ) {
-            None => Err(error::Repr::ExpectedStartOfKey(self.index)),
-            Some(str) => Ok(KeyRef::from_validated_str(str)),
+        match KeyRef::validate_prefix(&self.input[self.index..]) {
+            Err(_) => Err(error::Repr::ExpectedStartOfKey(self.index)),
+            Ok(key) => {
+                self.index += key.as_str().len();
+                Ok(key)
+            }
         }
     }
 

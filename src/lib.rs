@@ -153,6 +153,8 @@ assert_eq!(
 #![deny(missing_docs)]
 #![deny(missing_debug_implementations)]
 
+#[macro_use]
+mod utils;
 mod date;
 mod decimal;
 mod error;
@@ -165,7 +167,6 @@ mod ref_serializer;
 mod serializer;
 mod string;
 mod token;
-mod utils;
 pub mod visitor;
 
 #[cfg(test)]
