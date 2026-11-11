@@ -213,16 +213,19 @@ impl<'de> InnerListVisitor<'de> for Wrapper<&mut InnerList> {
     }
 }
 
-impl<'de> DictionaryVisitor<'de> for Dictionary {
-    type Out = Self;
+impl<'de> DictionaryVisitor<'de> for Wrapper<Dictionary> {
+    type Out = Dictionary;
     type Error = Infallible;
 
     fn entry(&mut self, key: &'de KeyRef) -> Result<impl EntryVisitor<'de>, Self::Error> {
-        Ok(Entry { dict: self, key })
+        Ok(Entry {
+            dict: &mut self.0,
+            key,
+        })
     }
 
     fn finish(self) -> Result<Self::Out, Self::Error> {
-        Ok(self)
+        Ok(self.0)
     }
 }
 
@@ -303,16 +306,16 @@ impl<'de> EntryVisitor<'de> for Wrapper<&mut List> {
     }
 }
 
-impl<'de> ListVisitor<'de> for List {
-    type Out = Self;
+impl<'de> ListVisitor<'de> for Wrapper<List> {
+    type Out = List;
     type Error = Infallible;
 
     fn entry(&mut self) -> Result<impl EntryVisitor<'de>, Self::Error> {
-        Ok(Wrapper(self))
+        Ok(Wrapper(&mut self.0))
     }
 
     fn finish(self) -> Result<Self::Out, Self::Error> {
-        Ok(self)
+        Ok(self.0)
     }
 }
 
@@ -407,5 +410,17 @@ impl<'de> visitor::MakeItemVisitor<'de> for Item {
                 |params| Ok(Item::with_params(bare_item, params)),
             ))
         }
+    }
+}
+
+impl<'de> visitor::MakeListVisitor<'de> for List {
+    fn make_list_visitor() -> impl ListVisitor<'de, Out = Self> {
+        Wrapper(Self::new())
+    }
+}
+
+impl<'de> visitor::MakeDictionaryVisitor<'de> for Dictionary {
+    fn make_dictionary_visitor() -> impl DictionaryVisitor<'de, Out = Self> {
+        Wrapper(Self::new())
     }
 }
