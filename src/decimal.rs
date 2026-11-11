@@ -28,7 +28,7 @@ impl Decimal {
     /// # Example
     ///
     /// ```
-    /// let decimal = sfv::Decimal::try_from(1.234).unwrap();
+    /// let decimal: sfv::Decimal = sfv::Parser::new("1.234").parse_item().unwrap();
     /// assert_eq!(i64::from(decimal.as_integer_scaled_1000()), 1234);
     /// ```
     #[must_use]
