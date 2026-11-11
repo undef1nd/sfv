@@ -1,7 +1,4 @@
-#[macro_use]
-extern crate criterion;
-
-use criterion::{Bencher, BenchmarkId, Criterion};
+use criterion::{Bencher, BenchmarkId, Criterion, criterion_group, criterion_main};
 use sfv::{
     Decimal, DictSerializer, Dictionary, FieldType, Item, ItemSerializer, List, ListSerializer,
     Parser, integer, key_ref, string_ref, token_ref,
