@@ -11,7 +11,7 @@ env:
 
 jobs:
   stable:
-    name: Check, clippy, and test (stable)
+    name: Clippy, test, and doc (stable)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -20,12 +20,16 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
-      - run: cargo check --all-targets
-      - run: cargo check --all-targets --no-default-features
-      - run: cargo check --all-targets --all-features
+      - run: cargo clippy --all-targets
+      - run: cargo clippy --all-targets --no-default-features
       - run: cargo clippy --all-targets --all-features
       - run: cargo test
+      - run: cargo test --no-default-features
+      - run: cargo test --all-features
       - run: cargo run --example priority
+      - run: cargo doc --no-deps --all-features
+        env:
+          RUSTDOCFLAGS: -D warnings
 
   msrv:
     name: Check MSRV
@@ -35,8 +39,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.95
-      - name: Build with MSRV
-        run: cargo build
+      - run: cargo check
+      - run: cargo check --no-default-features
+      - run: cargo check --all-features
 
   nightly:
     name: Format and fuzz (nightly)
