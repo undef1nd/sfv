@@ -8,8 +8,7 @@ pub(crate) enum Repr {
     OutOfRange,
     NaN,
 
-    Empty,
-    InvalidCharacter(usize),
+    String(StringError),
 
     TrailingCharactersAfterMember(usize),
     TrailingComma(usize),
@@ -71,8 +70,7 @@ impl Repr {
             Self::NaN => ("NaN", None),
             Self::OutOfRange => ("out of range", None),
 
-            Self::Empty => ("cannot be empty", None),
-            Self::InvalidCharacter(i) => ("invalid character", Some(i)),
+            Self::String(err) => err.parts(),
 
             Self::TrailingCharactersAfterMember(i) => ("trailing characters after member", Some(i)),
             Self::TrailingComma(i) => ("trailing comma", Some(i)),
@@ -194,35 +192,24 @@ impl Error {
     }
 }
 
-pub(crate) struct NonEmptyStringError {
-    byte_index: Option<usize>,
+#[derive(Clone, Copy, Debug)]
+#[cfg_attr(test, derive(PartialEq))]
+pub(crate) enum StringError {
+    Empty,
+    InvalidCharacter(usize),
 }
 
-impl NonEmptyStringError {
-    pub(crate) const fn empty() -> Self {
-        Self { byte_index: None }
-    }
-
-    pub(crate) const fn invalid_character(byte_index: usize) -> Self {
-        Self {
-            byte_index: Some(byte_index),
-        }
-    }
-
-    pub(crate) const fn msg(&self) -> &'static str {
-        match self.byte_index {
-            None => "cannot be empty",
-            Some(_) => "invalid character",
+impl StringError {
+    pub(crate) const fn parts(self) -> (&'static str, Option<usize>) {
+        match self {
+            Self::Empty => ("cannot be empty", None),
+            Self::InvalidCharacter(i) => ("invalid character", Some(i)),
         }
     }
 }
 
-impl From<NonEmptyStringError> for Error {
-    fn from(err: NonEmptyStringError) -> Self {
-        match err.byte_index {
-            None => Repr::Empty,
-            Some(index) => Repr::InvalidCharacter(index),
-        }
-        .into()
+impl From<StringError> for Error {
+    fn from(err: StringError) -> Self {
+        Repr::String(err).into()
     }
 }

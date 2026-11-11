@@ -79,13 +79,13 @@ macro_rules! impl_string_types {
 
             pub(crate) const fn validate_prefix(
                 v: &[u8],
-            ) -> Result<&Self, $crate::error::NonEmptyStringError> {
+            ) -> Result<&Self, $crate::error::StringError> {
                 let mut index = 0 $( + {
                     if v.is_empty() {
-                        return Err($crate::error::NonEmptyStringError::empty());
+                        return Err($crate::error::StringError::Empty);
                     }
                     if !$is_allowed_start_char(v[0]) {
-                        return Err($crate::error::NonEmptyStringError::invalid_character(0));
+                        return Err($crate::error::StringError::InvalidCharacter(0));
                     }
                     1
                 } )?;
@@ -104,13 +104,13 @@ macro_rules! impl_string_types {
                 Ok(Self::cast(s))
             }
 
-            const fn validate(v: &[u8]) -> Result<&Self, $crate::error::NonEmptyStringError> {
+            const fn validate(v: &[u8]) -> Result<&Self, $crate::error::StringError> {
                 match Self::validate_prefix(v) {
                     Ok(prefix) => {
                         if prefix.0.len() == v.len() {
                             Ok(prefix)
                         } else {
-                            Err($crate::error::NonEmptyStringError::invalid_character(
+                            Err($crate::error::StringError::InvalidCharacter(
                                 prefix.0.len(),
                             ))
                         }
@@ -157,7 +157,7 @@ macro_rules! impl_string_types {
             pub const fn constant(v: &str) -> &Self {
                 match Self::validate(v.as_bytes()) {
                     Ok(res) => res,
-                    Err(err) => panic!("{}", err.msg()),
+                    Err(err) => panic!("{}", err.parts().0),
                 }
             }
 
@@ -293,10 +293,9 @@ macro_rules! impl_string_types {
         impl<'a> arbitrary::Arbitrary<'a> for &'a $Ref {
             fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
                 let bytes = <&[u8]>::arbitrary(u)?;
-                <$Ref>::validate_prefix(bytes).map_err(|err| {
-                    if $crate::Error::from(err).index().is_none() {
-                        arbitrary::Error::NotEnoughData
-                    } else {
+                <$Ref>::validate_prefix(bytes).map_err(|err| match err {
+                    $crate::error::StringError::Empty => arbitrary::Error::NotEnoughData,
+                    $crate::error::StringError::InvalidCharacter(_) => {
                         arbitrary::Error::IncorrectFormat
                     }
                 })
