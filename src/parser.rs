@@ -9,45 +9,6 @@ use crate::{
     },
 };
 
-fn parse_item<'de, V>(parser: &mut Parser<'de>, visitor: V) -> Result<V::Out, error::Repr>
-where
-    V: ItemVisitor<'de>,
-{
-    // https://httpwg.org/specs/rfc9651.html#parse-item
-    let param_visitor = visitor.bare_item(parser.parse_bare_item()?)?;
-    parser.parse_parameters(param_visitor)
-}
-
-fn parse_comma_separated<'de>(
-    parser: &mut Parser<'de>,
-    mut parse_member: impl FnMut(&mut Parser<'de>) -> Result<(), error::Repr>,
-) -> Result<(), error::Repr> {
-    while parser.peek().is_some() {
-        parse_member(parser)?;
-
-        parser.consume_ows_chars();
-
-        match parser.peek() {
-            None => return Ok(()),
-            Some(b',') => {}
-            Some(_) => return Err(error::Repr::TrailingCharactersAfterMember(parser.index)),
-        }
-
-        let comma_index = parser.index;
-        parser.next();
-
-        parser.consume_ows_chars();
-
-        if parser.peek().is_none() {
-            // Report the error at the position of the comma itself, rather
-            // than at the end of input.
-            return Err(error::Repr::TrailingComma(comma_index));
-        }
-    }
-
-    Ok(())
-}
-
 #[derive(Debug, PartialEq)]
 pub(crate) enum Num {
     Decimal(Decimal),
@@ -111,7 +72,7 @@ impl<'de> Parser<'de> {
     {
         // https://httpwg.org/specs/rfc9651.html#parse-dictionary
         self.parse_internal(|parser| {
-            parse_comma_separated(parser, |parser| {
+            parser.parse_comma_separated(|parser| {
                 // Note: It is up to the visitor to properly handle duplicate keys.
                 let entry_visitor = visitor.entry(parser.parse_key()?)?;
 
@@ -154,7 +115,7 @@ impl<'de> Parser<'de> {
     {
         // https://httpwg.org/specs/rfc9651.html#parse-list
         self.parse_internal(|parser| {
-            parse_comma_separated(parser, |parser| parser.parse_list_entry(visitor.entry()?))?;
+            parser.parse_comma_separated(|parser| parser.parse_list_entry(visitor.entry()?))?;
             Ok(visitor.finish()?)
         })
     }
@@ -180,7 +141,7 @@ impl<'de> Parser<'de> {
     where
         V: ItemVisitor<'de>,
     {
-        self.parse_internal(|parser| parse_item(parser, visitor))
+        self.parse_internal(|parser| parser.parse_item_internal(visitor))
     }
 
     fn peek(&self) -> Option<u8> {
@@ -212,6 +173,36 @@ impl<'de> Parser<'de> {
         Ok(value)
     }
 
+    fn parse_comma_separated(
+        &mut self,
+        mut parse_member: impl FnMut(&mut Self) -> Result<(), error::Repr>,
+    ) -> Result<(), error::Repr> {
+        while self.peek().is_some() {
+            parse_member(self)?;
+
+            self.consume_ows_chars();
+
+            match self.peek() {
+                None => return Ok(()),
+                Some(b',') => {}
+                Some(_) => return Err(error::Repr::TrailingCharactersAfterMember(self.index)),
+            }
+
+            let comma_index = self.index;
+            self.next();
+
+            self.consume_ows_chars();
+
+            if self.peek().is_none() {
+                // Report the error at the position of the comma itself, rather
+                // than at the end of input.
+                return Err(error::Repr::TrailingComma(comma_index));
+            }
+        }
+
+        Ok(())
+    }
+
     fn parse_list_entry(&mut self, visitor: impl EntryVisitor<'de>) -> Result<(), error::Repr> {
         // https://httpwg.org/specs/rfc9651.html#parse-item-or-list
         // ListEntry represents a tuple (item_or_inner_list, parameters)
@@ -219,7 +210,7 @@ impl<'de> Parser<'de> {
         if let Some(b'(') = self.peek() {
             self.parse_inner_list(visitor.inner_list()?)
         } else {
-            parse_item(self, visitor.item()?)?;
+            self.parse_item_internal(visitor.item()?)?;
             Ok(())
         }
     }
@@ -246,7 +237,7 @@ impl<'de> Parser<'de> {
                 return Ok(());
             }
 
-            parse_item(self, visitor.item()?)?;
+            self.parse_item_internal(visitor.item()?)?;
 
             if let Some(c) = self.peek()
                 && c != b' '
@@ -257,6 +248,15 @@ impl<'de> Parser<'de> {
         }
 
         Err(error::Repr::UnterminatedInnerList(self.index))
+    }
+
+    fn parse_item_internal<V>(&mut self, visitor: V) -> Result<V::Out, error::Repr>
+    where
+        V: ItemVisitor<'de>,
+    {
+        // https://httpwg.org/specs/rfc9651.html#parse-item
+        let param_visitor = visitor.bare_item(self.parse_bare_item()?)?;
+        self.parse_parameters(param_visitor)
     }
 
     pub(crate) fn parse_bare_item(&mut self) -> Result<BareItemFromInput<'de>, error::Repr> {
