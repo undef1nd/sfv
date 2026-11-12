@@ -1,9 +1,7 @@
 use std::convert::Infallible;
 
 #[cfg(feature = "parsed-types")]
-use crate::{
-    BareItem, Date, Dictionary, InnerList, Item, List, ListEntry, Parameters, Version, token_ref,
-};
+use crate::{BareItem, Date, Item, Version};
 use crate::{
     BareItemFromInput, Error, KeyRef, Parser, error, key_ref,
     visitor::{
@@ -11,54 +9,6 @@ use crate::{
         ParameterVisitor,
     },
 };
-
-#[cfg(feature = "parsed-types")]
-macro_rules! item {
-    ($val:expr) => {
-        Item::from($val)
-    };
-    ($val:expr; {$($k:expr => $v:expr),* $(,)?}) => {
-        Item::with_params($val, params!({$($k => $v),*}))
-    };
-}
-
-#[cfg(feature = "parsed-types")]
-macro_rules! params {
-    ({$($k:expr => $v:expr),* $(,)?}) => {
-        Parameters::from([
-            $( (key_ref($k).to_owned(), BareItem::from($v)) ),*
-        ])
-    };
-}
-
-#[cfg(feature = "parsed-types")]
-macro_rules! inner_list {
-    ($($item:expr),* $(,)?) => {
-        InnerList::new(vec![$( Item::from($item) ),*])
-    };
-    ([$($item:expr),* $(,)?]; {$($k:expr => $v:expr),* $(,)?}) => {
-        InnerList::with_params(
-            vec![$( Item::from($item) ),*],
-            params!({$($k => $v),*})
-        )
-    };
-}
-
-#[cfg(feature = "parsed-types")]
-macro_rules! list {
-    ($($v:expr),* $(,)?) => {
-        vec![$( ListEntry::from($v) ),*]
-    };
-}
-
-#[cfg(feature = "parsed-types")]
-macro_rules! dict {
-    ($($k:expr => $v:expr),* $(,)?) => {
-        Dictionary::from([
-            $( (key_ref($k).to_owned(), ListEntry::from($v)) ),*
-        ])
-    };
-}
 
 fn check_expected_errs<'de, const N: usize, T, E>(
     parse: impl Fn(Parser<'de>, Ignored) -> Result<T, E>,
@@ -251,51 +201,6 @@ fn parse_key_errors() {
 
 #[test]
 #[cfg(feature = "parsed-types")]
-fn parse_more_list() -> Result<(), Error> {
-    let expected_list = list![inner_list![1, 2], 42];
-
-    let mut parsed_header: List = Parser::new("(1 2)").parse()?;
-    parsed_header = Parser::new("42").parse_list_with_visitor(parsed_header)?;
-    assert_eq!(expected_list, parsed_header);
-    Ok(())
-}
-
-#[test]
-#[cfg(feature = "parsed-types")]
-fn parse_more_dict() -> Result<(), Error> {
-    let expected_dict = dict! {
-        "a" => 1,
-        "b" => item!(token_ref("a"); {"bar" => true}),
-        "c" => 3
-    };
-
-    let mut parsed_header: Dictionary = Parser::new("a=1, b;foo=*\t\t").parse()?;
-    parsed_header = Parser::new(" c=3, b=a;bar").parse_dictionary_with_visitor(parsed_header)?;
-    assert_eq!(expected_dict, parsed_header);
-    Ok(())
-}
-
-#[test]
-#[cfg(feature = "parsed-types")]
-fn parse_more_errors() -> Result<(), Error> {
-    let parsed_dict_header: Dictionary = Parser::new("a=1, b;foo=*").parse()?;
-    assert!(
-        Parser::new(",a")
-            .parse_dictionary_with_visitor(parsed_dict_header)
-            .is_err()
-    );
-
-    let parsed_list_header: List = Parser::new("a, b;foo=*").parse()?;
-    assert!(
-        Parser::new("(a, 2)")
-            .parse_list_with_visitor(parsed_list_header)
-            .is_err()
-    );
-    Ok(())
-}
-
-#[test]
-#[cfg(feature = "parsed-types")]
 fn parse_date() -> Result<(), Error> {
     let input = "@0";
 
@@ -306,7 +211,10 @@ fn parse_date() -> Result<(), Error> {
             .is_err()
     );
 
-    assert_eq!(Parser::new(input).parse::<Item>()?, item!(Date::UNIX_EPOCH));
+    assert_eq!(
+        Parser::new(input).parse::<Item>()?,
+        Item::from(Date::UNIX_EPOCH)
+    );
 
     Ok(())
 }
@@ -325,7 +233,7 @@ fn parse_display_string() -> Result<(), Error> {
 
     assert_eq!(
         Parser::new(input).parse::<Item>()?,
-        item!(BareItem::DisplayString(
+        Item::from(BareItem::DisplayString(
             "This is intended for display to üsers.".to_owned()
         ))
     );

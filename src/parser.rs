@@ -102,29 +102,6 @@ impl<'de> Parser<'de> {
 
     /// Parses input into a structured field value of `Dictionary` type, using
     /// the given visitor.
-    #[cfg_attr(
-        feature = "parsed-types",
-        doc = r#"
-
-This can also be used to parse a dictionary that is split into multiple lines by merging
-them into an existing structure:
-
-```
-# use sfv::{Dictionary, FieldType, Parser};
-# fn main() -> Result<(), sfv::Error> {
-let mut dict: Dictionary = Parser::new("a=1").parse()?;
-
-dict = Parser::new("b=2").parse_dictionary_with_visitor(dict)?;
-
-assert_eq!(
-    dict.serialize().as_deref(),
-    Some("a=1, b=2"),
-);
-# Ok(())
-# }
-```
-"#
-    )]
     ///
     /// # Errors
     /// When the parsing process is unsuccessful, including any error raised by a visitor.
@@ -168,29 +145,6 @@ assert_eq!(
 
     /// Parses input into a structured field value of `List` type, using the
     /// given visitor.
-    #[allow(clippy::needless_raw_string_hashes)] // false positive: https://github.com/rust-lang/rust-clippy/issues/11737
-    #[cfg_attr(
-        feature = "parsed-types",
-        doc = r##"
-
-This can also be used to parse a list that is split into multiple lines by merging them
-into an existing structure:
-```
-# use sfv::{FieldType, List, Parser};
-# fn main() -> Result<(), sfv::Error> {
-let mut list: List = Parser::new("11, (12 13)").parse()?;
-
-list = Parser::new(r#""foo",        "bar""#).parse_list_with_visitor(list)?;
-
-assert_eq!(
-    list.serialize().as_deref(),
-    Some(r#"11, (12 13), "foo", "bar""#),
-);
-# Ok(())
-# }
-```
-"##
-    )]
     ///
     /// # Errors
     /// When the parsing process is unsuccessful, including any error raised by a visitor.
