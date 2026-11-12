@@ -218,33 +218,21 @@ type SFVResult<T> = std::result::Result<T, Error>;
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum GenericBareItem<S, B, T, D> {
     /// A [decimal](https://httpwg.org/specs/rfc9651.html#decimal).
-    // sf-decimal  = ["-"] 1*12DIGIT "." 1*3DIGIT
     Decimal(Decimal),
     /// An [integer](https://httpwg.org/specs/rfc9651.html#integer).
-    // sf-integer = ["-"] 1*15DIGIT
     Integer(Integer),
     /// A [string](https://httpwg.org/specs/rfc9651.html#string).
-    // sf-string = DQUOTE *chr DQUOTE
-    // chr       = unescaped / escaped
-    // unescaped = %x20-21 / %x23-5B / %x5D-7E
-    // escaped   = "\" ( DQUOTE / "\" )
     String(S),
     /// A [byte sequence](https://httpwg.org/specs/rfc9651.html#binary).
-    // ":" *(base64) ":"
-    // base64    = ALPHA / DIGIT / "+" / "/" / "="
     ByteSequence(B),
     /// A [boolean](https://httpwg.org/specs/rfc9651.html#boolean).
-    // sf-boolean = "?" boolean
-    // boolean    = "0" / "1"
     Boolean(bool),
     /// A [token](https://httpwg.org/specs/rfc9651.html#token).
-    // sf-token = ( ALPHA / "*" ) *( tchar / ":" / "/" )
     Token(T),
     /// A [date](https://httpwg.org/specs/rfc9651.html#date).
     ///
     /// [`Parser`] will never produce this variant when used with
     /// [`Version::Rfc8941`].
-    // sf-date = "@" sf-integer
     Date(Date),
     /// A [display string](https://httpwg.org/specs/rfc9651.html#displaystring).
     ///
@@ -256,9 +244,6 @@ pub enum GenericBareItem<S, B, T, D> {
     /// [`Version::Rfc8941`].
     ///
     /// [display string]: <https://httpwg.org/specs/rfc9651.html#displaystring>
-    // sf-displaystring = "%" DQUOTE *( unescaped / "\" / pct-encoded ) DQUOTE
-    // pct-encoded      = "%" lc-hexdig lc-hexdig
-    // lc-hexdig        = DIGIT / %x61-66 ; 0-9, a-f
     DisplayString(D),
 }
 
