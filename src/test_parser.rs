@@ -284,15 +284,12 @@ impl<'de> ParameterVisitor<'de> for &mut Point {
         key: &'de KeyRef,
         value: BareItemFromInput<'de>,
     ) -> Result<(), Self::Error> {
-        let Some(v) = value.as_integer() else {
-            return Ok(());
-        };
         let ptr = match key.as_str() {
             "x" => &mut self.x,
             "y" => &mut self.y,
             _ => return Ok(()),
         };
-        *ptr = i64::from(v);
+        *ptr = value.as_integer().map_or(0, i64::from);
         Ok(())
     }
 
@@ -331,9 +328,7 @@ impl<'de> ItemVisitor<'de> for CoordVisitor<'_> {
         self,
         bare_item: BareItemFromInput<'de>,
     ) -> Result<impl ParameterVisitor<'de, Out = Self::Out>, Self::Error> {
-        if let Some(v) = bare_item.as_integer() {
-            *self.coord = i64::from(v);
-        }
+        *self.coord = bare_item.as_integer().map_or(0, i64::from);
         Ok(Ignored)
     }
 }
@@ -346,6 +341,7 @@ impl<'de> EntryVisitor<'de> for CoordVisitor<'_> {
     }
 
     fn inner_list(self) -> Result<impl InnerListVisitor<'de>, Self::Error> {
+        *self.coord = 0;
         Ok(Ignored)
     }
 }
@@ -357,6 +353,12 @@ fn complex_dict_visitor() {
         .parse_dictionary_with_visitor(&mut point)
         .expect("successful parse");
     assert_eq!(point, Point::new(10, 3));
+
+    let mut point = Point::default();
+    Parser::new("x=10, y=3, x=foo, y=()")
+        .parse_dictionary_with_visitor(&mut point)
+        .expect("successful parse");
+    assert_eq!(point, Point::new(0, 0));
 }
 
 // An item that is an integer, with optional `x` and `y` parameters.
@@ -390,6 +392,12 @@ fn complex_item_visitor() {
         .parse_item_with_visitor(&mut holder)
         .expect("successful parse");
     assert_eq!(holder.point, Point::new(7, -5));
+
+    let mut holder = Holder::default();
+    Parser::new("12;x=7;y=-5;x=foo")
+        .parse_item_with_visitor(&mut holder)
+        .expect("successful parse");
+    assert_eq!(holder.point, Point::new(0, -5));
 }
 
 #[test]
