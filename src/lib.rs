@@ -75,64 +75,61 @@ match dict.get("u") {
 ### Serialization
 Serializes an `Item`:
 ```
-use sfv::{Decimal, ItemSerializer, KeyRef, StringRef};
+use sfv::{Decimal, ItemSerializer, integer, key_ref, string_ref};
 
-# fn main() -> Result<(), sfv::Error> {
+# fn main() {
 let serialized_item = ItemSerializer::new()
-    .bare_item(StringRef::from_str("foo")?)
-    .parameter(KeyRef::from_str("key")?, Decimal::try_from(13.45655)?)
+    .bare_item(string_ref("foo"))
+    .parameter(key_ref("key"), Decimal::from_integer_scaled_1000(integer(13_457)))
     .finish();
 
 assert_eq!(serialized_item, r#""foo";key=13.457"#);
-# Ok(())
 # }
 ```
 
 Serializes a `List`:
 ```
-use sfv::{KeyRef, ListSerializer, StringRef, TokenRef};
+use sfv::{ListSerializer, key_ref, string_ref, token_ref};
 
-# fn main() -> Result<(), sfv::Error> {
+# fn main() {
 let mut ser = ListSerializer::new();
 
-ser.bare_item(TokenRef::from_str("tok")?);
+ser.bare_item(token_ref("tok"));
 
 {
     let mut ser = ser.inner_list();
 
-    ser.bare_item(99).parameter(KeyRef::from_str("key")?, false);
+    ser.bare_item(99).parameter(key_ref("key"), false);
 
-    ser.bare_item(StringRef::from_str("foo")?);
+    ser.bare_item(string_ref("foo"));
 
-    ser.finish().parameter(KeyRef::from_str("bar")?, true);
+    ser.finish().parameter(key_ref("bar"), true);
 }
 
 assert_eq!(
     ser.finish().as_deref(),
     Some(r#"tok, (99;key=?0 "foo");bar"#),
 );
-# Ok(())
 # }
 ```
 
 Serializes a `Dictionary`:
 ```
-use sfv::{DictSerializer, KeyRef, StringRef};
+use sfv::{DictSerializer, key_ref, string_ref};
 
-# fn main() -> Result<(), sfv::Error> {
+# fn main() {
 let mut ser = DictSerializer::new();
 
-ser.bare_item(KeyRef::from_str("key1")?, StringRef::from_str("apple")?);
+ser.bare_item(key_ref("key1"), string_ref("apple"));
 
-ser.bare_item(KeyRef::from_str("key2")?, true);
+ser.bare_item(key_ref("key2"), true);
 
-ser.bare_item(KeyRef::from_str("key3")?, false);
+ser.bare_item(key_ref("key3"), false);
 
 assert_eq!(
     ser.finish().as_deref(),
     Some(r#"key1="apple", key2, key3=?0"#),
 );
-# Ok(())
 # }
 ```
 

@@ -15,16 +15,15 @@ use crate::{KeyRef, RefBareItem, serializer};
 /// [RFC 8941]: <https://httpwg.org/specs/rfc8941.html>
 /// [RFC 9651]: <https://httpwg.org/specs/rfc9651.html>
 /// ```
-/// use sfv::{KeyRef, ItemSerializer};
+/// use sfv::{ItemSerializer, key_ref};
 ///
-/// # fn main() -> Result<(), sfv::Error> {
+/// # fn main() {
 /// let serialized_item = ItemSerializer::new()
 ///     .bare_item(11)
-///     .parameter(KeyRef::from_str("foo")?, true)
+///     .parameter(key_ref("foo"), true)
 ///     .finish();
 ///
 /// assert_eq!(serialized_item, "11;foo");
-/// # Ok(())
 /// # }
 /// ```
 // https://httpwg.org/specs/rfc9651.html#ser-item
@@ -127,31 +126,30 @@ fn maybe_write_separator(buffer: &mut String, first: &mut bool) {
 /// [RFC 8941]: <https://httpwg.org/specs/rfc8941.html>
 /// [RFC 9651]: <https://httpwg.org/specs/rfc9651.html>
 /// ```
-/// use sfv::{KeyRef, StringRef, TokenRef, ListSerializer};
+/// use sfv::{ListSerializer, key_ref, string_ref, token_ref};
 ///
-/// # fn main() -> Result<(), sfv::Error> {
+/// # fn main() {
 /// let mut ser = ListSerializer::new();
 ///
 /// ser.bare_item(11)
-///     .parameter(KeyRef::from_str("foo")?, true);
+///     .parameter(key_ref("foo"), true);
 ///
 /// {
 ///     let mut ser = ser.inner_list();
 ///
-///     ser.bare_item(TokenRef::from_str("abc")?)
-///         .parameter(KeyRef::from_str("abc_param")?, false);
+///     ser.bare_item(token_ref("abc"))
+///         .parameter(key_ref("abc_param"), false);
 ///
-///     ser.bare_item(TokenRef::from_str("def")?);
+///     ser.bare_item(token_ref("def"));
 ///
 ///     ser.finish()
-///         .parameter(KeyRef::from_str("bar")?, StringRef::from_str("val")?);
+///         .parameter(key_ref("bar"), string_ref("val"));
 /// }
 ///
 /// assert_eq!(
 ///     ser.finish().as_deref(),
 ///     Some(r#"11;foo, (abc;abc_param=?0 def);bar="val""#),
 /// );
-/// # Ok(())
 /// # }
 /// ```
 // https://httpwg.org/specs/rfc9651.html#ser-list
@@ -253,33 +251,32 @@ impl<W: BorrowMut<String>> ListSerializer<W> {
 /// [RFC 9651]: <https://httpwg.org/specs/rfc9651.html>
 ///
 /// ```
-/// use sfv::{KeyRef, StringRef, TokenRef, DictSerializer, Decimal};
+/// use sfv::{DictSerializer, Decimal, integer, key_ref, string_ref, token_ref};
 ///
-/// # fn main() -> Result<(), sfv::Error> {
+/// # fn main() {
 /// let mut ser = DictSerializer::new();
 ///
-/// ser.bare_item(KeyRef::from_str("member1")?, 11)
-///     .parameter(KeyRef::from_str("foo")?, true);
+/// ser.bare_item(key_ref("member1"), 11)
+///     .parameter(key_ref("foo"), true);
 ///
 /// {
-///   let mut ser = ser.inner_list(KeyRef::from_str("member2")?);
+///   let mut ser = ser.inner_list(key_ref("member2"));
 ///
-///   ser.bare_item(TokenRef::from_str("abc")?)
-///       .parameter(KeyRef::from_str("abc_param")?, false);
+///   ser.bare_item(token_ref("abc"))
+///       .parameter(key_ref("abc_param"), false);
 ///
-///   ser.bare_item(TokenRef::from_str("def")?);
+///   ser.bare_item(token_ref("def"));
 ///
 ///   ser.finish()
-///      .parameter(KeyRef::from_str("bar")?, StringRef::from_str("val")?);
+///      .parameter(key_ref("bar"), string_ref("val"));
 /// }
 ///
-/// ser.bare_item(KeyRef::from_str("member3")?, Decimal::try_from(12.34566)?);
+/// ser.bare_item(key_ref("member3"), Decimal::from_integer_scaled_1000(integer(12_346)));
 ///
 /// assert_eq!(
 ///     ser.finish().as_deref(),
 ///     Some(r#"member1=11;foo, member2=(abc;abc_param=?0 def);bar="val", member3=12.346"#),
 /// );
-/// # Ok(())
 /// # }
 /// ```
 // https://httpwg.org/specs/rfc9651.html#ser-dictionary
