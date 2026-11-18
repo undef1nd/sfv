@@ -445,8 +445,8 @@ fn complex_list_visitor() {
         }
     }
 
-    let list: Vec<ListHolder> = Parser::new("(1;x=4 2;y=5 3);x=1;y=2,(4;x=12;y=33), ()")
-        .parse_list()
+    let list = Parser::new("(1;x=4 2;y=5 3);x=1;y=2,(4;x=12;y=33), ()")
+        .parse_list_with_visitor(Vec::new())
         .expect("successful parse");
 
     let expected = vec![
