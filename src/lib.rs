@@ -487,9 +487,10 @@ impl BareItemFromInput<'_> {
     /// only if necessary.
     ///
     /// ```
-    /// use sfv::{BareItem, BareItemFromInput, Parser, string_ref};
+    /// use std::borrow::Cow;
+    /// use sfv::{BareItem, BareItemFromInput, string_ref};
     ///
-    /// let parsed: BareItemFromInput = Parser::new(r#""hello""#).parse_item().unwrap();
+    /// let parsed = BareItemFromInput::String(Cow::Borrowed(string_ref("hello")));
     /// assert_eq!(parsed.into_bare_item(), BareItem::String(string_ref("hello").to_owned()));
     /// ```
     #[must_use]
