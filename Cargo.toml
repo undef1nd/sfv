@@ -38,10 +38,6 @@ default = ["parsed-types"]
 arbitrary = ["dep:arbitrary", "indexmap?/arbitrary"]
 parsed-types = ["dep:indexmap"]
 
-[[example]]
-name = "priority"
-required-features = ["parsed-types"]
-
 [[test]]
 name = "specification_tests"
 required-features = ["parsed-types"]
