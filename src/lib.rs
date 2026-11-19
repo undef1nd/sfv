@@ -367,42 +367,6 @@ impl<S, B, T, D> TryFrom<f64> for GenericBareItem<S, B, T, D> {
     }
 }
 
-impl<S, T, D> From<Vec<u8>> for GenericBareItem<S, Vec<u8>, T, D> {
-    fn from(val: Vec<u8>) -> Self {
-        Self::ByteSequence(val)
-    }
-}
-
-impl<S, B, D> From<Token> for GenericBareItem<S, B, Token, D> {
-    fn from(val: Token) -> Self {
-        Self::Token(val)
-    }
-}
-
-impl<B, T, D> From<String> for GenericBareItem<String, B, T, D> {
-    fn from(val: String) -> Self {
-        Self::String(val)
-    }
-}
-
-impl<'a, S, T, D> From<&'a [u8]> for GenericBareItem<S, Vec<u8>, T, D> {
-    fn from(val: &'a [u8]) -> Self {
-        Self::ByteSequence(val.to_owned())
-    }
-}
-
-impl<'a, S, B, D> From<&'a TokenRef> for GenericBareItem<S, B, Token, D> {
-    fn from(val: &'a TokenRef) -> Self {
-        Self::Token(val.to_owned())
-    }
-}
-
-impl<'a, B, T, D> From<&'a StringRef> for GenericBareItem<String, B, T, D> {
-    fn from(val: &'a StringRef) -> Self {
-        Self::String(val.to_owned())
-    }
-}
-
 /// A [bare item] that owns its data.
 ///
 /// [bare item]: <https://httpwg.org/specs/rfc9651.html#item>
@@ -477,6 +441,39 @@ pub type RefBareItem<'a> = GenericBareItem<&'a StringRef, &'a [u8], &'a TokenRef
 pub type BareItemFromInput<'a> =
     GenericBareItem<Cow<'a, StringRef>, Vec<u8>, &'a TokenRef, Cow<'a, str>>;
 
+impl From<Vec<u8>> for BareItem {
+    fn from(val: Vec<u8>) -> Self {
+        Self::ByteSequence(val)
+    }
+}
+
+impl From<Token> for BareItem {
+    fn from(val: Token) -> Self {
+        Self::Token(val)
+    }
+}
+
+impl From<String> for BareItem {
+    fn from(val: String) -> Self {
+        Self::String(val)
+    }
+}
+
+impl<'a> From<BareItemFromInput<'a>> for BareItem {
+    fn from(val: BareItemFromInput<'a>) -> BareItem {
+        match val {
+            BareItemFromInput::Integer(val) => BareItem::Integer(val),
+            BareItemFromInput::Decimal(val) => BareItem::Decimal(val),
+            BareItemFromInput::String(val) => BareItem::String(val.into_owned()),
+            BareItemFromInput::ByteSequence(val) => BareItem::ByteSequence(val),
+            BareItemFromInput::Boolean(val) => BareItem::Boolean(val),
+            BareItemFromInput::Token(val) => BareItem::Token(val.to_owned()),
+            BareItemFromInput::Date(val) => BareItem::Date(val),
+            BareItemFromInput::DisplayString(val) => BareItem::DisplayString(val.into_owned()),
+        }
+    }
+}
+
 impl<'a, S, B, T, D> From<&'a GenericBareItem<S, B, T, D>> for RefBareItem<'a>
 where
     S: Borrow<StringRef>,
@@ -498,61 +495,31 @@ where
     }
 }
 
-impl<'a> From<BareItemFromInput<'a>> for BareItem {
-    fn from(val: BareItemFromInput<'a>) -> BareItem {
-        match val {
-            BareItemFromInput::Integer(val) => BareItem::Integer(val),
-            BareItemFromInput::Decimal(val) => BareItem::Decimal(val),
-            BareItemFromInput::String(val) => BareItem::String(val.into_owned()),
-            BareItemFromInput::ByteSequence(val) => BareItem::ByteSequence(val),
-            BareItemFromInput::Boolean(val) => BareItem::Boolean(val),
-            BareItemFromInput::Token(val) => BareItem::Token(val.to_owned()),
-            BareItemFromInput::Date(val) => BareItem::Date(val),
-            BareItemFromInput::DisplayString(val) => BareItem::DisplayString(val.into_owned()),
-        }
-    }
-}
-
-impl<'a> From<RefBareItem<'a>> for BareItem {
-    fn from(val: RefBareItem<'a>) -> BareItem {
-        match val {
-            RefBareItem::Integer(val) => BareItem::Integer(val),
-            RefBareItem::Decimal(val) => BareItem::Decimal(val),
-            RefBareItem::String(val) => BareItem::String(val.to_owned()),
-            RefBareItem::ByteSequence(val) => BareItem::ByteSequence(val.to_owned()),
-            RefBareItem::Boolean(val) => BareItem::Boolean(val),
-            RefBareItem::Token(val) => BareItem::Token(val.to_owned()),
-            RefBareItem::Date(val) => BareItem::Date(val),
-            RefBareItem::DisplayString(val) => BareItem::DisplayString(val.to_owned()),
-        }
-    }
-}
-
-impl<'a, S, T, D> From<&'a [u8]> for GenericBareItem<S, &'a [u8], T, D> {
+impl<'a> From<&'a [u8]> for RefBareItem<'a> {
     fn from(val: &'a [u8]) -> Self {
         Self::ByteSequence(val)
     }
 }
 
-impl<'a, S, B, D> From<&'a Token> for GenericBareItem<S, B, &'a TokenRef, D> {
+impl<'a> From<&'a Token> for RefBareItem<'a> {
     fn from(val: &'a Token) -> Self {
         Self::Token(val)
     }
 }
 
-impl<'a, S, B, D> From<&'a TokenRef> for GenericBareItem<S, B, &'a TokenRef, D> {
+impl<'a> From<&'a TokenRef> for RefBareItem<'a> {
     fn from(val: &'a TokenRef) -> Self {
         Self::Token(val)
     }
 }
 
-impl<'a, B, T, D> From<&'a String> for GenericBareItem<&'a StringRef, B, T, D> {
+impl<'a> From<&'a String> for RefBareItem<'a> {
     fn from(val: &'a String) -> Self {
         Self::String(val)
     }
 }
 
-impl<'a, B, T, D> From<&'a StringRef> for GenericBareItem<&'a StringRef, B, T, D> {
+impl<'a> From<&'a StringRef> for RefBareItem<'a> {
     fn from(val: &'a StringRef) -> Self {
         Self::String(val)
     }

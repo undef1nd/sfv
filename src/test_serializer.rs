@@ -30,12 +30,12 @@ fn serialize_value_list_mixed_members_with_params() {
         key_ref("in1_p").to_owned(),
         BareItem::Boolean(false),
     )]);
-    let inner_list_item1 = Item::with_params(string_ref("str1"), inner_list_item1_param);
+    let inner_list_item1 = Item::with_params(string_ref("str1").to_owned(), inner_list_item1_param);
     let inner_list_item2_param = Parameters::from_iter(vec![(
         key_ref("in2_p").to_owned(),
         BareItem::String(string_ref("valu\\e").to_owned()),
     )]);
-    let inner_list_item2 = Item::with_params(token_ref("str2"), inner_list_item2_param);
+    let inner_list_item2 = Item::with_params(token_ref("str2").to_owned(), inner_list_item2_param);
     let inner_list_param = Parameters::from_iter(vec![(
         key_ref("inner_list_param").to_owned(),
         BareItem::ByteSequence(b"weather".to_vec()),
@@ -86,7 +86,7 @@ fn serialize_item_with_token_param() {
         key_ref("a1").to_owned(),
         BareItem::Token(token_ref("*tok").to_owned()),
     )]);
-    let item = Item::with_params(string_ref("12.35"), param);
+    let item = Item::with_params(string_ref("12.35").to_owned(), param);
     assert_eq!(r#""12.35";a1=*tok"#, item.serialize());
 }
 
@@ -326,8 +326,8 @@ fn serialize_key() {
 fn serialize_list_of_items_and_inner_list() {
     let item1 = Item::new(12);
     let item2 = Item::new(14);
-    let item3 = Item::new(token_ref("a"));
-    let item4 = Item::new(token_ref("b"));
+    let item3 = Item::new(token_ref("a").to_owned());
+    let item4 = Item::new(token_ref("b").to_owned());
     let inner_list_param = Parameters::from_iter(vec![(
         key_ref("param").to_owned(),
         BareItem::String(string_ref("param_value_1").to_owned()),
@@ -363,7 +363,7 @@ fn serialize_list_with_bool_item_and_bool_params() {
         (key_ref("b").to_owned(), BareItem::Boolean(false)),
     ]);
     let item1 = Item::with_params(false, item1_params);
-    let item2 = Item::new(token_ref("cde_456"));
+    let item2 = Item::new(token_ref("cde_456").to_owned());
 
     let input: List = vec![item1.into(), item2.into()];
     assert_eq!(Some("?0;a;b=?0, cde_456"), input.serialize().as_deref());
