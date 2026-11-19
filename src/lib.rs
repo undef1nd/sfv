@@ -211,7 +211,7 @@ type SFVResult<T> = std::result::Result<T, Error>;
 /// - [`BareItemFromInput`], for data borrowed from input when possible
 ///
 /// [bare item]: <https://httpwg.org/specs/rfc9651.html#item>
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum GenericBareItem<S, B, T, D> {
     /// A [decimal](https://httpwg.org/specs/rfc9651.html#decimal).
@@ -555,27 +555,6 @@ impl<'a, B, T, D> From<&'a String> for GenericBareItem<&'a StringRef, B, T, D> {
 impl<'a, B, T, D> From<&'a StringRef> for GenericBareItem<&'a StringRef, B, T, D> {
     fn from(val: &'a StringRef) -> Self {
         Self::String(val)
-    }
-}
-
-impl<S1, B1, T1, D1, S2, B2, T2, D2> PartialEq<GenericBareItem<S2, B2, T2, D2>>
-    for GenericBareItem<S1, B1, T1, D1>
-where
-    for<'a> RefBareItem<'a>: From<&'a Self>,
-    for<'a> RefBareItem<'a>: From<&'a GenericBareItem<S2, B2, T2, D2>>,
-{
-    fn eq(&self, other: &GenericBareItem<S2, B2, T2, D2>) -> bool {
-        match (RefBareItem::from(self), RefBareItem::from(other)) {
-            (RefBareItem::Integer(a), RefBareItem::Integer(b)) => a == b,
-            (RefBareItem::Decimal(a), RefBareItem::Decimal(b)) => a == b,
-            (RefBareItem::String(a), RefBareItem::String(b)) => a == b,
-            (RefBareItem::ByteSequence(a), RefBareItem::ByteSequence(b)) => a == b,
-            (RefBareItem::Boolean(a), RefBareItem::Boolean(b)) => a == b,
-            (RefBareItem::Token(a), RefBareItem::Token(b)) => a == b,
-            (RefBareItem::Date(a), RefBareItem::Date(b)) => a == b,
-            (RefBareItem::DisplayString(a), RefBareItem::DisplayString(b)) => a == b,
-            _ => false,
-        }
     }
 }
 
