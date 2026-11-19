@@ -325,6 +325,34 @@ impl<S, B, T, D> GenericBareItem<S, B, T, D> {
             _ => None,
         }
     }
+
+    /// Converts the bare item into a [`RefBareItem`] that borrows from `self`.
+    ///
+    /// ```
+    /// use sfv::{BareItem, RefBareItem, token_ref};
+    ///
+    /// let owned = BareItem::from(token_ref("abc").to_owned());
+    /// assert_eq!(owned.as_ref_bare_item(), RefBareItem::Token(token_ref("abc")));
+    /// ```
+    #[must_use]
+    pub fn as_ref_bare_item(&self) -> RefBareItem<'_>
+    where
+        S: Borrow<StringRef>,
+        B: Borrow<[u8]>,
+        T: Borrow<TokenRef>,
+        D: Borrow<str>,
+    {
+        match *self {
+            Self::Integer(val) => RefBareItem::Integer(val),
+            Self::Decimal(val) => RefBareItem::Decimal(val),
+            Self::String(ref val) => RefBareItem::String(val.borrow()),
+            Self::ByteSequence(ref val) => RefBareItem::ByteSequence(val.borrow()),
+            Self::Boolean(val) => RefBareItem::Boolean(val),
+            Self::Token(ref val) => RefBareItem::Token(val.borrow()),
+            Self::Date(val) => RefBareItem::Date(val),
+            Self::DisplayString(ref val) => RefBareItem::DisplayString(val.borrow()),
+        }
+    }
 }
 
 impl<S, B, T, D> From<Integer> for GenericBareItem<S, B, T, D> {
@@ -443,17 +471,52 @@ impl From<String> for BareItem {
     }
 }
 
-impl<'a> From<BareItemFromInput<'a>> for BareItem {
-    fn from(val: BareItemFromInput<'a>) -> BareItem {
-        match val {
-            BareItemFromInput::Integer(val) => BareItem::Integer(val),
-            BareItemFromInput::Decimal(val) => BareItem::Decimal(val),
-            BareItemFromInput::String(val) => BareItem::String(val.into_owned()),
-            BareItemFromInput::ByteSequence(val) => BareItem::ByteSequence(val),
-            BareItemFromInput::Boolean(val) => BareItem::Boolean(val),
-            BareItemFromInput::Token(val) => BareItem::Token(val.to_owned()),
-            BareItemFromInput::Date(val) => BareItem::Date(val),
-            BareItemFromInput::DisplayString(val) => BareItem::DisplayString(val.into_owned()),
+impl RefBareItem<'_> {
+    /// Converts the borrowed bare item into an owned [`BareItem`] by cloning
+    /// any borrowed data.
+    ///
+    /// ```
+    /// use sfv::{BareItem, RefBareItem, token_ref};
+    ///
+    /// let borrowed = RefBareItem::Token(token_ref("abc"));
+    /// assert_eq!(borrowed.to_bare_item(), BareItem::Token(token_ref("abc").to_owned()));
+    /// ```
+    #[must_use]
+    pub fn to_bare_item(self) -> BareItem {
+        match self {
+            Self::Integer(val) => BareItem::Integer(val),
+            Self::Decimal(val) => BareItem::Decimal(val),
+            Self::String(val) => BareItem::String(val.to_owned()),
+            Self::ByteSequence(val) => BareItem::ByteSequence(val.to_owned()),
+            Self::Boolean(val) => BareItem::Boolean(val),
+            Self::Token(val) => BareItem::Token(val.to_owned()),
+            Self::Date(val) => BareItem::Date(val),
+            Self::DisplayString(val) => BareItem::DisplayString(val.to_owned()),
+        }
+    }
+}
+
+impl BareItemFromInput<'_> {
+    /// Converts the bare item into an owned [`BareItem`], cloning borrowed data
+    /// only if necessary.
+    ///
+    /// ```
+    /// use sfv::{BareItem, BareItemFromInput, Parser, string_ref};
+    ///
+    /// let parsed: BareItemFromInput = Parser::new(r#""hello""#).parse_item().unwrap();
+    /// assert_eq!(parsed.into_bare_item(), BareItem::String(string_ref("hello").to_owned()));
+    /// ```
+    #[must_use]
+    pub fn into_bare_item(self) -> BareItem {
+        match self {
+            Self::Integer(val) => BareItem::Integer(val),
+            Self::Decimal(val) => BareItem::Decimal(val),
+            Self::String(val) => BareItem::String(val.into_owned()),
+            Self::ByteSequence(val) => BareItem::ByteSequence(val),
+            Self::Boolean(val) => BareItem::Boolean(val),
+            Self::Token(val) => BareItem::Token(val.to_owned()),
+            Self::Date(val) => BareItem::Date(val),
+            Self::DisplayString(val) => BareItem::DisplayString(val.into_owned()),
         }
     }
 }
@@ -466,16 +529,7 @@ where
     D: Borrow<str>,
 {
     fn from(val: &'a GenericBareItem<S, B, T, D>) -> RefBareItem<'a> {
-        match val {
-            GenericBareItem::Integer(val) => RefBareItem::Integer(*val),
-            GenericBareItem::Decimal(val) => RefBareItem::Decimal(*val),
-            GenericBareItem::String(val) => RefBareItem::String(val.borrow()),
-            GenericBareItem::ByteSequence(val) => RefBareItem::ByteSequence(val.borrow()),
-            GenericBareItem::Boolean(val) => RefBareItem::Boolean(*val),
-            GenericBareItem::Token(val) => RefBareItem::Token(val.borrow()),
-            GenericBareItem::Date(val) => RefBareItem::Date(*val),
-            GenericBareItem::DisplayString(val) => RefBareItem::DisplayString(val.borrow()),
-        }
+        val.as_ref_bare_item()
     }
 }
 

@@ -143,7 +143,7 @@ impl<'de> ParameterVisitor<'de> for Wrapper<&mut Parameters> {
         key: &'de KeyRef,
         value: BareItemFromInput<'de>,
     ) -> Result<(), Self::Error> {
-        self.0.insert(key.to_owned(), value.into());
+        self.0.insert(key.to_owned(), value.into_bare_item());
         Ok(())
     }
 
@@ -161,7 +161,7 @@ impl<'de> ParameterVisitor<'de> for Wrapper<Parameters> {
         key: &'de KeyRef,
         value: BareItemFromInput<'de>,
     ) -> Result<(), Self::Error> {
-        self.0.insert(key.to_owned(), value.into());
+        self.0.insert(key.to_owned(), value.into_bare_item());
         Ok(())
     }
 
@@ -178,7 +178,7 @@ impl<'de> ItemVisitor<'de> for Wrapper<&mut InnerList> {
         self,
         bare_item: BareItemFromInput<'de>,
     ) -> Result<impl ParameterVisitor<'de, Out = Self::Out>, Self::Error> {
-        let item = self.0.items.push_mut(Item::new(bare_item));
+        let item = self.0.items.push_mut(Item::new(bare_item.into_bare_item()));
         Ok(Wrapper(&mut item.params))
     }
 }
@@ -227,7 +227,7 @@ impl<'de> ItemVisitor<'de> for Entry<'de, '_> {
         match self
             .dict
             .entry(self.key.to_owned())
-            .insert_entry(Item::new(bare_item).into())
+            .insert_entry(Item::new(bare_item.into_bare_item()).into())
             .into_mut()
         {
             ListEntry::Item(item) => Ok(Wrapper(&mut item.params)),
@@ -264,7 +264,9 @@ impl<'de> ItemVisitor<'de> for Wrapper<&mut List> {
         self,
         bare_item: BareItemFromInput<'de>,
     ) -> Result<impl ParameterVisitor<'de, Out = Self::Out>, Self::Error> {
-        let item = self.0.push_mut(Item::new(bare_item).into());
+        let item = self
+            .0
+            .push_mut(Item::new(bare_item.into_bare_item()).into());
         match item {
             ListEntry::Item(item) => Ok(Wrapper(&mut item.params)),
             ListEntry::InnerList(_) => unreachable!(),
@@ -386,10 +388,10 @@ impl FieldType for Dictionary {
 
 impl<'de> visitor::MakeItemVisitor<'de> for Item {
     fn make_item_visitor() -> impl ItemVisitor<'de, Out = Self> {
-        |bare_item| {
+        |bare_item: BareItemFromInput<'de>| {
             Ok::<_, Infallible>(visitor::parameter_visitor_with(
                 Wrapper(Parameters::new()),
-                |params| Ok(Item::with_params(bare_item, params)),
+                |params| Ok(Item::with_params(bare_item.into_bare_item(), params)),
             ))
         }
     }
