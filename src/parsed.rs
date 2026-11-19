@@ -6,8 +6,8 @@ use crate::{
     BareItem, BareItemFromInput, Error, Key, KeyRef, Parser,
     private::Sealed,
     visitor::{
-        DictionaryVisitor, EntryVisitor, InnerListVisitor, ItemVisitor, ListVisitor,
-        ParameterVisitor,
+        BareItemVisitor, DictionaryVisitor, EntryVisitor, InnerListVisitor, ItemVisitor,
+        ListVisitor, ParameterVisitor,
     },
 };
 
@@ -134,17 +134,26 @@ impl InnerList {
 // Used to hide the visitor impls for public types.
 struct Wrapper<T>(T);
 
+impl<'de> BareItemVisitor<'de> for Wrapper<&mut BareItem> {
+    type Out = ();
+    type Error = Infallible;
+
+    fn bare_item(self, value: BareItemFromInput<'de>) -> Result<Self::Out, Self::Error> {
+        *self.0 = value.into();
+        Ok(())
+    }
+}
+
 impl<'de> ParameterVisitor<'de> for Wrapper<&mut Parameters> {
     type Out = ();
     type Error = Infallible;
 
-    fn parameter(
-        &mut self,
-        key: &'de KeyRef,
-        value: BareItemFromInput<'de>,
-    ) -> Result<(), Self::Error> {
-        self.0.insert(key.to_owned(), value.into());
-        Ok(())
+    fn parameter(&mut self, key: &'de KeyRef) -> Result<impl BareItemVisitor<'de>, Self::Error> {
+        Ok(Wrapper(
+            self.0
+                .entry(key.to_owned())
+                .or_insert(BareItem::Boolean(false)),
+        ))
     }
 
     fn finish(self) -> Result<Self::Out, Self::Error> {
@@ -152,27 +161,21 @@ impl<'de> ParameterVisitor<'de> for Wrapper<&mut Parameters> {
     }
 }
 
-impl<'de> ItemVisitor<'de> for Wrapper<&mut Item> {
-    type Out = ();
+impl<'de, 'a> BareItemVisitor<'de> for Wrapper<&'a mut Item> {
+    type Out = Wrapper<&'a mut Parameters>;
     type Error = Infallible;
 
-    fn bare_item(
-        self,
-        bare_item: BareItemFromInput<'de>,
-    ) -> Result<impl ParameterVisitor<'de, Out = Self::Out>, Self::Error> {
-        self.0.bare_item = bare_item.into();
+    fn bare_item(self, bare_item: BareItemFromInput<'de>) -> Result<Self::Out, Self::Error> {
+        Wrapper(&mut self.0.bare_item).bare_item(bare_item)?;
         Ok(Wrapper(&mut self.0.params))
     }
 }
 
-impl<'de> ItemVisitor<'de> for Wrapper<&mut InnerList> {
-    type Out = ();
+impl<'de, 'a> BareItemVisitor<'de> for Wrapper<&'a mut InnerList> {
+    type Out = Wrapper<&'a mut Parameters>;
     type Error = Infallible;
 
-    fn bare_item(
-        self,
-        bare_item: BareItemFromInput<'de>,
-    ) -> Result<impl ParameterVisitor<'de, Out = Self::Out>, Self::Error> {
+    fn bare_item(self, bare_item: BareItemFromInput<'de>) -> Result<Self::Out, Self::Error> {
         let item = self.0.items.push_mut(Item::new(bare_item));
         Ok(Wrapper(&mut item.params))
     }
@@ -208,14 +211,11 @@ struct Entry<'de, 'a> {
     key: &'de KeyRef,
 }
 
-impl<'de> ItemVisitor<'de> for Entry<'de, '_> {
-    type Out = ();
+impl<'de, 'a> BareItemVisitor<'de> for Entry<'de, 'a> {
+    type Out = Wrapper<&'a mut Parameters>;
     type Error = Infallible;
 
-    fn bare_item(
-        self,
-        bare_item: BareItemFromInput<'de>,
-    ) -> Result<impl ParameterVisitor<'de, Out = Self::Out>, Self::Error> {
+    fn bare_item(self, bare_item: BareItemFromInput<'de>) -> Result<Self::Out, Self::Error> {
         match self
             .dict
             .entry(self.key.to_owned())
@@ -248,14 +248,11 @@ impl<'de> EntryVisitor<'de> for Entry<'de, '_> {
     }
 }
 
-impl<'de> ItemVisitor<'de> for Wrapper<&mut List> {
-    type Out = ();
+impl<'de, 'a> BareItemVisitor<'de> for Wrapper<&'a mut List> {
+    type Out = Wrapper<&'a mut Parameters>;
     type Error = Infallible;
 
-    fn bare_item(
-        self,
-        bare_item: BareItemFromInput<'de>,
-    ) -> Result<impl ParameterVisitor<'de, Out = Self::Out>, Self::Error> {
+    fn bare_item(self, bare_item: BareItemFromInput<'de>) -> Result<Self::Out, Self::Error> {
         let item = self.0.push_mut(Item::new(bare_item).into());
         match item {
             ListEntry::Item(item) => Ok(Wrapper(&mut item.params)),

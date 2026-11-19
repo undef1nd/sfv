@@ -114,14 +114,11 @@ pub fn parse_with_visitor(input: &[u8]) -> Result<Priority, sfv::Error> {
         }
     }
 
-    impl<'de> visitor::ItemVisitor<'de> for Parameter<'_> {
-        type Out = ();
+    impl<'de> visitor::BareItemVisitor<'de> for Parameter<'_> {
+        type Out = visitor::Ignored;
         type Error = Infallible;
 
-        fn bare_item(
-            self,
-            bare_item: BareItemFromInput<'de>,
-        ) -> Result<impl visitor::ParameterVisitor<'de, Out = Self::Out>, Self::Error> {
+        fn bare_item(self, bare_item: BareItemFromInput<'de>) -> Result<Self::Out, Self::Error> {
             // Per https://httpwg.org/specs/rfc9218.html#parameters values of
             // unexpected types and out-of-range values are ignored. Since the
             // same dictionary key can appear multiple times in the input, and
