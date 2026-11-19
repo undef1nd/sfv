@@ -4,8 +4,8 @@ use crate::{
     BareItemFromInput, Date, Decimal, Integer, KeyRef, SFVResult, String, StringRef, TokenRef,
     Version, error, utils,
     visitor::{
-        DictionaryVisitor, EntryVisitor, InnerListVisitor, ItemVisitor, ListVisitor,
-        ParameterVisitor,
+        BareItemVisitor, DictionaryVisitor, EntryVisitor, InnerListVisitor, ItemVisitor,
+        ListVisitor, ParameterVisitor,
     },
 };
 
@@ -101,7 +101,10 @@ impl<'de> Parser<'de> {
     ///
     /// # Errors
     /// When the parsing process is unsuccessful, including any error raised by a visitor.
-    pub fn parse_item_with_visitor<V>(self, visitor: V) -> SFVResult<V::Out>
+    pub fn parse_item_with_visitor<V>(
+        self,
+        visitor: V,
+    ) -> SFVResult<<V::Out as ParameterVisitor<'de>>::Out>
     where
         V: ItemVisitor<'de>,
     {
@@ -214,7 +217,10 @@ impl<'de> Parser<'de> {
         Err(error::Repr::UnterminatedInnerList(self.index))
     }
 
-    fn parse_item<V>(&mut self, visitor: V) -> Result<V::Out, error::Repr>
+    fn parse_item<V>(
+        &mut self,
+        visitor: V,
+    ) -> Result<<V::Out as ParameterVisitor<'de>>::Out, error::Repr>
     where
         V: ItemVisitor<'de>,
     {
@@ -566,15 +572,14 @@ impl<'de> Parser<'de> {
             self.next();
             self.consume_sp_chars();
 
-            let param_name = self.parse_key()?;
-            let param_value = if let Some(b'=') = self.peek() {
+            // Note: It is up to the visitor to properly handle duplicate keys.
+            let param_visitor = visitor.parameter(self.parse_key()?)?;
+            param_visitor.bare_item(if let Some(b'=') = self.peek() {
                 self.next();
                 self.parse_bare_item()?
             } else {
                 BareItemFromInput::Boolean(true)
-            };
-            // Note: It is up to the visitor to properly handle duplicate keys.
-            visitor.parameter(param_name, param_value)?;
+            })?;
         }
 
         Ok(visitor.finish()?)

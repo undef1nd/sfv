@@ -5,8 +5,8 @@ use crate::{BareItem, Date, Item, Version};
 use crate::{
     BareItemFromInput, Error, KeyRef, Parser, error, key_ref,
     visitor::{
-        DictionaryVisitor, EntryVisitor, Ignored, InnerListVisitor, ItemVisitor, ListVisitor,
-        ParameterVisitor,
+        BareItemVisitor, DictionaryVisitor, EntryVisitor, Ignored, InnerListVisitor, ItemVisitor,
+        ListVisitor, Never, ParameterVisitor,
     },
 };
 
@@ -272,6 +272,15 @@ impl Point {
     fn new(x: i64, y: i64) -> Self {
         Self { x, y }
     }
+
+    fn coord(&mut self, key: &KeyRef) -> Option<CoordVisitor<'_>> {
+        let coord = match key.as_str() {
+            "x" => &mut self.x,
+            "y" => &mut self.y,
+            _ => return None,
+        };
+        Some(CoordVisitor { coord })
+    }
 }
 
 // For when a `Point` is a parameter somewhere.
@@ -279,18 +288,8 @@ impl<'de> ParameterVisitor<'de> for &mut Point {
     type Out = ();
     type Error = Infallible;
 
-    fn parameter(
-        &mut self,
-        key: &'de KeyRef,
-        value: BareItemFromInput<'de>,
-    ) -> Result<(), Self::Error> {
-        let ptr = match key.as_str() {
-            "x" => &mut self.x,
-            "y" => &mut self.y,
-            _ => return Ok(()),
-        };
-        *ptr = value.as_integer().map_or(0, i64::from);
-        Ok(())
+    fn parameter(&mut self, key: &'de KeyRef) -> Result<impl BareItemVisitor<'de>, Self::Error> {
+        Ok(self.coord(key))
     }
 
     fn finish(self) -> Result<Self::Out, Self::Error> {
@@ -303,12 +302,7 @@ impl<'de> DictionaryVisitor<'de> for &mut Point {
     type Error = Infallible;
 
     fn entry(&mut self, key: &'de KeyRef) -> Result<impl EntryVisitor<'de>, Self::Error> {
-        let coord = match key.as_str() {
-            "x" => &mut self.x,
-            "y" => &mut self.y,
-            _ => return Ok(None),
-        };
-        Ok(Some(CoordVisitor { coord }))
+        Ok(self.coord(key))
     }
 
     fn finish(self) -> Result<Self::Out, Self::Error> {
@@ -320,14 +314,11 @@ struct CoordVisitor<'a> {
     coord: &'a mut i64,
 }
 
-impl<'de> ItemVisitor<'de> for CoordVisitor<'_> {
-    type Out = ();
+impl<'de> BareItemVisitor<'de> for CoordVisitor<'_> {
+    type Out = Ignored;
     type Error = Infallible;
 
-    fn bare_item(
-        self,
-        bare_item: BareItemFromInput<'de>,
-    ) -> Result<impl ParameterVisitor<'de, Out = Self::Out>, Self::Error> {
+    fn bare_item(self, bare_item: BareItemFromInput<'de>) -> Result<Self::Out, Self::Error> {
         *self.coord = bare_item.as_integer().map_or(0, i64::from);
         Ok(Ignored)
     }
@@ -368,14 +359,11 @@ struct Holder {
     point: Point,
 }
 
-impl<'de> ItemVisitor<'de> for &mut Holder {
-    type Out = Option<()>;
+impl<'a, 'de> BareItemVisitor<'de> for &'a mut Holder {
+    type Out = Option<&'a mut Point>;
     type Error = Infallible;
 
-    fn bare_item(
-        self,
-        bare_item: BareItemFromInput<'de>,
-    ) -> Result<impl ParameterVisitor<'de, Out = Self::Out>, Self::Error> {
+    fn bare_item(self, bare_item: BareItemFromInput<'de>) -> Result<Self::Out, Self::Error> {
         Ok(if let Some(v) = bare_item.as_integer() {
             self.v = i64::from(v);
             Some(&mut self.point)
@@ -508,4 +496,92 @@ fn parse_dictionary_lifetime() -> Result<(), Error> {
         Some(key_ref("a"))
     );
     Ok(())
+}
+
+#[test]
+fn never_visitor() {
+    #[derive(Debug)]
+    struct Rejected;
+
+    impl std::fmt::Display for Rejected {
+        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            f.write_str("rejected")
+        }
+    }
+
+    impl std::error::Error for Rejected {}
+
+    struct RejectAll;
+
+    impl<'de> ParameterVisitor<'de> for RejectAll {
+        type Out = ();
+        type Error = Rejected;
+
+        fn parameter(&mut self, _key: &'de KeyRef) -> Result<impl BareItemVisitor<'de>, Rejected> {
+            Err::<Never, _>(Rejected)
+        }
+
+        fn finish(self) -> Result<(), Rejected> {
+            Ok(())
+        }
+    }
+
+    impl<'de> InnerListVisitor<'de> for RejectAll {
+        type Error = Rejected;
+
+        fn item(&mut self) -> Result<impl ItemVisitor<'de>, Rejected> {
+            Err::<Never, _>(Rejected)
+        }
+
+        fn finish(self) -> Result<impl ParameterVisitor<'de>, Rejected> {
+            Err::<Never, _>(Rejected)
+        }
+    }
+
+    impl<'de> EntryVisitor<'de> for RejectAll {
+        type Error = Rejected;
+
+        fn item(self) -> Result<impl ItemVisitor<'de>, Rejected> {
+            Err::<Never, _>(Rejected)
+        }
+
+        fn inner_list(self) -> Result<impl InnerListVisitor<'de>, Rejected> {
+            Ok(self)
+        }
+    }
+
+    impl<'de> ListVisitor<'de> for RejectAll {
+        type Out = ();
+        type Error = Rejected;
+
+        fn entry(&mut self) -> Result<impl EntryVisitor<'de>, Rejected> {
+            Ok(RejectAll)
+        }
+
+        fn finish(self) -> Result<(), Rejected> {
+            Ok(())
+        }
+    }
+
+    assert_eq!(
+        Parser::new("a")
+            .parse_list_with_visitor(RejectAll)
+            .unwrap_err()
+            .to_string(),
+        "rejected",
+    );
+    assert_eq!(
+        Parser::new("()")
+            .parse_list_with_visitor(RejectAll)
+            .unwrap_err()
+            .to_string(),
+        "rejected",
+    );
+    assert_eq!(
+        Parser::new("(1)")
+            .parse_list_with_visitor(RejectAll)
+            .unwrap_err()
+            .to_string(),
+        "rejected",
+    );
 }
