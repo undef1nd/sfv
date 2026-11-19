@@ -93,13 +93,6 @@ macro_rules! impl_conversion {
                 }
             }
         }
-        impl<S, B, T, D> TryFrom<$t> for GenericBareItem<S, B, T, D> {
-            type Error = Error;
-
-            fn try_from(v: $t) -> Result<Self, Error> {
-                Integer::try_from(v).map(Self::Integer)
-            }
-        }
     };
     (Into<$t: ty>) => {
         impl From<Integer> for $t {

@@ -351,22 +351,6 @@ impl<S, B, T, D> From<Date> for GenericBareItem<S, B, T, D> {
     }
 }
 
-impl<S, B, T, D> TryFrom<f32> for GenericBareItem<S, B, T, D> {
-    type Error = Error;
-
-    fn try_from(val: f32) -> Result<Self, Error> {
-        Decimal::try_from(val).map(Self::Decimal)
-    }
-}
-
-impl<S, B, T, D> TryFrom<f64> for GenericBareItem<S, B, T, D> {
-    type Error = Error;
-
-    fn try_from(val: f64) -> Result<Self, Error> {
-        Decimal::try_from(val).map(Self::Decimal)
-    }
-}
-
 /// A [bare item] that owns its data.
 ///
 /// [bare item]: <https://httpwg.org/specs/rfc9651.html#item>
