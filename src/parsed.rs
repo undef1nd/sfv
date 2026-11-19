@@ -171,25 +171,48 @@ impl<'de, 'a> BareItemVisitor<'de> for Wrapper<&'a mut Item> {
     }
 }
 
-impl<'de, 'a> BareItemVisitor<'de> for Wrapper<&'a mut InnerList> {
-    type Out = Wrapper<&'a mut Parameters>;
-    type Error = Infallible;
-
-    fn bare_item(self, bare_item: BareItemFromInput<'de>) -> Result<Self::Out, Self::Error> {
-        let item = self.0.items.push_mut(Item::new(bare_item));
-        Ok(Wrapper(&mut item.params))
-    }
-}
-
 impl<'de> InnerListVisitor<'de> for Wrapper<&mut InnerList> {
     type Error = Infallible;
 
     fn item(&mut self) -> Result<impl ItemVisitor<'de>, Self::Error> {
-        Ok(Wrapper(&mut *self.0))
+        Ok(Wrapper(self.0.items.push_mut(Item::new(false))))
     }
 
     fn finish(self) -> Result<impl ParameterVisitor<'de>, Self::Error> {
         Ok(Wrapper(&mut self.0.params))
+    }
+}
+
+impl<'de> EntryVisitor<'de> for Wrapper<&mut ListEntry> {
+    type Error = Infallible;
+
+    fn item(self) -> Result<impl ItemVisitor<'de>, Self::Error> {
+        loop {
+            match *self.0 {
+                ListEntry::Item(ref mut item) => {
+                    item.params.clear();
+                    return Ok(Wrapper(item));
+                }
+                ListEntry::InnerList(_) => {
+                    *self.0 = ListEntry::Item(Item::new(false));
+                }
+            }
+        }
+    }
+
+    fn inner_list(self) -> Result<impl InnerListVisitor<'de>, Self::Error> {
+        loop {
+            match *self.0 {
+                ListEntry::InnerList(ref mut inner_list) => {
+                    inner_list.items.clear();
+                    inner_list.params.clear();
+                    return Ok(Wrapper(inner_list));
+                }
+                ListEntry::Item(_) => {
+                    *self.0 = ListEntry::InnerList(InnerList::default());
+                }
+            }
+        }
     }
 }
 
@@ -198,82 +221,15 @@ impl<'de> DictionaryVisitor<'de> for Wrapper<&mut Dictionary> {
     type Error = Infallible;
 
     fn entry(&mut self, key: &'de KeyRef) -> Result<impl EntryVisitor<'de>, Self::Error> {
-        Ok(Entry { dict: self.0, key })
+        Ok(Wrapper(
+            self.0
+                .entry(key.to_owned())
+                .or_insert_with(|| Item::new(false).into()),
+        ))
     }
 
     fn finish(self) -> Result<Self::Out, Self::Error> {
         Ok(())
-    }
-}
-
-struct Entry<'de, 'a> {
-    dict: &'a mut Dictionary,
-    key: &'de KeyRef,
-}
-
-impl<'de, 'a> BareItemVisitor<'de> for Entry<'de, 'a> {
-    type Out = Wrapper<&'a mut Parameters>;
-    type Error = Infallible;
-
-    fn bare_item(self, bare_item: BareItemFromInput<'de>) -> Result<Self::Out, Self::Error> {
-        match self
-            .dict
-            .entry(self.key.to_owned())
-            .insert_entry(Item::new(bare_item).into())
-            .into_mut()
-        {
-            ListEntry::Item(item) => Ok(Wrapper(&mut item.params)),
-            ListEntry::InnerList(_) => unreachable!(),
-        }
-    }
-}
-
-impl<'de> EntryVisitor<'de> for Entry<'de, '_> {
-    type Error = Infallible;
-
-    fn item(self) -> Result<impl ItemVisitor<'de>, Self::Error> {
-        Ok(self)
-    }
-
-    fn inner_list(self) -> Result<impl InnerListVisitor<'de>, Self::Error> {
-        match self
-            .dict
-            .entry(self.key.to_owned())
-            .insert_entry(InnerList::default().into())
-            .into_mut()
-        {
-            ListEntry::InnerList(inner_list) => Ok(Wrapper(inner_list)),
-            ListEntry::Item(_) => unreachable!(),
-        }
-    }
-}
-
-impl<'de, 'a> BareItemVisitor<'de> for Wrapper<&'a mut List> {
-    type Out = Wrapper<&'a mut Parameters>;
-    type Error = Infallible;
-
-    fn bare_item(self, bare_item: BareItemFromInput<'de>) -> Result<Self::Out, Self::Error> {
-        let item = self.0.push_mut(Item::new(bare_item).into());
-        match item {
-            ListEntry::Item(item) => Ok(Wrapper(&mut item.params)),
-            ListEntry::InnerList(_) => unreachable!(),
-        }
-    }
-}
-
-impl<'de> EntryVisitor<'de> for Wrapper<&mut List> {
-    type Error = Infallible;
-
-    fn item(self) -> Result<impl ItemVisitor<'de>, Self::Error> {
-        Ok(self)
-    }
-
-    fn inner_list(self) -> Result<impl InnerListVisitor<'de>, Self::Error> {
-        let inner_list = self.0.push_mut(InnerList::default().into());
-        match inner_list {
-            ListEntry::InnerList(inner_list) => Ok(Wrapper(inner_list)),
-            ListEntry::Item(_) => unreachable!(),
-        }
     }
 }
 
@@ -282,7 +238,7 @@ impl<'de> ListVisitor<'de> for Wrapper<&mut List> {
     type Error = Infallible;
 
     fn entry(&mut self) -> Result<impl EntryVisitor<'de>, Self::Error> {
-        Ok(Wrapper(&mut *self.0))
+        Ok(Wrapper(self.0.push_mut(Item::new(false).into())))
     }
 
     fn finish(self) -> Result<Self::Out, Self::Error> {
