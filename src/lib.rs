@@ -211,7 +211,7 @@ type SFVResult<T> = std::result::Result<T, Error>;
 /// - [`BareItemFromInput`], for data borrowed from input when possible
 ///
 /// [bare item]: <https://httpwg.org/specs/rfc9651.html#item>
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum GenericBareItem<S, B, T, D> {
     /// A [decimal](https://httpwg.org/specs/rfc9651.html#decimal).

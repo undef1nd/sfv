@@ -16,7 +16,7 @@ use crate::{
 /// Can be used as a member of `List` or `Dictionary`.
 ///
 /// [item]: <https://httpwg.org/specs/rfc9651.html#item>
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Item {
     /// The item's value.
@@ -71,7 +71,7 @@ pub type List = Vec<ListEntry>;
 pub type Parameters = IndexMap<Key, BareItem>;
 
 /// A member of a [`List`] or [`Dictionary`].
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum ListEntry {
     /// An item.
@@ -105,7 +105,7 @@ where
 /// An [array] of [`Item`]s with associated [`Parameters`].
 ///
 /// [array]: <https://httpwg.org/specs/rfc9651.html#inner-list>
-#[derive(Debug, Default, PartialEq, Clone)]
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct InnerList {
     /// The inner list's items, which can be empty.
