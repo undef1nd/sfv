@@ -21,7 +21,7 @@ considered invalid.
 ```
 use std::convert::Infallible;
 
-use sfv::{BareItem, BareItemFromInput, KeyRef, visitor};
+use sfv::{BareItemFromInput, KeyRef, visitor};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum Color {
@@ -49,28 +49,24 @@ struct Foo {
     strong: bool,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 enum Error {
     ColorMissing,
     ColorWrongType,
     ColorInvalid,
     StrongWrongType,
-}
-
-impl From<InvalidColor> for Error {
-    fn from(_: InvalidColor) -> Self {
-        Self::ColorInvalid
-    }
+    Syntax(sfv::Error),
 }
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.write_str(match self {
-            Self::ColorMissing => "color missing",
-            Self::ColorWrongType => "color wrong type",
-            Self::ColorInvalid => "color invalid",
-            Self::StrongWrongType => "strong wrong type",
-        })
+        match self {
+            Self::ColorMissing => f.write_str("color missing"),
+            Self::ColorWrongType => f.write_str("color wrong type"),
+            Self::ColorInvalid => f.write_str("color invalid"),
+            Self::StrongWrongType => f.write_str("strong wrong type"),
+            Self::Syntax(err) => std::fmt::Display::fmt(err, f),
+        }
     }
 }
 
@@ -79,126 +75,159 @@ impl std::error::Error for Error {}
 const KEY_COLOR: &KeyRef = sfv::key_ref("color");
 const KEY_STRONG: &KeyRef = sfv::key_ref("strong");
 
+// Notes for real-world implementations:
+//
+// - Accept `&[u8]` rather than `&str`, since HTTP header field values are not
+//   necessarily UTF-8.
+// - Encapsulate parsing in a function rather than exposing
+//   `TryFrom<&sfv::Dictionary>` or visitor types publicly, which could lead
+//   callers to configure `sfv::Parser` with the wrong RFC version for the
+//   header.
+// - Expose only one of the two implementations below, which trade off
+//   allocations, source-code complexity, and monomorphization costs:
+//   - `parse_from_dictionary` is simpler to write and avoids monomorphizing a
+//     custom visitor, but requires the `parsed-types` Cargo feature (which
+//     entails an additional crate dependency) and allocates an intermediate
+//     `Dictionary`.
+//   - `parse_with_visitor` involves more source code and monomorphization, but
+//     records only the minimal state needed to parse and validate the header
+//     (avoiding the intermediate `Dictionary` allocation) and allows the
+//     `parsed-types` Cargo feature to be disabled.
+
 #[cfg(feature = "parsed-types")]
-impl TryFrom<&sfv::Dictionary> for Foo {
-    type Error = Error;
+pub fn parse_from_dictionary(input: &[u8]) -> Result<Foo, Error> {
+    let dict: sfv::Dictionary = sfv::Parser::new(input).parse().map_err(Error::Syntax)?;
 
-    fn try_from(dict: &sfv::Dictionary) -> Result<Self, Error> {
-        let Some(v) = dict.get(KEY_COLOR) else {
-            return Err(Error::ColorMissing);
-        };
+    let Some(v) = dict.get(KEY_COLOR) else {
+        return Err(Error::ColorMissing);
+    };
 
-        let sfv::ListEntry::Item(sfv::Item { bare_item: BareItem::Token(v), params }) = v else {
-            return Err(Error::ColorWrongType);
-        };
+    let sfv::ListEntry::Item(sfv::Item { bare_item: sfv::BareItem::Token(v), params }) = v else {
+        return Err(Error::ColorWrongType);
+    };
 
-        let color = Color::try_from(&**v)?;
+    let Ok(color) = Color::try_from(&**v) else {
+        return Err(Error::ColorInvalid);
+    };
 
-        let strong = match params.get(KEY_STRONG) {
-            None => false,
-            Some(BareItem::Boolean(v)) => *v,
-            Some(_) => return Err(Error::StrongWrongType),
-        };
+    let strong = match params.get(KEY_STRONG) {
+        None => false,
+        Some(sfv::BareItem::Boolean(v)) => *v,
+        Some(_) => return Err(Error::StrongWrongType),
+    };
 
-        Ok(Self { color, strong })
-    }
+    Ok(Foo { color, strong })
 }
 
-struct Visitor {
-    color: Result<Color, Error>,
-    strong: Result<bool, Error>,
-}
-
-impl Visitor {
-    fn new() -> Self {
-        Self { color: Err(Error::ColorMissing), strong: Ok(false) }
-    }
-}
-
-impl<'de> visitor::DictionaryVisitor<'de> for Visitor {
-    type Out = Foo;
-    type Error = Error;
-
-    fn entry(&mut self, key: &'de KeyRef) -> Result<impl visitor::EntryVisitor<'de>, Self::Error> {
-        Ok(if key == KEY_COLOR {
-            // Reset the values to ensure that multiple instances of `color` do
-            // not have their values and parameters mixed.
-            *self = Self::new();
-            Some(self)
-        } else {
-            // Ignore other keys.
-            None
-        })
+pub fn parse_with_visitor(input: &[u8]) -> Result<Foo, Error> {
+    enum State {
+        ColorMissing,
+        ColorWrongType,
+        ColorInvalid,
+        StrongWrongType,
+        Valid(Foo),
     }
 
-    fn finish(self) -> Result<Self::Out, Self::Error> {
-        Ok(Foo { color: self.color?, strong: self.strong? })
-    }
-}
-
-impl<'de> visitor::EntryVisitor<'de> for &mut Visitor {
-    type Error = Infallible;
-
-    fn item(self) -> Result<impl visitor::ItemVisitor<'de>, Self::Error> {
-        Ok(self)
+    struct ParamVisitor<'a> {
+        state: &'a mut State,
+        color: Color,
     }
 
-    fn inner_list(self) -> Result<impl visitor::InnerListVisitor<'de>, Self::Error> {
-        // It would be incorrect to return an error here: If the `color` key
-        // appears more than once, doing so would cause the entire visitation to
-        // fail even if the later key has the correct type. Instead, we record
-        // the error so it can be returned from `DictionaryVisitor::finish`.
-        self.color = Err(Error::ColorWrongType);
-        Ok(visitor::Ignored)
+    impl<'de> visitor::DictionaryVisitor<'de> for State {
+        type Out = Self;
+        type Error = Infallible;
+
+        fn entry(&mut self, key: &'de KeyRef) -> Result<impl visitor::EntryVisitor<'de>, Self::Error> {
+            Ok(if key == KEY_COLOR {
+                Some(self)
+            } else {
+                // Ignore other keys.
+                None
+            })
+        }
+
+        fn finish(self) -> Result<Self::Out, Self::Error> {
+            Ok(self)
+        }
     }
-}
 
-impl<'de> visitor::ItemVisitor<'de> for &mut Visitor {
-    type Out = Option<()>;
-    type Error = Infallible;
+    impl<'de> visitor::EntryVisitor<'de> for &mut State {
+        type Error = Infallible;
 
-    fn bare_item(self, v: BareItemFromInput<'de>) -> Result<impl visitor::ParameterVisitor<'de, Out = Self::Out>, Self::Error> {
-        // It would be incorrect to return the errors here: If the `color` key
-        // appears more than once, doing so would cause the entire visitation to
-        // fail even if the later key has the correct type and a valid value.
-        // Instead, we record the errors so they can be returned from
-        // `DictionaryVisitor::finish`.
+        fn item(self) -> Result<impl visitor::ItemVisitor<'de>, Self::Error> {
+            Ok(self)
+        }
 
-        if let BareItemFromInput::Token(v) = v {
-            self.color = Color::try_from(v).map_err(Error::from);
-            // Visit the parameters.
-            Ok(Some(self))
-        } else {
-            self.color = Err(Error::ColorWrongType);
-            // No need to visit the parameters if the type is wrong.
+        fn inner_list(self) -> Result<impl visitor::InnerListVisitor<'de>, Self::Error> {
+            // It would be incorrect to return an error here: If the `color` key
+            // appears more than once, doing so would cause the entire visitation to
+            // fail even if the later key has the correct type. Instead, we record
+            // the error in `State` and check the final state after parsing completes.
+            *self = State::ColorWrongType;
+            Ok(visitor::Ignored)
+        }
+    }
+
+    impl<'de> visitor::ItemVisitor<'de> for &mut State {
+        type Out = Option<()>;
+        type Error = Infallible;
+
+        fn bare_item(self, v: BareItemFromInput<'de>) -> Result<impl visitor::ParameterVisitor<'de, Out = Self::Out>, Self::Error> {
+            // It would be incorrect to return the errors here: If the `color` key
+            // appears more than once, doing so would cause the entire visitation to
+            // fail even if the later key has the correct type and a valid value.
+            // Instead, we record the errors in `State` and check the final state
+            // after parsing completes.
+
+            if let BareItemFromInput::Token(v) = v {
+                if let Ok(color) = Color::try_from(v) {
+                    *self = State::Valid(Foo { color, strong: false });
+                    // Visit the parameters.
+                    return Ok(Some(ParamVisitor { state: self, color }));
+                }
+
+                *self = State::ColorInvalid;
+            } else {
+                *self = State::ColorWrongType;
+            }
+
+            // No need to visit the parameters if the type or value is invalid.
             Ok(None)
         }
     }
-}
 
-impl<'de> visitor::ParameterVisitor<'de> for &mut Visitor {
-    type Out = ();
-    type Error = Error;
+    impl<'de> visitor::ParameterVisitor<'de> for ParamVisitor<'_> {
+        type Out = ();
+        type Error = Infallible;
 
-    fn parameter(&mut self, key: &'de KeyRef, v: BareItemFromInput<'de>) -> Result<(), Self::Error> {
-        // Ignore other parameters.
-        if key == KEY_STRONG {
-            // It would be incorrect to return an error here: If the `strong`
-            // key appears more than once, doing so would cause the entire
-            // visitation to fail even if the later key has the correct type.
-            // Instead, we record the error so it can be returned from
-            // `DictionaryVisitor::finish`.
-            self.strong = if let BareItemFromInput::Boolean(v) = v {
-                Ok(v)
-            } else {
-                Err(Error::StrongWrongType)
-            };
+        fn parameter(&mut self, key: &'de KeyRef, v: BareItemFromInput<'de>) -> Result<(), Self::Error> {
+            // Ignore other parameters.
+            if key == KEY_STRONG {
+                // It would be incorrect to return an error here: If the `strong`
+                // key appears more than once, doing so would cause the entire
+                // visitation to fail even if the later key has the correct type.
+                // Instead, we record the error in `State` and check the final state
+                // after parsing completes.
+                *self.state = if let BareItemFromInput::Boolean(strong) = v {
+                    State::Valid(Foo { color: self.color, strong })
+                } else {
+                    State::StrongWrongType
+                };
+            }
+            Ok(())
         }
-        Ok(())
+
+        fn finish(self) -> Result<Self::Out, Self::Error> {
+            Ok(())
+        }
     }
 
-    fn finish(self) -> Result<Self::Out, Self::Error> {
-        Ok(())
+    match sfv::Parser::new(input).parse_dictionary_with_visitor(State::ColorMissing).map_err(Error::Syntax)? {
+        State::ColorMissing => Err(Error::ColorMissing),
+        State::ColorWrongType => Err(Error::ColorWrongType),
+        State::ColorInvalid => Err(Error::ColorInvalid),
+        State::StrongWrongType => Err(Error::StrongWrongType),
+        State::Valid(foo) => Ok(foo),
     }
 }
 
@@ -252,24 +281,35 @@ for (input, expected) in [
         "color=red;strong, color=red",
         Ok(Foo { color: Color::Red, strong: false }),
     ),
+    (
+        "color=red;strong=a;strong",
+        Ok(Foo { color: Color::Red, strong: true }),
+    ),
+    (
+        "color=red;strong;strong=a",
+        Err(Error::StrongWrongType),
+    ),
 ] {
     println!("{input}");
 
-    // This works, but has the downsides of requiring the `parsed-types` Cargo
-    // feature (which entails an additional crate dependency) and allocating a
-    // `Dictionary`.
-    #[cfg(feature = "parsed-types")]
-    {
-        let dict = sfv::Parser::new(input).parse_dictionary().unwrap();
-        assert_eq!(Foo::try_from(&dict), expected);
-    }
+    let expected = expected.map_err(|err| err.to_string());
 
-    // This records the minimal information needed to parse and validate the
-    // header, and allows the `parsed-types` Cargo feature to be disabled.
+    #[cfg(feature = "parsed-types")]
     assert_eq!(
-        sfv::Parser::new(input).parse_dictionary_with_visitor(Visitor::new()).ok(),
-        expected.as_ref().ok().cloned());
+        parse_from_dictionary(input.as_bytes()).map_err(|err| err.to_string()),
+        expected,
+    );
+
+    assert_eq!(
+        parse_with_visitor(input.as_bytes()).map_err(|err| err.to_string()),
+        expected,
+    );
 }
+
+// Syntax errors are also reported:
+#[cfg(feature = "parsed-types")]
+assert!(matches!(parse_from_dictionary(b"color=?2"), Err(Error::Syntax(_))));
+assert!(matches!(parse_with_visitor(b"color=?2"), Err(Error::Syntax(_))));
 ```
 
 # Returning a value from `ItemVisitor`

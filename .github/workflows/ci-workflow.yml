@@ -27,6 +27,7 @@ jobs:
       - run: cargo test --no-default-features
       - run: cargo test --all-features
       - run: cargo run --example priority
+      - run: cargo run --example priority --no-default-features
       - run: cargo doc --no-deps --all-features
         env:
           RUSTDOCFLAGS: -D warnings
