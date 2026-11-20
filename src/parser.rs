@@ -82,7 +82,7 @@ impl<'de> Parser<'de> {
                 } else {
                     let param_visitor = entry_visitor
                         .item()?
-                        .bare_item(BareItemFromInput::from(true))?;
+                        .bare_item(BareItemFromInput::Boolean(true))?;
                     parser.parse_parameters(param_visitor)?;
                     Ok(())
                 }

@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::{Error, GenericBareItem, error};
+use crate::{BareItem, Error, RefBareItem, error};
 
 const RANGE_I64: std::ops::RangeInclusive<i64> = -999_999_999_999_999..=999_999_999_999_999;
 
@@ -76,7 +76,12 @@ macro_rules! impl_conversion {
                 Integer(v.into())
             }
         }
-        impl<S, B, T, D> From<$t> for GenericBareItem<S, B, T, D> {
+        impl From<$t> for BareItem {
+            fn from(v: $t) -> Self {
+                Self::Integer(v.into())
+            }
+        }
+        impl From<$t> for RefBareItem<'_> {
             fn from(v: $t) -> Self {
                 Self::Integer(v.into())
             }

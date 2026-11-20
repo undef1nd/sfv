@@ -358,30 +358,6 @@ impl<S, B, T, D> GenericBareItem<S, B, T, D> {
     }
 }
 
-impl<S, B, T, D> From<Integer> for GenericBareItem<S, B, T, D> {
-    fn from(val: Integer) -> Self {
-        Self::Integer(val)
-    }
-}
-
-impl<S, B, T, D> From<bool> for GenericBareItem<S, B, T, D> {
-    fn from(val: bool) -> Self {
-        Self::Boolean(val)
-    }
-}
-
-impl<S, B, T, D> From<Decimal> for GenericBareItem<S, B, T, D> {
-    fn from(val: Decimal) -> Self {
-        Self::Decimal(val)
-    }
-}
-
-impl<S, B, T, D> From<Date> for GenericBareItem<S, B, T, D> {
-    fn from(val: Date) -> Self {
-        Self::Date(val)
-    }
-}
-
 /// A [bare item] that owns its data.
 ///
 /// [bare item]: <https://httpwg.org/specs/rfc9651.html#item>
@@ -435,26 +411,33 @@ pub type RefBareItem<'a> = GenericBareItem<&'a StringRef, &'a [u8], &'a TokenRef
 /// Used to parse input incrementally in the [`visitor`] module.
 ///
 /// [bare item]: <https://httpwg.org/specs/rfc9651.html#item>
-///
-/// Note: This type deliberately does not implement `From<Cow<str>>` as a
-/// shorthand for [`BareItemFromInput::DisplayString`] because it is too easy to
-/// confuse with conversions from [`Cow<StringRef>`]:
-///
-/// ```compile_fail
-/// # use sfv::BareItemFromInput;
-/// # use std::borrow::Cow;
-/// let _: BareItemFromInput = "x".to_owned().into();
-/// ```
-///
-/// Instead, use:
-///
-/// ```
-/// # use sfv::BareItemFromInput;
-/// # use std::borrow::Cow;
-/// let _ = BareItemFromInput::DisplayString(Cow::Borrowed("x"));
-/// ```
 pub type BareItemFromInput<'a> =
     GenericBareItem<Cow<'a, StringRef>, Vec<u8>, &'a TokenRef, Cow<'a, str>>;
+
+macro_rules! impl_from_for_bare_items {
+    ($($variant:ident($from:ty),)+) => {
+        $(
+            impl From<$from> for BareItem {
+                fn from(val: $from) -> Self {
+                    Self::$variant(val)
+                }
+            }
+
+            impl From<$from> for RefBareItem<'_> {
+                fn from(val: $from) -> Self {
+                    Self::$variant(val)
+                }
+            }
+        )+
+    };
+}
+
+impl_from_for_bare_items! {
+    Integer(Integer),
+    Boolean(bool),
+    Decimal(Decimal),
+    Date(Date),
+}
 
 impl From<Vec<u8>> for BareItem {
     fn from(val: Vec<u8>) -> Self {
