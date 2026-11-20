@@ -4,8 +4,8 @@ use crate::{
     BareItemFromInput, Date, Decimal, Integer, KeyRef, SFVResult, String, StringRef, TokenRef,
     Version, error, utils,
     visitor::{
-        DictionaryVisitor, EntryVisitor, InnerListVisitor, ItemVisitor, ListVisitor,
-        MakeDictionaryVisitor, MakeItemVisitor, MakeListVisitor, ParameterVisitor,
+        BareItemVisitor, DictionaryVisitor, EntryVisitor, InnerListVisitor, ItemVisitor,
+        ListVisitor, ParameterVisitor,
     },
 };
 
@@ -49,18 +49,6 @@ impl<'de> Parser<'de> {
         T::parse(self)
     }
 
-    /// Parses input into a structured field value of `Dictionary` type,
-    /// returning the result as type `T`.
-    ///
-    /// # Errors
-    /// When the parsing process is unsuccessful, including any error raised by a visitor.
-    pub fn parse_dictionary<T>(self) -> SFVResult<T>
-    where
-        T: MakeDictionaryVisitor<'de>,
-    {
-        self.parse_dictionary_with_visitor(T::make_dictionary_visitor())
-    }
-
     /// Parses input into a structured field value of `Dictionary` type, using
     /// the given visitor.
     ///
@@ -92,18 +80,6 @@ impl<'de> Parser<'de> {
         })
     }
 
-    /// Parses input into a structured field value of `List` type, returning the
-    /// result as type `T`.
-    ///
-    /// # Errors
-    /// When the parsing process is unsuccessful, including any error raised by a visitor.
-    pub fn parse_list<T>(self) -> SFVResult<T>
-    where
-        T: MakeListVisitor<'de>,
-    {
-        self.parse_list_with_visitor(T::make_list_visitor())
-    }
-
     /// Parses input into a structured field value of `List` type, using the
     /// given visitor.
     ///
@@ -120,28 +96,19 @@ impl<'de> Parser<'de> {
         })
     }
 
-    /// Parses input into a structured field value of `Item` type, returning the
-    /// result as type `T`.
-    ///
-    /// # Errors
-    /// When the parsing process is unsuccessful, including any error raised by a visitor.
-    pub fn parse_item<T>(self) -> SFVResult<T>
-    where
-        T: MakeItemVisitor<'de>,
-    {
-        self.parse_item_with_visitor(T::make_item_visitor())
-    }
-
     /// Parses input into a structured field value of `Item` type, using the
     /// given visitor.
     ///
     /// # Errors
     /// When the parsing process is unsuccessful, including any error raised by a visitor.
-    pub fn parse_item_with_visitor<V>(self, visitor: V) -> SFVResult<V::Out>
+    pub fn parse_item_with_visitor<V>(
+        self,
+        visitor: V,
+    ) -> SFVResult<<V::Out as ParameterVisitor<'de>>::Out>
     where
         V: ItemVisitor<'de>,
     {
-        self.parse_internal(|parser| parser.parse_item_internal(visitor))
+        self.parse_internal(|parser| parser.parse_item(visitor))
     }
 
     fn peek(&self) -> Option<u8> {
@@ -210,7 +177,7 @@ impl<'de> Parser<'de> {
         if let Some(b'(') = self.peek() {
             self.parse_inner_list(visitor.inner_list()?)
         } else {
-            self.parse_item_internal(visitor.item()?)?;
+            self.parse_item(visitor.item()?)?;
             Ok(())
         }
     }
@@ -237,7 +204,7 @@ impl<'de> Parser<'de> {
                 return Ok(());
             }
 
-            self.parse_item_internal(visitor.item()?)?;
+            self.parse_item(visitor.item()?)?;
 
             if let Some(c) = self.peek()
                 && c != b' '
@@ -250,7 +217,10 @@ impl<'de> Parser<'de> {
         Err(error::Repr::UnterminatedInnerList(self.index))
     }
 
-    fn parse_item_internal<V>(&mut self, visitor: V) -> Result<V::Out, error::Repr>
+    fn parse_item<V>(
+        &mut self,
+        visitor: V,
+    ) -> Result<<V::Out as ParameterVisitor<'de>>::Out, error::Repr>
     where
         V: ItemVisitor<'de>,
     {
@@ -602,15 +572,14 @@ impl<'de> Parser<'de> {
             self.next();
             self.consume_sp_chars();
 
-            let param_name = self.parse_key()?;
-            let param_value = if let Some(b'=') = self.peek() {
+            // Note: It is up to the visitor to properly handle duplicate keys.
+            let param_visitor = visitor.parameter(self.parse_key()?)?;
+            param_visitor.bare_item(if let Some(b'=') = self.peek() {
                 self.next();
                 self.parse_bare_item()?
             } else {
                 BareItemFromInput::Boolean(true)
-            };
-            // Note: It is up to the visitor to properly handle duplicate keys.
-            visitor.parameter(param_name, param_value)?;
+            })?;
         }
 
         Ok(visitor.finish()?)
