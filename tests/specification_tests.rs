@@ -5,7 +5,7 @@ use serde::{
     Deserialize, Deserializer,
     de::{self, DeserializeOwned},
 };
-use sfv::{BareItem, Date, FieldType, InnerList, Item, Key, ListEntry, Parser};
+use sfv::{BareItem, Date, FieldType, InnerList, Item, Key, ListEntry, Parser, Version};
 
 #[derive(Deserialize)]
 #[serde(bound = "")]
@@ -201,31 +201,40 @@ impl TestCase for ParseTestData {
         E::Output: PartialEq + fmt::Debug + FieldType,
     {
         let input = self.raw.join(", ");
-        let parsed = Parser::new(&input).parse::<E::Output>();
 
-        match expectation {
-            Expectation::MustFail => assert!(parsed.is_err()),
-            Expectation::Valid {
-                expected: (expected, canonical),
-                can_fail,
-            } => match parsed {
-                Ok(actual) => {
-                    assert_eq!(actual, expected);
+        for version in [Version::Rfc8941, Version::Rfc9651] {
+            let parsed = Parser::new(&input)
+                .with_version(version)
+                .parse::<E::Output>();
 
-                    // If the canonical field is omitted, the canonical form is the input.
-                    // If the canonical field is an empty list, the serialization should be
-                    // omitted, which corresponds to `None` from `serialize`.
-                    assert_eq!(
-                        actual.serialize().into(),
-                        match canonical {
-                            None => Some(input),
-                            Some(Canonical::Empty([])) => None,
-                            Some(Canonical::Single([canonical])) => Some(canonical),
-                        },
-                    );
+            match &expectation {
+                Expectation::Valid {
+                    expected: (expected, canonical),
+                    can_fail,
+                } if expected.supports_version(version) => match parsed {
+                    Ok(actual) => {
+                        assert_eq!(actual, *expected, "{version}");
+
+                        // If the canonical field is omitted, the canonical form is the input.
+                        // If the canonical field is an empty list, the serialization should be
+                        // omitted, which corresponds to `None` from `serialize`.
+                        let serialized: Option<String> = actual.serialize().into();
+                        assert_eq!(
+                            serialized.as_deref(),
+                            match canonical {
+                                None => Some(input.as_str()),
+                                Some(Canonical::Empty([])) => None,
+                                Some(Canonical::Single([canonical])) => Some(canonical.as_str()),
+                            },
+                            "{version}",
+                        );
+                    }
+                    Err(_) => assert!(*can_fail, "{version}"),
+                },
+                Expectation::MustFail | Expectation::Valid { .. } => {
+                    assert!(parsed.is_err(), "{version}");
                 }
-                Err(_) => assert!(can_fail),
-            },
+            }
         }
     }
 }
@@ -277,8 +286,62 @@ impl TestCase for SerializeTestData {
     }
 }
 
+trait SupportsVersion {
+    fn supports_version(&self, version: Version) -> bool;
+}
+
+impl<T: SupportsVersion> SupportsVersion for IndexMap<Key, T> {
+    fn supports_version(&self, version: Version) -> bool {
+        self.values().all(|value| value.supports_version(version))
+    }
+}
+
+impl<T: SupportsVersion> SupportsVersion for Vec<T> {
+    fn supports_version(&self, version: Version) -> bool {
+        self.iter().all(|value| value.supports_version(version))
+    }
+}
+
+impl SupportsVersion for ListEntry {
+    fn supports_version(&self, version: Version) -> bool {
+        match self {
+            Self::Item(value) => value.supports_version(version),
+            Self::InnerList(value) => value.supports_version(version),
+        }
+    }
+}
+
+impl SupportsVersion for InnerList {
+    fn supports_version(&self, version: Version) -> bool {
+        self.items.supports_version(version) && self.params.supports_version(version)
+    }
+}
+
+impl SupportsVersion for Item {
+    fn supports_version(&self, version: Version) -> bool {
+        self.bare_item.supports_version(version) && self.params.supports_version(version)
+    }
+}
+
+impl SupportsVersion for BareItem {
+    fn supports_version(&self, version: Version) -> bool {
+        match self {
+            Self::Integer(_)
+            | Self::Decimal(_)
+            | Self::Boolean(_)
+            | Self::String(_)
+            | Self::Token(_)
+            | Self::ByteSequence(_) => true,
+            Self::Date(_) | Self::DisplayString(_) => match version {
+                Version::Rfc8941 => false,
+                Version::Rfc9651 => true,
+            },
+        }
+    }
+}
+
 trait Build: DeserializeOwned {
-    type Output;
+    type Output: SupportsVersion;
 
     fn build(self) -> Result<Self::Output, sfv::Error>;
 }
