@@ -339,8 +339,8 @@ impl Build for ExpectedBareItem {
 
     fn build(self) -> Result<BareItem, sfv::Error> {
         Ok(match self {
-            Self::Integer(value) => value.try_into()?,
-            Self::Decimal(value) => value.try_into()?,
+            Self::Integer(value) => BareItem::Integer(value.try_into()?),
+            Self::Decimal(value) => BareItem::Decimal(value.try_into()?),
             Self::Boolean(value) => value.into(),
             Self::String(value) => BareItem::String(value.try_into()?),
             Self::Token(value) => BareItem::Token(value.try_into()?),

@@ -154,10 +154,7 @@ fn serializing_ref_list(c: &mut Criterion) {
                 let mut ser = ser.inner_list();
                 ser.bare_item(string_ref("somelongstringvalue"));
                 ser.bare_item(string_ref("anotherlongstringvalue"))
-                    .parameter(
-                        key_ref("key"),
-                        "somever longstringvaluerepresentedasbytes".as_bytes(),
-                    );
+                    .parameter(key_ref("key"), b"somever longstringvaluerepresentedasbytes");
                 ser.bare_item(145);
             }
             ser.finish()
@@ -175,7 +172,7 @@ fn serializing_ref_dict(c: &mut Criterion) {
             {
                 let mut ser = ser.inner_list(key_ref("dict_key4"));
                 ser.bare_item(string_ref("inner-list-member"));
-                ser.bare_item("inner-list-member".as_bytes());
+                ser.bare_item(b"inner-list-member");
                 ser.finish()
                     .parameter(key_ref("key"), token_ref("aW5uZXItbGlzdC1wYXJhbWV0ZXJz"));
             }
