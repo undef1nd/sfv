@@ -536,6 +536,18 @@ where
     }
 }
 
+impl<'a> From<&'a Vec<u8>> for RefBareItem<'a> {
+    fn from(val: &'a Vec<u8>) -> Self {
+        Self::ByteSequence(val)
+    }
+}
+
+impl<'a, const N: usize> From<&'a [u8; N]> for RefBareItem<'a> {
+    fn from(val: &'a [u8; N]) -> Self {
+        Self::ByteSequence(val)
+    }
+}
+
 impl<'a> From<&'a [u8]> for RefBareItem<'a> {
     fn from(val: &'a [u8]) -> Self {
         Self::ByteSequence(val)
