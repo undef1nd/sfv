@@ -319,9 +319,12 @@ impl<S, B, T, D> GenericBareItem<S, B, T, D> {
 
     /// If the bare item is a display string, returns a reference to it; otherwise returns `None`.
     #[must_use]
-    pub fn as_display_string(&self) -> Option<&D> {
+    pub fn as_display_string(&self) -> Option<&str>
+    where
+        D: Borrow<str>,
+    {
         match *self {
-            Self::DisplayString(ref val) => Some(val),
+            Self::DisplayString(ref val) => Some(val.borrow()),
             _ => None,
         }
     }
