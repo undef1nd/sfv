@@ -314,123 +314,67 @@ assert!(matches!(parse_with_visitor(b"color=?2"), Err(Error::Syntax(_))));
 
 # Returning a value from `ItemVisitor`
 
-If a top-level item is being parsed, the visitor can return the value directly:
+When a top-level item is parsed with
+[`Parser::parse_item_with_visitor`][crate::Parser::parse_item_with_visitor],
+[`ItemVisitor::Out`] is returned directly on success:
 
 ```
-# use sfv::visitor::{Ignored, ItemVisitor, ParameterVisitor, parameter_visitor_with};
-# use sfv::{BareItemFromInput, TokenRef, token_ref};
-# fn main() -> Result<(), sfv::Error> {
-struct Visitor;
-
-impl<'de> ItemVisitor<'de> for Visitor {
-  type Out = Option<&'de TokenRef>;
-  type Error = std::convert::Infallible;
-
-  fn bare_item(self, bare_item: BareItemFromInput<'de>) -> Result<impl ParameterVisitor<'de, Out = Self::Out>, Self::Error> {
-      Ok(parameter_visitor_with(Ignored, move |_| {
-        Ok(if let BareItemFromInput::Token(token) = bare_item {
-            Some(token)
-        } else {
-            None
-        })
-     }))
-  }
-}
-
-assert_eq!(
-  Some(token_ref("abc")),
-  sfv::Parser::new("abc").parse_item_with_visitor(Visitor)?,
-);
-# Ok(())
-# }
-```
-
-Or without the `Option` at all:
-
-```
-# use sfv::visitor::{Ignored, ItemVisitor, ParameterVisitor, parameter_visitor_with};
-# use sfv::{BareItemFromInput, TokenRef, token_ref};
-# fn main() -> Result<(), sfv::Error> {
-struct Visitor;
+use std::convert::Infallible;
+use sfv::visitor::{ItemVisitor, ParameterVisitor};
+use sfv::{BareItemFromInput, KeyRef, Parser, TokenRef, Version, token_ref};
 
 #[derive(Debug)]
-struct ExpectedToken;
+enum BarError {
+    Syntax(sfv::Error),
+    ExpectedToken,
+}
 
-impl std::fmt::Display for ExpectedToken {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.write_str("expected token")
+fn parse_bar(input: &[u8]) -> Result<&TokenRef, BarError> {
+    struct Visitor<'de>(Option<&'de TokenRef>);
+
+    impl<'de> ItemVisitor<'de> for Visitor<'de> {
+        type Out = Option<&'de TokenRef>;
+        type Error = Infallible;
+
+        fn bare_item(
+            mut self,
+            bare_item: BareItemFromInput<'de>,
+        ) -> Result<impl ParameterVisitor<'de, Out = Self::Out>, Self::Error> {
+            if let BareItemFromInput::Token(token) = bare_item {
+                self.0 = Some(token);
+            }
+            Ok(self)
+        }
     }
+
+    impl<'de> ParameterVisitor<'de> for Visitor<'de> {
+        type Out = Option<&'de TokenRef>;
+        type Error = Infallible;
+
+        fn parameter(
+            &mut self,
+            _key: &'de KeyRef,
+            _value: BareItemFromInput<'de>,
+        ) -> Result<(), Self::Error> {
+            Ok(())
+        }
+
+        fn finish(self) -> Result<Self::Out, Self::Error> {
+            Ok(self.0)
+        }
+    }
+
+    Parser::new(input)
+        .with_version(Version::Rfc8941)
+        .parse_item_with_visitor(Visitor(None))
+        .map_err(BarError::Syntax)?
+        .ok_or(BarError::ExpectedToken)
 }
 
-impl std::error::Error for ExpectedToken {}
-
-impl<'de> ItemVisitor<'de> for Visitor {
-  type Out = &'de TokenRef;
-  type Error = ExpectedToken;
-
-  fn bare_item(self, bare_item: BareItemFromInput<'de>) -> Result<impl ParameterVisitor<'de, Out = Self::Out>, Self::Error> {
-      if let BareItemFromInput::Token(token) = bare_item {
-          Ok(parameter_visitor_with(Ignored, move |_| Ok(token)))
-      } else {
-          Err(ExpectedToken)
-      }
-  }
-}
-
-assert_eq!(
-  token_ref("abc"),
-  sfv::Parser::new("abc").parse_item_with_visitor(Visitor)?,
-);
-
-assert!(sfv::Parser::new("123").parse_item_with_visitor(Visitor).is_err());
-# Ok(())
-# }
-```
-
-Or using a function, given the blanket implementation of [`ItemVisitor`] for [`FnOnce`]:
-
-```
-# use sfv::visitor::{Ignored, ParameterVisitor, parameter_visitor_with};
-# use sfv::{BareItemFromInput, TokenRef, token_ref};
-# fn main() -> Result<(), sfv::Error> {
-# #[derive(Debug)]
-# struct ExpectedToken;
-#
-# impl std::fmt::Display for ExpectedToken {
-#    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-#        f.write_str("expected token")
-#    }
-# }
-#
-# impl std::error::Error for ExpectedToken {}
-#
-fn as_token<'de>(bare_item: BareItemFromInput<'de>) -> Result<impl ParameterVisitor<'de, Out = &'de TokenRef>, ExpectedToken> {
-  if let BareItemFromInput::Token(token) = bare_item {
-      Ok(parameter_visitor_with(Ignored, move |_| Ok(token)))
-  } else {
-      Err(ExpectedToken)
-  }
-}
-
-assert_eq!(
-  token_ref("abc"),
-  sfv::Parser::new("abc").parse_item_with_visitor(as_token)?,
-);
-# Ok(())
-# }
-```
-
-Or even:
-
-```
-# use sfv::{TokenRef, token_ref};
-# fn main() -> Result<(), sfv::Error> {
-assert_eq!(
-  token_ref("abc"),
-  sfv::Parser::new("abc").parse_item::<&TokenRef>()?,
-);
-# Ok(())
-# }
+assert_eq!(parse_bar(b"abc;foo=1").unwrap(), token_ref("abc"));
+assert!(matches!(parse_bar(b"123"), Err(BarError::ExpectedToken)));
+assert!(matches!(parse_bar(b"@1659578233"), Err(BarError::Syntax(_))));
+assert!(matches!(parse_bar(b"123;0"), Err(BarError::Syntax(_))));
 ```
 
 # Discarding irrelevant parts
@@ -905,219 +849,4 @@ impl<'de> InnerListVisitor<'de> for Never {
     fn finish(self) -> Result<impl ParameterVisitor<'de>, Self::Error> {
         Ok(self)
     }
-}
-
-/// Returns a `ParameterVisitor` that delegates to another visitor but invokes
-/// a function to return its value.
-///
-/// The returned visitor behaves as follows:
-///
-/// - [`ParameterVisitor::parameter`] forwards directly to `visitor.parameter`
-/// - [`ParameterVisitor::finish`] returns `finish(visitor.finish()?)`
-///
-/// This can be used to propagate a value of type `T` produced within an
-/// [`ItemVisitor::bare_item`] call to a parameter visitor `V` that will return
-/// it, and even delay an expensive operation producing `T` until the parameters
-/// have been parsed successfully.
-///
-/// See [the module documentation](crate::visitor#returning-a-value-from-itemvisitor)
-/// for an example.
-pub fn parameter_visitor_with<'de, V, T>(
-    visitor: V,
-    finish: impl FnOnce(V::Out) -> Result<T, V::Error>,
-) -> impl ParameterVisitor<'de, Out = T, Error = V::Error>
-where
-    V: ParameterVisitor<'de>,
-{
-    ParameterVisitorWith { visitor, finish }
-}
-
-struct ParameterVisitorWith<V, F> {
-    visitor: V,
-    finish: F,
-}
-
-impl<'de, V, F, T> ParameterVisitor<'de> for ParameterVisitorWith<V, F>
-where
-    V: ParameterVisitor<'de>,
-    F: FnOnce(V::Out) -> Result<T, V::Error>,
-{
-    type Out = T;
-    type Error = V::Error;
-
-    fn parameter(
-        &mut self,
-        key: &'de KeyRef,
-        value: BareItemFromInput<'de>,
-    ) -> Result<(), Self::Error> {
-        self.visitor.parameter(key, value)
-    }
-
-    fn finish(self) -> Result<Self::Out, Self::Error> {
-        (self.finish)(self.visitor.finish()?)
-    }
-}
-
-/// A type that can be produced from an [`ItemVisitor`].
-///
-/// Use this with [`crate::Parser::parse_item`].
-pub trait MakeItemVisitor<'de> {
-    /// Returns an item visitor that produces `Self` on success.
-    fn make_item_visitor() -> impl ItemVisitor<'de, Out = Self>;
-}
-
-/// A type that can be produced from a [`ListVisitor`].
-///
-/// Use this with [`crate::Parser::parse_list`].
-pub trait MakeListVisitor<'de> {
-    /// Returns a list visitor that produces `Self` on success.
-    fn make_list_visitor() -> impl ListVisitor<'de, Out = Self>;
-}
-
-/// A type that can be produced from a [`DictionaryVisitor`].
-///
-/// Use this with [`crate::Parser::parse_dictionary`].
-pub trait MakeDictionaryVisitor<'de> {
-    /// Returns a dictionary visitor that produces `Self` on success.
-    fn make_dictionary_visitor() -> impl DictionaryVisitor<'de, Out = Self>;
-}
-
-impl<'de, V> MakeItemVisitor<'de> for V
-where
-    V: ItemVisitor<'de, Out = Self> + Default,
-{
-    fn make_item_visitor() -> impl ItemVisitor<'de, Out = Self> {
-        V::default()
-    }
-}
-
-impl<'de, V> MakeListVisitor<'de> for V
-where
-    V: ListVisitor<'de, Out = Self> + Default,
-{
-    fn make_list_visitor() -> impl ListVisitor<'de, Out = Self> {
-        V::default()
-    }
-}
-
-impl<'de, V> MakeDictionaryVisitor<'de> for V
-where
-    V: DictionaryVisitor<'de, Out = Self> + Default,
-{
-    fn make_dictionary_visitor() -> impl DictionaryVisitor<'de, Out = Self> {
-        V::default()
-    }
-}
-
-/// Makes an item visitor expecting any bare item and ignoring parameters.
-impl<'de> MakeItemVisitor<'de> for BareItemFromInput<'de> {
-    fn make_item_visitor() -> impl ItemVisitor<'de, Out = Self> {
-        |bare_item| Ok::<_, Infallible>(parameter_visitor_with(Ignored, |()| Ok(bare_item)))
-    }
-}
-
-/// Makes an item visitor expecting any bare item and ignoring parameters.
-impl<'de> MakeItemVisitor<'de> for super::BareItem {
-    fn make_item_visitor() -> impl ItemVisitor<'de, Out = Self> {
-        |bare_item: BareItemFromInput<'de>| {
-            Ok::<_, Infallible>(parameter_visitor_with(Ignored, |()| {
-                Ok(bare_item.into_bare_item())
-            }))
-        }
-    }
-}
-
-#[derive(Debug)]
-enum BareItemType {
-    Decimal,
-    Integer,
-    String,
-    ByteSequence,
-    Boolean,
-    Token,
-    Date,
-    DisplayString,
-}
-
-impl BareItemFromInput<'_> {
-    fn ty(&self) -> BareItemType {
-        match *self {
-            Self::Decimal(_) => BareItemType::Decimal,
-            Self::Integer(_) => BareItemType::Integer,
-            Self::String(_) => BareItemType::String,
-            Self::ByteSequence(_) => BareItemType::ByteSequence,
-            Self::Boolean(_) => BareItemType::Boolean,
-            Self::Token(_) => BareItemType::Token,
-            Self::Date(_) => BareItemType::Date,
-            Self::DisplayString(_) => BareItemType::DisplayString,
-        }
-    }
-}
-
-impl std::fmt::Display for BareItemType {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.write_str(match *self {
-            Self::Decimal => "decimal",
-            Self::Integer => "integer",
-            Self::String => "string",
-            Self::ByteSequence => "byte sequence",
-            Self::Boolean => "boolean",
-            Self::Token => "token",
-            Self::Date => "date",
-            Self::DisplayString => "display string",
-        })
-    }
-}
-
-#[derive(Debug)]
-struct UnexpectedBareItemType {
-    expected: BareItemType,
-    got: BareItemType,
-}
-
-impl std::fmt::Display for UnexpectedBareItemType {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "unexpected bare item type: expected {}, got {}",
-            self.expected, self.got
-        )
-    }
-}
-
-impl Error for UnexpectedBareItemType {}
-
-macro_rules! impl_make_item_visitor_ignoring_params {
-    ($($var: ident($t: ty) $doc: literal,)+) => {
-        $(
-            /// Makes an item visitor expecting
-            #[doc = $doc]
-            /// bare item and ignoring parameters.
-            impl<'de> MakeItemVisitor<'de> for $t {
-                fn make_item_visitor() -> impl ItemVisitor<'de, Out = Self> {
-                    |v| {
-                        if let BareItemFromInput::$var(v) = v {
-                            Ok(parameter_visitor_with(Ignored, move |()| Ok(v)))
-                        } else {
-                            Err(UnexpectedBareItemType {
-                                expected: BareItemType::$var,
-                                got: v.ty(),
-                            })
-                        }
-                    }
-                }
-            }
-        )+
-    };
-}
-
-impl_make_item_visitor_ignoring_params! {
-    Decimal(super::Decimal) "a decimal",
-    Integer(super::Integer) "an integer",
-    String(std::borrow::Cow<'de, super::StringRef>) "a string",
-    ByteSequence(Vec<u8>) "a byte sequence",
-    Boolean(bool) "a boolean",
-    Token(&'de super::TokenRef) "a token",
-    Date(super::Date) "a date",
-    // deliberately omitted: DisplayString(Cow<'de, str>) "display string",
 }
