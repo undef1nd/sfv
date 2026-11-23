@@ -149,6 +149,8 @@ impl<'de> ParameterVisitor<'de> for Wrapper<&mut Parameters> {
     type Error = Infallible;
 
     fn parameter(&mut self, key: &'de KeyRef) -> Result<impl BareItemVisitor<'de>, Self::Error> {
+        // TODO: Avoid allocating an owned `Key` when an equivalent key is
+        // already present if `IndexMap` adds an `entry_ref`-style API.
         Ok(Wrapper(
             self.0
                 .entry(key.to_owned())
@@ -221,6 +223,8 @@ impl<'de> DictionaryVisitor<'de> for Wrapper<&mut Dictionary> {
     type Error = Infallible;
 
     fn entry(&mut self, key: &'de KeyRef) -> Result<impl EntryVisitor<'de>, Self::Error> {
+        // TODO: Avoid allocating an owned `Key` when an equivalent key is
+        // already present if `IndexMap` adds an `entry_ref`-style API.
         Ok(Wrapper(
             self.0
                 .entry(key.to_owned())
