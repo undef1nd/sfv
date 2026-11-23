@@ -69,8 +69,8 @@ fn test_fast_serialize_dict() {
 
         {
             let mut ser = ser.inner_list(key_ref("key7"));
-            ser.bare_item("some_string".as_bytes());
-            ser.bare_item("other_string".as_bytes());
+            ser.bare_item(b"some_string");
+            ser.bare_item(&b"other_string".to_vec());
             ser.finish().parameter(key_ref("lparam"), 10);
         }
 

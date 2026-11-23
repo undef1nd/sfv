@@ -1009,27 +1009,21 @@ where
     }
 }
 
-#[allow(clippy::unnecessary_wraps)]
-fn infallible_bare_item_visitor<'de, T>(
-    bare_item: BareItemFromInput<'de>,
-) -> Result<impl ParameterVisitor<'de, Out = T>, Infallible>
-where
-    T: From<BareItemFromInput<'de>>,
-{
-    Ok(parameter_visitor_with(Ignored, |()| Ok(T::from(bare_item))))
-}
-
 /// Makes an item visitor expecting any bare item and ignoring parameters.
 impl<'de> MakeItemVisitor<'de> for BareItemFromInput<'de> {
     fn make_item_visitor() -> impl ItemVisitor<'de, Out = Self> {
-        infallible_bare_item_visitor
+        |bare_item| Ok::<_, Infallible>(parameter_visitor_with(Ignored, |()| Ok(bare_item)))
     }
 }
 
 /// Makes an item visitor expecting any bare item and ignoring parameters.
 impl<'de> MakeItemVisitor<'de> for super::BareItem {
     fn make_item_visitor() -> impl ItemVisitor<'de, Out = Self> {
-        infallible_bare_item_visitor
+        |bare_item: BareItemFromInput<'de>| {
+            Ok::<_, Infallible>(parameter_visitor_with(Ignored, |()| {
+                Ok(bare_item.into_bare_item())
+            }))
+        }
     }
 }
 
