@@ -280,7 +280,7 @@ impl<'de> Parser<'de> {
 
         self.next();
 
-        let start = self.index;
+        let mut span_start = self.index;
         let mut output = Vec::new();
 
         while let Some(curr_char) = self.peek() {
@@ -291,10 +291,11 @@ impl<'de> Parser<'de> {
                     // TODO: The UTF-8 validation is redundant with the preceding character checks, but
                     // its removal is only possible with unsafe code.
                     return Ok(if output.is_empty() {
-                        let slice = &self.input[start..end];
+                        let slice = &self.input[span_start..end];
                         let output = std::str::from_utf8(slice).unwrap();
                         Cow::Borrowed(StringRef::from_validated_str(output))
                     } else {
+                        output.extend_from_slice(&self.input[span_start..end]);
                         let output = StdString::from_utf8(output).unwrap();
                         Cow::Owned(String::from_validated_string(output))
                     });
@@ -308,10 +309,9 @@ impl<'de> Parser<'de> {
                     match self.peek() {
                         Some(c @ (b'\\' | b'"')) => {
                             self.next();
-                            if output.is_empty() {
-                                output = self.input[start..escape_index].to_vec();
-                            }
+                            output.extend_from_slice(&self.input[span_start..escape_index]);
                             output.push(c);
+                            span_start = self.index;
                         }
                         None => return Err(error::Repr::UnterminatedEscapeSequence(self.index)),
                         Some(_) => return Err(error::Repr::InvalidEscapeSequence(self.index)),
@@ -319,9 +319,6 @@ impl<'de> Parser<'de> {
                 }
                 _ => {
                     self.next();
-                    if !output.is_empty() {
-                        output.push(curr_char);
-                    }
                 }
             }
         }
@@ -489,6 +486,7 @@ impl<'de> Parser<'de> {
         self.next();
 
         let start = self.index;
+        let mut span_start = start;
         let mut output = Vec::new();
 
         while let Some(curr_char) = self.peek() {
@@ -503,6 +501,7 @@ impl<'de> Parser<'de> {
                         let output = std::str::from_utf8(slice).unwrap();
                         Ok(Cow::Borrowed(output))
                     } else {
+                        output.extend_from_slice(&self.input[span_start..end]);
                         match StdString::from_utf8(output) {
                             Ok(output) => Ok(Cow::Owned(output)),
                             Err(err) => {
@@ -546,16 +545,12 @@ impl<'de> Parser<'de> {
                             };
                     }
 
-                    if output.is_empty() {
-                        output = self.input[start..escape_index].to_vec();
-                    }
+                    output.extend_from_slice(&self.input[span_start..escape_index]);
                     output.push(octet);
+                    span_start = self.index;
                 }
                 _ => {
                     self.next();
-                    if !output.is_empty() {
-                        output.push(curr_char);
-                    }
                 }
             }
         }

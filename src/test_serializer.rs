@@ -418,7 +418,15 @@ fn serialize_date_with() {
 
 #[test]
 fn serialize_display_string() {
-    let mut buf = String::new();
-    serializer::serialize_display_string("üsers", &mut buf);
-    assert_eq!(buf, r#"%"%c3%bcsers""#);
+    for (input, expected) in [
+        ("", r#"%"""#),
+        ("hello world", r#"%"hello world""#),
+        ("üsers", r#"%"%c3%bcsers""#),
+        ("sersü", r#"%"sers%c3%bc""#),
+        ("a%\"b\x00\x1f\x7fc€", r#"%"a%25%22b%00%1f%7fc%e2%82%ac""#),
+    ] {
+        let mut buf = String::new();
+        serializer::serialize_display_string(input, &mut buf);
+        assert_eq!(buf, expected, "{input:?}");
+    }
 }
