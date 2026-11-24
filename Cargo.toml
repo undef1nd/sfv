@@ -16,7 +16,7 @@ rust-version = "1.95"
 [dependencies]
 arbitrary = { version = "1.5.0", optional = true, features = ["derive"] }
 base64 = { version = "0.23.1", default-features = false, features = ["alloc"] }
-indexmap = { version = "2.7", optional = true }
+ordermap = { version = "1.2", optional = true }
 ref-cast = "1.0.23"
 
 [dev-dependencies]
@@ -35,8 +35,8 @@ required-features = ["parsed-types"]
 
 [features]
 default = ["parsed-types"]
-arbitrary = ["dep:arbitrary", "indexmap?/arbitrary"]
-parsed-types = ["dep:indexmap"]
+arbitrary = ["dep:arbitrary", "ordermap?/arbitrary"]
+parsed-types = ["dep:ordermap"]
 
 [[test]]
 name = "specification_tests"

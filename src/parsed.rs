@@ -1,6 +1,6 @@
 use std::convert::Infallible;
 
-use indexmap::IndexMap;
+use ordermap::OrderMap;
 
 use crate::{
     BareItem, BareItemFromInput, Error, Key, KeyRef, Parser,
@@ -16,7 +16,7 @@ use crate::{
 /// Can be used as a member of `List` or `Dictionary`.
 ///
 /// [item]: <https://httpwg.org/specs/rfc9651.html#item>
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Item {
     /// The item's value.
@@ -58,7 +58,7 @@ where
 /// A [dictionary]-type structured field value.
 ///
 /// [dictionary]: <https://httpwg.org/specs/rfc9651.html#dictionary>
-pub type Dictionary = IndexMap<Key, ListEntry>;
+pub type Dictionary = OrderMap<Key, ListEntry>;
 
 /// A [list]-type structured field value.
 ///
@@ -68,10 +68,10 @@ pub type List = Vec<ListEntry>;
 /// [Parameters] of an [`Item`] or [`InnerList`].
 ///
 /// [parameters]: <https://httpwg.org/specs/rfc9651.html#param>
-pub type Parameters = IndexMap<Key, BareItem>;
+pub type Parameters = OrderMap<Key, BareItem>;
 
 /// A member of a [`List`] or [`Dictionary`].
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum ListEntry {
     /// An item.
@@ -105,7 +105,7 @@ where
 /// An [array] of [`Item`]s with associated [`Parameters`].
 ///
 /// [array]: <https://httpwg.org/specs/rfc9651.html#inner-list>
-#[derive(Debug, Default, PartialEq, Eq, Clone)]
+#[derive(Debug, Default, PartialEq, Eq, Hash, Clone)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct InnerList {
     /// The inner list's items, which can be empty.
@@ -150,7 +150,7 @@ impl<'de> ParameterVisitor<'de> for Wrapper<&mut Parameters> {
 
     fn parameter(&mut self, key: &'de KeyRef) -> Result<impl BareItemVisitor<'de>, Self::Error> {
         // TODO: Avoid allocating an owned `Key` when an equivalent key is
-        // already present if `IndexMap` adds an `entry_ref`-style API.
+        // already present if `OrderMap` adds an `entry_ref`-style API.
         Ok(Wrapper(
             self.0
                 .entry(key.to_owned())
@@ -224,7 +224,7 @@ impl<'de> DictionaryVisitor<'de> for Wrapper<&mut Dictionary> {
 
     fn entry(&mut self, key: &'de KeyRef) -> Result<impl EntryVisitor<'de>, Self::Error> {
         // TODO: Avoid allocating an owned `Key` when an equivalent key is
-        // already present if `IndexMap` adds an `entry_ref`-style API.
+        // already present if `OrderMap` adds an `entry_ref`-style API.
         Ok(Wrapper(
             self.0
                 .entry(key.to_owned())
