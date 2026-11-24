@@ -1,7 +1,7 @@
 use std::convert::Infallible;
 
 #[cfg(feature = "parsed-types")]
-use crate::{BareItem, Date, Item, Version};
+use crate::{BareItem, Date, Dictionary, Item, List, Version};
 use crate::{
     BareItemFromInput, Error, KeyRef, Parser, error, key_ref,
     visitor::{
@@ -243,6 +243,35 @@ fn parse_display_string() -> Result<(), Error> {
             Item::from(BareItem::DisplayString(expected.to_owned())),
         );
     }
+
+    Ok(())
+}
+
+#[test]
+#[cfg(feature = "parsed-types")]
+fn parsed_eq_and_hash_respect_key_order() -> Result<(), Error> {
+    use std::hash::BuildHasher as _;
+
+    let hasher = std::collections::hash_map::RandomState::new();
+
+    let d1: Dictionary = Parser::new("a=1, b=2").parse()?;
+    let d2: Dictionary = Parser::new("b=2, a=1").parse()?;
+    let d3: Dictionary = Parser::new("a=9, b=2, a=1").parse()?;
+    assert_ne!(d1, d2);
+    assert_eq!(d1, d3);
+    assert_eq!(hasher.hash_one(&d1), hasher.hash_one(&d3));
+
+    let i1: Item = Parser::new("1;a=1;b=2").parse()?;
+    let i2: Item = Parser::new("1;b=2;a=1").parse()?;
+    let i3: Item = Parser::new("1;a=9;b=2;a=1").parse()?;
+    assert_ne!(i1, i2);
+    assert_eq!(i1, i3);
+    assert_eq!(hasher.hash_one(&i1), hasher.hash_one(&i3));
+
+    let l1: List = Parser::new("(1);a=1;b=2").parse()?;
+    let l2: List = Parser::new("(1);b=2;a=1").parse()?;
+    assert_ne!(l1, l2);
+    assert_eq!(hasher.hash_one(&l1), hasher.hash_one(&l1));
 
     Ok(())
 }

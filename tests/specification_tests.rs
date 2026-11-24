@@ -1,6 +1,6 @@
 use std::{env, error::Error, fmt, fs, io, path::Path};
 
-use indexmap::IndexMap;
+use ordermap::OrderMap;
 use serde::{
     Deserialize, Deserializer,
     de::{self, DeserializeOwned},
@@ -290,7 +290,7 @@ trait SupportsVersion {
     fn supports_version(&self, version: Version) -> bool;
 }
 
-impl<T: SupportsVersion> SupportsVersion for IndexMap<Key, T> {
+impl<T: SupportsVersion> SupportsVersion for OrderMap<Key, T> {
     fn supports_version(&self, version: Version) -> bool {
         self.values().all(|value| value.supports_version(version))
     }
@@ -347,7 +347,7 @@ trait Build: DeserializeOwned {
 }
 
 impl<T: Build> Build for Vec<(String, T)> {
-    type Output = IndexMap<Key, T::Output>;
+    type Output = OrderMap<Key, T::Output>;
 
     fn build(self) -> Result<Self::Output, sfv::Error> {
         self.into_iter()

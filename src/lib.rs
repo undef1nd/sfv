@@ -138,7 +138,7 @@ assert_eq!(
 - `parsed-types` (enabled by default) -- When enabled, exposes fully owned types
   [`Item`], [`Dictionary`], [`List`], and their components, which can be obtained from
   [`Parser::parse`], etc. These types are implemented using the
-  [`indexmap`](https://crates.io/crates/indexmap) crate, so disabling this
+  [`ordermap`](https://crates.io/crates/ordermap) crate, so disabling this
   feature can avoid that dependency if parsing using a visitor
   ([`Parser::parse_item_with_visitor`], etc.) is sufficient.
 
