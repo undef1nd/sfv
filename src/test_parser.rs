@@ -231,12 +231,18 @@ fn parse_display_string() -> Result<(), Error> {
             .is_err()
     );
 
-    assert_eq!(
-        Parser::new(input).parse::<Item>()?,
-        Item::from(BareItem::DisplayString(
-            "This is intended for display to üsers.".to_owned()
-        ))
-    );
+    for (raw, expected) in [
+        (input, "This is intended for display to üsers."),
+        (r#"%"""#, ""),
+        (r#"%"hello""#, "hello"),
+        (r#"%"%c3%bc""#, "ü"),
+        (r#"%"%c3%bc mid %25 end %e2%82%ac""#, "ü mid % end €"),
+    ] {
+        assert_eq!(
+            Parser::new(raw).parse::<Item>()?,
+            Item::from(BareItem::DisplayString(expected.to_owned())),
+        );
+    }
 
     Ok(())
 }
