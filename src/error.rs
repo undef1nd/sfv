@@ -1,10 +1,8 @@
 use std::fmt;
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 #[cfg_attr(test, derive(PartialEq))]
 pub(crate) enum Repr {
-    Visit(Box<str>),
-
     OutOfRange,
     NaN,
 
@@ -56,17 +54,9 @@ pub(crate) enum Repr {
     ExpectedStartOfKey(usize),
 }
 
-impl<E: std::error::Error> From<E> for Repr {
-    fn from(err: E) -> Self {
-        Self::Visit(err.to_string().into())
-    }
-}
-
 impl Repr {
-    fn parts(&self) -> (&str, Option<usize>) {
-        match *self {
-            Self::Visit(ref msg) => (msg, None),
-
+    const fn parts(self) -> (&'static str, Option<usize>) {
+        match self {
             Self::NaN => ("NaN", None),
             Self::OutOfRange => ("out of range", None),
 

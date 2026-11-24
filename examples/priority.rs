@@ -1,8 +1,6 @@
 // This example demonstrates both dictionary- and visitor-based parsing of the
 // Priority header according to https://httpwg.org/specs/rfc9218.html.
 
-use std::convert::Infallible;
-
 use sfv::{BareItemFromInput, KeyRef, visitor};
 
 const KEY_U: &str = "u";
@@ -94,31 +92,26 @@ pub fn parse_with_visitor(input: &[u8]) -> Result<Priority, sfv::Error> {
 
     impl<'de> visitor::DictionaryVisitor<'de> for Visitor {
         type Out = Priority;
-        type Error = Infallible;
 
-        fn entry(
-            &mut self,
-            key: &'de KeyRef,
-        ) -> Result<impl visitor::EntryVisitor<'de>, Self::Error> {
-            Ok(match key.as_str() {
+        fn entry(&mut self, key: &'de KeyRef) -> impl visitor::EntryVisitor<'de> {
+            match key.as_str() {
                 KEY_U => Some(Parameter::U(&mut self.0.urgency)),
                 KEY_I => Some(Parameter::I(&mut self.0.incremental)),
                 // Per https://httpwg.org/specs/rfc9218.html#parameters unknown
                 // dictionary keys are ignored.
                 _ => None,
-            })
+            }
         }
 
-        fn finish(self) -> Result<Self::Out, Self::Error> {
-            Ok(self.0)
+        fn finish(self) -> Self::Out {
+            self.0
         }
     }
 
     impl<'de> visitor::BareItemVisitor<'de> for Parameter<'_> {
         type Out = visitor::Ignored;
-        type Error = Infallible;
 
-        fn bare_item(self, bare_item: BareItemFromInput<'de>) -> Result<Self::Out, Self::Error> {
+        fn bare_item(self, bare_item: BareItemFromInput<'de>) -> Self::Out {
             // Per https://httpwg.org/specs/rfc9218.html#parameters values of
             // unexpected types and out-of-range values are ignored. Since the
             // same dictionary key can appear multiple times in the input, and
@@ -132,18 +125,16 @@ pub fn parse_with_visitor(input: &[u8]) -> Result<Priority, sfv::Error> {
             // Neither https://httpwg.org/specs/rfc9218.html#urgency nor
             // https://httpwg.org/specs/rfc9218.html#incremental defines
             // parameters.
-            Ok(visitor::Ignored)
+            visitor::Ignored
         }
     }
 
     impl<'de> visitor::EntryVisitor<'de> for Parameter<'_> {
-        type Error = Infallible;
-
-        fn item(self) -> Result<impl visitor::ItemVisitor<'de>, Self::Error> {
-            Ok(self)
+        fn item(self) -> impl visitor::ItemVisitor<'de> {
+            self
         }
 
-        fn inner_list(self) -> Result<impl visitor::InnerListVisitor<'de>, Self::Error> {
+        fn inner_list(self) -> impl visitor::InnerListVisitor<'de> {
             // Per https://httpwg.org/specs/rfc9218.html#parameters values of
             // unexpected types are ignored. Since the same dictionary key can
             // appear multiple times in the input, and only the last value may
@@ -153,7 +144,7 @@ pub fn parse_with_visitor(input: &[u8]) -> Result<Priority, sfv::Error> {
                 Self::U(urgency) => *urgency = DEFAULT_URGENCY,
                 Self::I(incremental) => *incremental = DEFAULT_INCREMENTAL,
             }
-            Ok(visitor::Ignored)
+            visitor::Ignored
         }
     }
 

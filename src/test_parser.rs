@@ -1,12 +1,10 @@
-use std::convert::Infallible;
-
 #[cfg(feature = "parsed-types")]
 use crate::{BareItem, Date, Item, Version};
 use crate::{
-    BareItemFromInput, Error, KeyRef, Parser, error, key_ref,
+    BareItemFromInput, Error, KeyRef, Parser, TokenRef, error, key_ref, token_ref,
     visitor::{
         BareItemVisitor, DictionaryVisitor, EntryVisitor, Ignored, InnerListVisitor, ItemVisitor,
-        ListVisitor, Never, ParameterVisitor,
+        ListVisitor, ParameterVisitor,
     },
 };
 
@@ -292,28 +290,22 @@ impl Point {
 // For when a `Point` is a parameter somewhere.
 impl<'de> ParameterVisitor<'de> for &mut Point {
     type Out = ();
-    type Error = Infallible;
 
-    fn parameter(&mut self, key: &'de KeyRef) -> Result<impl BareItemVisitor<'de>, Self::Error> {
-        Ok(self.coord(key))
+    fn parameter(&mut self, key: &'de KeyRef) -> impl BareItemVisitor<'de> {
+        self.coord(key)
     }
 
-    fn finish(self) -> Result<Self::Out, Self::Error> {
-        Ok(())
-    }
+    fn finish(self) -> Self::Out {}
 }
 
 impl<'de> DictionaryVisitor<'de> for &mut Point {
     type Out = ();
-    type Error = Infallible;
 
-    fn entry(&mut self, key: &'de KeyRef) -> Result<impl EntryVisitor<'de>, Self::Error> {
-        Ok(self.coord(key))
+    fn entry(&mut self, key: &'de KeyRef) -> impl EntryVisitor<'de> {
+        self.coord(key)
     }
 
-    fn finish(self) -> Result<Self::Out, Self::Error> {
-        Ok(())
-    }
+    fn finish(self) -> Self::Out {}
 }
 
 struct CoordVisitor<'a> {
@@ -322,24 +314,21 @@ struct CoordVisitor<'a> {
 
 impl<'de> BareItemVisitor<'de> for CoordVisitor<'_> {
     type Out = Ignored;
-    type Error = Infallible;
 
-    fn bare_item(self, bare_item: BareItemFromInput<'de>) -> Result<Self::Out, Self::Error> {
+    fn bare_item(self, bare_item: BareItemFromInput<'de>) -> Self::Out {
         *self.coord = bare_item.as_integer().map_or(0, i64::from);
-        Ok(Ignored)
+        Ignored
     }
 }
 
 impl<'de> EntryVisitor<'de> for CoordVisitor<'_> {
-    type Error = Infallible;
-
-    fn item(self) -> Result<impl ItemVisitor<'de>, Self::Error> {
-        Ok(self)
+    fn item(self) -> impl ItemVisitor<'de> {
+        self
     }
 
-    fn inner_list(self) -> Result<impl InnerListVisitor<'de>, Self::Error> {
+    fn inner_list(self) -> impl InnerListVisitor<'de> {
         *self.coord = 0;
-        Ok(Ignored)
+        Ignored
     }
 }
 
@@ -367,15 +356,14 @@ struct Holder {
 
 impl<'a, 'de> BareItemVisitor<'de> for &'a mut Holder {
     type Out = Option<&'a mut Point>;
-    type Error = Infallible;
 
-    fn bare_item(self, bare_item: BareItemFromInput<'de>) -> Result<Self::Out, Self::Error> {
-        Ok(if let Some(v) = bare_item.as_integer() {
+    fn bare_item(self, bare_item: BareItemFromInput<'de>) -> Self::Out {
+        if let Some(v) = bare_item.as_integer() {
             self.v = i64::from(v);
             Some(&mut self.point)
         } else {
             None
-        })
+        }
     }
 }
 
@@ -404,38 +392,33 @@ fn complex_list_visitor() {
 
     impl<'de> ListVisitor<'de> for Vec<ListHolder> {
         type Out = Self;
-        type Error = Infallible;
 
-        fn entry(&mut self) -> Result<impl EntryVisitor<'de>, Self::Error> {
-            Ok(self.push_mut(ListHolder::default()))
+        fn entry(&mut self) -> impl EntryVisitor<'de> {
+            self.push_mut(ListHolder::default())
         }
 
-        fn finish(self) -> Result<Self::Out, Self::Error> {
-            Ok(self)
+        fn finish(self) -> Self::Out {
+            self
         }
     }
 
     impl<'de> EntryVisitor<'de> for &mut ListHolder {
-        type Error = Infallible;
-
-        fn item(self) -> Result<impl ItemVisitor<'de>, Self::Error> {
-            Ok(Ignored)
+        fn item(self) -> impl ItemVisitor<'de> {
+            Ignored
         }
 
-        fn inner_list(self) -> Result<impl InnerListVisitor<'de>, Self::Error> {
-            Ok(self)
+        fn inner_list(self) -> impl InnerListVisitor<'de> {
+            self
         }
     }
 
     impl<'de> InnerListVisitor<'de> for &mut ListHolder {
-        type Error = Infallible;
-
-        fn item(&mut self) -> Result<impl ItemVisitor<'de>, Self::Error> {
-            Ok(self.list.push_mut(Holder::default()))
+        fn item(&mut self) -> impl ItemVisitor<'de> {
+            self.list.push_mut(Holder::default())
         }
 
-        fn finish(self) -> Result<impl ParameterVisitor<'de>, Self::Error> {
-            Ok(&mut self.point)
+        fn finish(self) -> impl ParameterVisitor<'de> {
+            &mut self.point
         }
     }
 
@@ -485,15 +468,14 @@ fn parse_dictionary_lifetime() -> Result<(), Error> {
 
     impl<'de> DictionaryVisitor<'de> for Visitor<'de> {
         type Out = Option<&'de KeyRef>;
-        type Error = Infallible;
 
-        fn entry(&mut self, key: &'de KeyRef) -> Result<impl EntryVisitor<'de>, Self::Error> {
+        fn entry(&mut self, key: &'de KeyRef) -> impl EntryVisitor<'de> {
             self.0 = Some(key);
-            Ok(Ignored)
+            Ignored
         }
 
-        fn finish(self) -> Result<Self::Out, Self::Error> {
-            Ok(self.0)
+        fn finish(self) -> Self::Out {
+            self.0
         }
     }
 
@@ -505,89 +487,77 @@ fn parse_dictionary_lifetime() -> Result<(), Error> {
 }
 
 #[test]
-fn never_visitor() {
-    #[derive(Debug)]
-    struct Rejected;
+fn fallible_domain_validation() {
+    // Domain error type intentionally does not implement `std::error::Error`.
+    #[derive(Debug, PartialEq)]
+    enum ListError {
+        ExpectedToken,
+        TooManyTokens,
+    }
 
-    impl std::fmt::Display for Rejected {
-        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            f.write_str("rejected")
+    struct TokenListVisitor<'de>(Result<Vec<&'de TokenRef>, ListError>);
+
+    struct TokenEntry<'a, 'de>(&'a mut Result<Vec<&'de TokenRef>, ListError>);
+
+    impl<'de> EntryVisitor<'de> for TokenEntry<'_, 'de> {
+        fn item(self) -> impl ItemVisitor<'de> {
+            move |bare_item: BareItemFromInput<'de>| {
+                if let BareItemFromInput::Token(tok) = bare_item {
+                    if let Ok(vec) = self.0 {
+                        vec.push(tok);
+                    }
+                } else {
+                    *self.0 = Err(ListError::ExpectedToken);
+                }
+                Ignored
+            }
+        }
+
+        fn inner_list(self) -> impl InnerListVisitor<'de> {
+            *self.0 = Err(ListError::ExpectedToken);
+            Ignored
         }
     }
 
-    impl std::error::Error for Rejected {}
+    impl<'de> ListVisitor<'de> for TokenListVisitor<'de> {
+        type Out = Result<Vec<&'de TokenRef>, ListError>;
 
-    struct RejectAll;
-
-    impl<'de> ParameterVisitor<'de> for RejectAll {
-        type Out = ();
-        type Error = Rejected;
-
-        fn parameter(&mut self, _key: &'de KeyRef) -> Result<impl BareItemVisitor<'de>, Rejected> {
-            Err::<Never, _>(Rejected)
+        fn entry(&mut self) -> impl EntryVisitor<'de> {
+            let Ok(vec) = &self.0 else {
+                return None;
+            };
+            if vec.len() == 2 {
+                self.0 = Err(ListError::TooManyTokens);
+                return None;
+            }
+            Some(TokenEntry(&mut self.0))
         }
 
-        fn finish(self) -> Result<(), Rejected> {
-            Ok(())
-        }
-    }
-
-    impl<'de> InnerListVisitor<'de> for RejectAll {
-        type Error = Rejected;
-
-        fn item(&mut self) -> Result<impl ItemVisitor<'de>, Rejected> {
-            Err::<Never, _>(Rejected)
-        }
-
-        fn finish(self) -> Result<impl ParameterVisitor<'de>, Rejected> {
-            Err::<Never, _>(Rejected)
+        fn finish(self) -> Self::Out {
+            self.0
         }
     }
 
-    impl<'de> EntryVisitor<'de> for RejectAll {
-        type Error = Rejected;
-
-        fn item(self) -> Result<impl ItemVisitor<'de>, Rejected> {
-            Err::<Never, _>(Rejected)
-        }
-
-        fn inner_list(self) -> Result<impl InnerListVisitor<'de>, Rejected> {
-            Ok(self)
-        }
-    }
-
-    impl<'de> ListVisitor<'de> for RejectAll {
-        type Out = ();
-        type Error = Rejected;
-
-        fn entry(&mut self) -> Result<impl EntryVisitor<'de>, Rejected> {
-            Ok(RejectAll)
-        }
-
-        fn finish(self) -> Result<(), Rejected> {
-            Ok(())
-        }
-    }
+    let make_visitor = || TokenListVisitor(Ok(Vec::new()));
 
     assert_eq!(
-        Parser::new("a")
-            .parse_list_with_visitor(RejectAll)
-            .unwrap_err()
-            .to_string(),
-        "rejected",
+        Parser::new("a, b").parse_list_with_visitor(make_visitor()),
+        Ok(Ok(vec![token_ref("a"), token_ref("b")])),
     );
     assert_eq!(
-        Parser::new("()")
-            .parse_list_with_visitor(RejectAll)
-            .unwrap_err()
-            .to_string(),
-        "rejected",
+        Parser::new("123, b").parse_list_with_visitor(make_visitor()),
+        Ok(Err(ListError::ExpectedToken)),
     );
     assert_eq!(
-        Parser::new("(1)")
-            .parse_list_with_visitor(RejectAll)
-            .unwrap_err()
-            .to_string(),
-        "rejected",
+        Parser::new("(), b").parse_list_with_visitor(make_visitor()),
+        Ok(Err(ListError::ExpectedToken)),
+    );
+    assert_eq!(
+        Parser::new("a, b, c").parse_list_with_visitor(make_visitor()),
+        Ok(Err(ListError::TooManyTokens)),
+    );
+    assert_eq!(
+        Parser::new("123, ?2").parse_list_with_visitor(make_visitor()),
+        Err(error::Repr::ExpectedBoolean(6).into()),
     );
 }
