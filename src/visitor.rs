@@ -1,26 +1,53 @@
 /*!
 Contains traits for parsing structured-field values incrementally.
 
-The various visitor methods are invoked *during* parsing, i.e. before validation
-of the entire input is complete. Therefore, users of these traits must carefully
-consider whether they want to induce side effects or perform expensive
-operations *before* knowing whether the entire input is valid, and must
-*especially* avoid breaking RFC 8941/9651 requirements around the handling of
-duplicate parameter/dictionary keys. Specifically, validation of parameters and
-keys typically needs to be done as part of the `finish` method of
-`ParameterVisitor`, `ListVisitor`, or `DictionaryVisitor`, in order to ensure
-that all but the last instance of a given dictionary or parameter key is
-ignored from a semantic perspective.
+# Design: Infallible Visitation
 
-For example, consider a fictitious dictionary header `Foo` defined to contain
-a single required top-level key, `color`, which is either the token `blue` or
-the token `red`, with an optional boolean parameter `strong`, defaulting to
-`false`. If `color` or `strong` has the wrong type, the entire header is
-considered invalid.
+Visitor trait methods are intentionally infallible and cannot short-circuit
+parsing early:
+
+- **Strict syntactic validation ([RFC 9651 Section 1.2], [Section 4.2]):**
+  Structured-field parsers must reject the entire field value if *any* part of
+  the input is syntactically malformed—even parts whose values are semantically
+  ignored or follow an earlier semantic error. Aborting mid-parse on a visitor
+  error would leave trailing input unparsed and misclassify syntax errors (such
+  as `123;0` when expecting a token) as semantic errors.
+- **Duplicate dictionary and parameter keys ([RFC 9651 Section 4.2.2], [Section 4.2.6]):**
+  When duplicate keys appear in the same dictionary or parameter list, all but
+  the last instance must be ignored. Preventing mid-parse failure ensures an
+  invalid value on an earlier occurrence of a key (such as `color=123, color=red`
+  or `color=red;strong=a;strong`) cannot prematurely abort parsing before a
+  later valid occurrence overrides it.
+- **Incremental execution before completion:** Visitor methods run *during*
+  parsing before the full input is known to be syntactically valid.
+  Implementations should avoid external side effects or expensive work during
+  visitation (performing them only after parsing succeeds), and must ensure
+  later occurrences of duplicate dictionary or parameter keys overwrite earlier
+  state (including any recorded semantic error).
+
+To perform fallible domain validation, accumulate validation state in the
+visitor (such as `Result<T, MyError>`) and return it as the top-level `Out` type
+([`DictionaryVisitor::Out`], [`ListVisitor::Out`], or
+[`ParameterVisitor::Out`]). [`Parser::parse_dictionary_with_visitor`][crate::Parser::parse_dictionary_with_visitor]
+(and its list/item counterparts) will return `Result<Result<T, MyError>, sfv::Error>`,
+preserving typed domain errors without requiring [`std::error::Error`] or string
+allocation. Use [`Ignored`] or [`Option<V>`] (`None`) to skip visiting irrelevant
+or already-invalidated subtrees while still syntactically validating the
+underlying input.
+
+[RFC 9651 Section 1.2]: <https://httpwg.org/specs/rfc9651.html#strict>
+[Section 4.2]: <https://httpwg.org/specs/rfc9651.html#text-parse>
+[RFC 9651 Section 4.2.2]: <https://httpwg.org/specs/rfc9651.html#parse-dictionary>
+[Section 4.2.6]: <https://httpwg.org/specs/rfc9651.html#parse-param>
+
+# Example
+
+Consider a fictitious dictionary header `Foo` defined to contain a single
+required top-level key, `color`, which is either the token `blue` or the token
+`red`, with an optional boolean parameter `strong`, defaulting to `false`. If
+`color` or `strong` has the wrong type, the entire header is considered invalid.
 
 ```
-use std::convert::Infallible;
-
 use sfv::{BareItemFromInput, KeyRef, visitor};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -44,13 +71,13 @@ impl TryFrom<&sfv::TokenRef> for Color {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-struct Foo {
+pub struct Foo {
     color: Color,
     strong: bool,
 }
 
 #[derive(Debug)]
-enum Error {
+pub enum Error {
     ColorMissing,
     ColorWrongType,
     ColorInvalid,
@@ -120,132 +147,91 @@ pub fn parse_from_dictionary(input: &[u8]) -> Result<Foo, Error> {
 }
 
 pub fn parse_with_visitor(input: &[u8]) -> Result<Foo, Error> {
-    enum State {
-        ColorMissing,
-        ColorWrongType,
-        ColorInvalid,
-        StrongWrongType,
-        Valid(Foo),
-    }
+    struct Visitor(Result<Foo, Error>);
 
     struct ParamVisitor<'a> {
-        state: &'a mut State,
+        state: &'a mut Result<Foo, Error>,
         color: Color,
     }
 
-    struct StrongVisitor<'a> {
-        state: &'a mut State,
-        color: Color,
-    }
+    impl<'de> visitor::DictionaryVisitor<'de> for Visitor {
+        type Out = Result<Foo, Error>;
 
-    impl<'de> visitor::DictionaryVisitor<'de> for State {
-        type Out = Self;
-        type Error = Infallible;
-
-        fn entry(&mut self, key: &'de KeyRef) -> Result<impl visitor::EntryVisitor<'de>, Self::Error> {
-            Ok(if key == KEY_COLOR {
+        fn entry(&mut self, key: &'de KeyRef) -> impl visitor::EntryVisitor<'de> {
+            if key == KEY_COLOR {
                 Some(self)
             } else {
                 // Ignore other keys.
                 None
-            })
+            }
         }
 
-        fn finish(self) -> Result<Self::Out, Self::Error> {
-            Ok(self)
-        }
-    }
-
-    impl<'de> visitor::EntryVisitor<'de> for &mut State {
-        type Error = Infallible;
-
-        fn item(self) -> Result<impl visitor::ItemVisitor<'de>, Self::Error> {
-            Ok(self)
-        }
-
-        fn inner_list(self) -> Result<impl visitor::InnerListVisitor<'de>, Self::Error> {
-            // It would be incorrect to return an error here: If the `color` key
-            // appears more than once, doing so would cause the entire visitation to
-            // fail even if the later key has the correct type. Instead, we record
-            // the error in `State` and check the final state after parsing completes.
-            *self = State::ColorWrongType;
-            Ok(visitor::Ignored)
+        fn finish(self) -> Self::Out {
+            self.0
         }
     }
 
-    impl<'de, 'a> visitor::BareItemVisitor<'de> for &'a mut State {
+    impl<'de> visitor::EntryVisitor<'de> for &mut Visitor {
+        fn item(self) -> impl visitor::ItemVisitor<'de> {
+            self
+        }
+
+        fn inner_list(self) -> impl visitor::InnerListVisitor<'de> {
+            // Record the error so a later `color` entry can still override it.
+            self.0 = Err(Error::ColorWrongType);
+            visitor::Ignored
+        }
+    }
+
+    impl<'de, 'a> visitor::BareItemVisitor<'de> for &'a mut Visitor {
         type Out = Option<ParamVisitor<'a>>;
-        type Error = Infallible;
 
-        fn bare_item(self, v: BareItemFromInput<'de>) -> Result<Self::Out, Self::Error> {
-            // It would be incorrect to return the errors here: If the `color` key
-            // appears more than once, doing so would cause the entire visitation to
-            // fail even if the later key has the correct type and a valid value.
-            // Instead, we record the errors in `State` and check the final state
-            // after parsing completes.
-
+        fn bare_item(self, v: BareItemFromInput<'de>) -> Self::Out {
             if let BareItemFromInput::Token(v) = v {
                 if let Ok(color) = Color::try_from(v) {
-                    *self = State::Valid(Foo { color, strong: false });
+                    self.0 = Ok(Foo { color, strong: false });
                     // Visit the parameters.
-                    return Ok(Some(ParamVisitor { state: self, color }));
+                    return Some(ParamVisitor { state: &mut self.0, color });
                 }
 
-                *self = State::ColorInvalid;
+                self.0 = Err(Error::ColorInvalid);
             } else {
-                *self = State::ColorWrongType;
+                self.0 = Err(Error::ColorWrongType);
             }
 
             // No need to visit the parameters if the type or value is invalid.
-            Ok(None)
-        }
-    }
-
-    impl<'de> visitor::BareItemVisitor<'de> for StrongVisitor<'_> {
-        type Out = ();
-        type Error = Infallible;
-
-        fn bare_item(self, v: BareItemFromInput<'de>) -> Result<Self::Out, Self::Error> {
-            *self.state = if let BareItemFromInput::Boolean(strong) = v {
-                State::Valid(Foo { color: self.color, strong })
-            } else {
-                State::StrongWrongType
-            };
-            Ok(())
+            None
         }
     }
 
     impl<'de> visitor::ParameterVisitor<'de> for ParamVisitor<'_> {
         type Out = ();
-        type Error = Infallible;
 
-        fn parameter(&mut self, key: &'de KeyRef) -> Result<impl visitor::BareItemVisitor<'de>, Self::Error> {
+        fn parameter(&mut self, key: &'de KeyRef) -> impl visitor::BareItemVisitor<'de> {
             // Ignore other parameters.
-            Ok(if key == KEY_STRONG {
-                // It would be incorrect for `StrongVisitor` to return an error
-                // when the type is wrong: If the `strong` key appears more than
-                // once, doing so would cause the entire visitation to fail even
-                // if the later key has the correct type. Instead, it records
-                // the error in `State` and checks the final state after parsing
-                // completes.
-                Some(StrongVisitor { state: self.state, color: self.color })
+            if key == KEY_STRONG {
+                let state = &mut *self.state;
+                let color = self.color;
+                // Record any error so a later `strong` parameter on the same
+                // item can still override it.
+                Some(move |v: BareItemFromInput<'de>| {
+                    *state = if let BareItemFromInput::Boolean(strong) = v {
+                        Ok(Foo { color, strong })
+                    } else {
+                        Err(Error::StrongWrongType)
+                    };
+                })
             } else {
                 None
-            })
+            }
         }
 
-        fn finish(self) -> Result<Self::Out, Self::Error> {
-            Ok(())
-        }
+        fn finish(self) -> Self::Out {}
     }
 
-    match sfv::Parser::new(input).parse_dictionary_with_visitor(State::ColorMissing).map_err(Error::Syntax)? {
-        State::ColorMissing => Err(Error::ColorMissing),
-        State::ColorWrongType => Err(Error::ColorWrongType),
-        State::ColorInvalid => Err(Error::ColorInvalid),
-        State::StrongWrongType => Err(Error::StrongWrongType),
-        State::Valid(foo) => Ok(foo),
-    }
+    sfv::Parser::new(input)
+        .parse_dictionary_with_visitor(Visitor(Err(Error::ColorMissing)))
+        .map_err(Error::Syntax)?
 }
 
 for (input, expected) in [
@@ -323,10 +309,11 @@ for (input, expected) in [
     );
 }
 
-// Syntax errors are also reported:
+// Syntax errors are also reported, even after semantic errors:
 #[cfg(feature = "parsed-types")]
 assert!(matches!(parse_from_dictionary(b"color=?2"), Err(Error::Syntax(_))));
 assert!(matches!(parse_with_visitor(b"color=?2"), Err(Error::Syntax(_))));
+assert!(matches!(parse_with_visitor(b"color=green, ?2"), Err(Error::Syntax(_))));
 ```
 
 # Returning a value from `ItemVisitor`
@@ -337,7 +324,6 @@ the [`ParameterVisitor::Out`] of its parameter visitor is returned directly on
 success:
 
 ```
-use std::convert::Infallible;
 use sfv::visitor::{BareItemVisitor, Ignored, ParameterVisitor};
 use sfv::{BareItemFromInput, KeyRef, Parser, TokenRef, Version, token_ref};
 
@@ -348,42 +334,26 @@ enum BarError {
 }
 
 fn parse_bar(input: &[u8]) -> Result<&TokenRef, BarError> {
-    struct Visitor<'de>(Option<&'de TokenRef>);
+    struct Params<'de>(&'de TokenRef);
 
-    impl<'de> BareItemVisitor<'de> for Visitor<'de> {
-        type Out = Self;
-        type Error = Infallible;
+    impl<'de> ParameterVisitor<'de> for Params<'de> {
+        type Out = &'de TokenRef;
 
-        fn bare_item(
-            mut self,
-            bare_item: BareItemFromInput<'de>,
-        ) -> Result<Self::Out, Self::Error> {
-            if let BareItemFromInput::Token(token) = bare_item {
-                self.0 = Some(token);
-            }
-            Ok(self)
-        }
-    }
-
-    impl<'de> ParameterVisitor<'de> for Visitor<'de> {
-        type Out = Option<&'de TokenRef>;
-        type Error = Infallible;
-
-        fn parameter(
-            &mut self,
-            _key: &'de KeyRef,
-        ) -> Result<impl BareItemVisitor<'de>, Self::Error> {
-            Ok(Ignored)
+        fn parameter(&mut self, _key: &'de KeyRef) -> impl BareItemVisitor<'de> {
+            Ignored
         }
 
-        fn finish(self) -> Result<Self::Out, Self::Error> {
-            Ok(self.0)
+        fn finish(self) -> Self::Out {
+            self.0
         }
     }
 
     Parser::new(input)
         .with_version(Version::Rfc8941)
-        .parse_item_with_visitor(Visitor(None))
+        .parse_item_with_visitor(|bare_item| match bare_item {
+            BareItemFromInput::Token(token) => Some(Params(token)),
+            _ => None,
+        })
         .map_err(BarError::Syntax)?
         .ok_or(BarError::ExpectedToken)
 }
@@ -391,6 +361,7 @@ fn parse_bar(input: &[u8]) -> Result<&TokenRef, BarError> {
 assert_eq!(parse_bar(b"abc;foo=1").unwrap(), token_ref("abc"));
 assert!(matches!(parse_bar(b"123"), Err(BarError::ExpectedToken)));
 assert!(matches!(parse_bar(b"@1659578233"), Err(BarError::Syntax(_))));
+assert!(matches!(parse_bar(b"abc;0"), Err(BarError::Syntax(_))));
 assert!(matches!(parse_bar(b"123;0"), Err(BarError::Syntax(_))));
 ```
 
@@ -410,17 +381,17 @@ parts:
   where `V` implements that trait: These implementations act like `Ignored` when
   `self` is [`None`], and forward to `V`'s implementation when `self` is
   [`Some`]. These can be used when the visitor dynamically handles or ignores
-  field parts. An example of this is when a field definition prescribes the
-  format of certain dictionary keys, but ignores unknown ones.
+  field parts. Examples include ignoring unknown dictionary or parameter keys,
+  skipping parameters on an already-invalid item, or skipping remaining entries
+  of an already-invalidated list.
 
 Note that the discarded parts are still validated during parsing: syntactic
 errors in the input still cause parsing to fail even when these helpers are
 used, [as required by RFC 9651](https://httpwg.org/specs/rfc9651.html#strict).
 
-The `Foo` header example above demonstrates usage of both kinds of helpers.
+The `Foo` and `parse_bar` examples above demonstrate usage of both kinds of
+helpers.
 */
-
-use std::{convert::Infallible, error::Error};
 
 use crate::{BareItemFromInput, KeyRef};
 
@@ -431,8 +402,12 @@ use crate::{BareItemFromInput, KeyRef};
 /// When [`Self::Out`][BareItemVisitor::Out] implements [`ParameterVisitor`],
 /// this trait also serves as an [`ItemVisitor`], which can be used with
 /// [`Parser::parse_item_with_visitor`][crate::Parser::parse_item_with_visitor].
+///
+/// See [the module documentation](crate::visitor#design-infallible-visitation)
+/// for why visitor methods are infallible and how to represent validation
+/// errors.
 pub trait BareItemVisitor<'de> {
-    /// The successful return type of the [`BareItemVisitor::bare_item`] method.
+    /// The return type of the [`BareItemVisitor::bare_item`] method.
     ///
     /// For bare-item visitors returned by [`ParameterVisitor::parameter`], this
     /// is typically `()`. For [`ItemVisitor`]s, this must implement
@@ -441,27 +416,17 @@ pub trait BareItemVisitor<'de> {
     /// for guidance on discarding parameters.
     type Out;
 
-    /// The error type that can be returned if some error occurs during parsing.
-    type Error: Error;
-
     /// Called after a bare item has been parsed.
-    ///
-    /// Parsing will be terminated early if an error is returned.
-    ///
-    /// # Errors
-    /// The error result should report the reason for any failed validation.
-    fn bare_item(self, value: BareItemFromInput<'de>) -> Result<Self::Out, Self::Error>;
+    fn bare_item(self, value: BareItemFromInput<'de>) -> Self::Out;
 }
 
-impl<'de, F, Out, E> BareItemVisitor<'de> for F
+impl<'de, F, Out> BareItemVisitor<'de> for F
 where
-    F: FnOnce(BareItemFromInput<'de>) -> Result<Out, E>,
-    E: Error,
+    F: FnOnce(BareItemFromInput<'de>) -> Out,
 {
     type Out = Out;
-    type Error = E;
 
-    fn bare_item(self, value: BareItemFromInput<'de>) -> Result<Self::Out, Self::Error> {
+    fn bare_item(self, value: BareItemFromInput<'de>) -> Self::Out {
         self(value)
     }
 }
@@ -469,24 +434,23 @@ where
 /// A visitor whose methods are called during parameter parsing.
 ///
 /// The lifetime `'de` is the lifetime of the input.
+///
+/// See [the module documentation](crate::visitor#design-infallible-visitation)
+/// for why visitor methods are infallible and how to represent validation
+/// errors.
 pub trait ParameterVisitor<'de> {
-    /// The successful return type of the [`ParameterVisitor::finish`] method.
+    /// The return type of the [`ParameterVisitor::finish`] method.
     ///
     /// Many implementations will set this to `()`. See
     /// [the module documentation](crate::visitor#returning-a-value-from-itemvisitor)
     /// for an example that does not.
     type Out;
 
-    /// The error type that can be returned if some error occurs during parsing.
-    type Error: Error;
-
     /// Called after a parameter key has been parsed.
     ///
     /// The returned visitor is used to handle the associated bare-item value.
     /// See [the module documentation](crate::visitor#discarding-irrelevant-parts)
     /// for guidance on discarding parameters.
-    ///
-    /// Parsing will be terminated early if an error is returned.
     ///
     /// Note: Per [RFC 9651], when duplicate parameter keys are encountered in
     /// the same scope, all but the last instance are ignored. Implementations
@@ -495,18 +459,10 @@ pub trait ParameterVisitor<'de> {
     /// values for a given parameter key must be overwritten by later ones.
     ///
     /// [RFC 9651]: <https://httpwg.org/specs/rfc9651.html#parse-param>
-    ///
-    /// # Errors
-    /// The error result should report the reason for any failed validation.
-    fn parameter(&mut self, key: &'de KeyRef) -> Result<impl BareItemVisitor<'de>, Self::Error>;
+    fn parameter(&mut self, key: &'de KeyRef) -> impl BareItemVisitor<'de>;
 
     /// Called after all parameters have been parsed.
-    ///
-    /// Parsing will be terminated early if an error is returned.
-    ///
-    /// # Errors
-    /// The error result should report the reason for any failed validation.
-    fn finish(self) -> Result<Self::Out, Self::Error>;
+    fn finish(self) -> Self::Out;
 }
 
 /// A visitor whose methods are called during item parsing.
@@ -526,59 +482,41 @@ impl<'de, V> ItemVisitor<'de> for V where V: BareItemVisitor<'de, Out: Parameter
 /// A visitor whose methods are called during inner-list parsing.
 ///
 /// The lifetime `'de` is the lifetime of the input.
+///
+/// See [the module documentation](crate::visitor#design-infallible-visitation)
+/// for why visitor methods are infallible and how to represent validation
+/// errors.
 pub trait InnerListVisitor<'de> {
-    /// The error type that can be returned if some error occurs during parsing.
-    type Error: Error;
-
     /// Called before an item has been parsed.
     ///
     /// The returned visitor is used to handle the item.
-    ///
-    /// Parsing will be terminated early if an error is returned.
-    ///
-    /// # Errors
-    /// The error result should report the reason for any failed validation.
-    fn item(&mut self) -> Result<impl ItemVisitor<'de>, Self::Error>;
+    fn item(&mut self) -> impl ItemVisitor<'de>;
 
     /// Called after all inner-list items have been parsed.
     ///
     /// The returned visitor is used to handle the inner list's parameters.
     /// See [the module documentation](crate::visitor#discarding-irrelevant-parts)
     /// for guidance on discarding parameters.
-    ///
-    /// Parsing will be terminated early if an error is returned.
-    ///
-    /// # Errors
-    /// The error result should report the reason for any failed validation.
-    fn finish(self) -> Result<impl ParameterVisitor<'de>, Self::Error>;
+    fn finish(self) -> impl ParameterVisitor<'de>;
 }
 
 /// A visitor whose methods are called during entry parsing.
 ///
 /// The lifetime `'de` is the lifetime of the input.
+///
+/// See [the module documentation](crate::visitor#design-infallible-visitation)
+/// for why visitor methods are infallible and how to represent validation
+/// errors.
 pub trait EntryVisitor<'de> {
-    /// The error type that can be returned if some error occurs during parsing.
-    type Error: Error;
-
     /// Called before an item has been parsed.
     ///
     /// The returned visitor is used to handle the item.
-    ///
-    /// Parsing will be terminated early if an error is returned.
-    ///
-    /// # Errors
-    /// The error result should report the reason for any failed validation.
-    fn item(self) -> Result<impl ItemVisitor<'de>, Self::Error>;
+    fn item(self) -> impl ItemVisitor<'de>;
 
     /// Called before an inner list has been parsed.
     ///
     /// The returned visitor is used to handle the inner list.
-    ///
-    /// Parsing will be terminated early if an error is returned.
-    ///
-    /// # Errors
-    /// The error result should report the reason for any failed validation.
-    fn inner_list(self) -> Result<impl InnerListVisitor<'de>, Self::Error>;
+    fn inner_list(self) -> impl InnerListVisitor<'de>;
 }
 
 /// A visitor whose methods are called during dictionary parsing.
@@ -587,20 +525,19 @@ pub trait EntryVisitor<'de> {
 ///
 /// Use this trait with
 /// [`Parser::parse_dictionary_with_visitor`][crate::Parser::parse_dictionary_with_visitor].
+///
+/// See [the module documentation](crate::visitor#design-infallible-visitation)
+/// for why visitor methods are infallible and how to represent validation
+/// errors.
 pub trait DictionaryVisitor<'de> {
-    /// The successful return type of the [`DictionaryVisitor::finish`] method.
+    /// The return type of the [`DictionaryVisitor::finish`] method.
     type Out;
-
-    /// The error type that can be returned if some error occurs during parsing.
-    type Error: Error;
 
     /// Called after a dictionary key has been parsed.
     ///
     /// The returned visitor is used to handle the associated value.
     /// See [the module documentation](crate::visitor#discarding-irrelevant-parts)
     /// for guidance on discarding entries.
-    ///
-    /// Parsing will be terminated early if an error is returned.
     ///
     /// Note: Per [RFC 9651], when duplicate dictionary keys are encountered in
     /// the same scope, all but the last instance are ignored. Implementations
@@ -610,18 +547,10 @@ pub trait DictionaryVisitor<'de> {
     /// ones.
     ///
     /// [RFC 9651]: <https://httpwg.org/specs/rfc9651.html#parse-dictionary>
-    ///
-    /// # Errors
-    /// The error result should report the reason for any failed validation.
-    fn entry(&mut self, key: &'de KeyRef) -> Result<impl EntryVisitor<'de>, Self::Error>;
+    fn entry(&mut self, key: &'de KeyRef) -> impl EntryVisitor<'de>;
 
     /// Called after all dictionary keys have been parsed.
-    ///
-    /// Parsing will be terminated early if an error is returned.
-    ///
-    /// # Errors
-    /// The error result should report the reason for any failed validation.
-    fn finish(self) -> Result<Self::Out, Self::Error>;
+    fn finish(self) -> Self::Out;
 }
 
 /// A visitor whose methods are called during list parsing.
@@ -630,30 +559,21 @@ pub trait DictionaryVisitor<'de> {
 ///
 /// Use this trait with
 /// [`Parser::parse_list_with_visitor`][crate::Parser::parse_list_with_visitor].
+///
+/// See [the module documentation](crate::visitor#design-infallible-visitation)
+/// for why visitor methods are infallible and how to represent validation
+/// errors.
 pub trait ListVisitor<'de> {
-    /// The successful return type of the [`ListVisitor::finish`] method.
+    /// The return type of the [`ListVisitor::finish`] method.
     type Out;
-
-    /// The error type that can be returned if some error occurs during parsing.
-    type Error: Error;
 
     /// Called before a list entry has been parsed.
     ///
     /// The returned visitor is used to handle the entry.
-    ///
-    /// Parsing will be terminated early if an error is returned.
-    ///
-    /// # Errors
-    /// The error result should report the reason for any failed validation.
-    fn entry(&mut self) -> Result<impl EntryVisitor<'de>, Self::Error>;
+    fn entry(&mut self) -> impl EntryVisitor<'de>;
 
     /// Called after all list entries have been parsed.
-    ///
-    /// Parsing will be terminated early if an error is returned.
-    ///
-    /// # Errors
-    /// The error result should report the reason for any failed validation.
-    fn finish(self) -> Result<Self::Out, Self::Error>;
+    fn finish(self) -> Self::Out;
 }
 
 /// A visitor that can be used to silently discard structured-field parts.
@@ -669,182 +589,98 @@ pub struct Ignored;
 
 impl<'de> BareItemVisitor<'de> for Ignored {
     type Out = Self;
-    type Error = Infallible;
 
-    fn bare_item(self, _value: BareItemFromInput<'de>) -> Result<Self::Out, Self::Error> {
-        Ok(Self)
+    fn bare_item(self, _value: BareItemFromInput<'de>) -> Self::Out {
+        Self
     }
 }
 
 impl<'de> ParameterVisitor<'de> for Ignored {
     type Out = ();
-    type Error = Infallible;
 
-    fn parameter(&mut self, _key: &'de KeyRef) -> Result<impl BareItemVisitor<'de>, Self::Error> {
-        Ok(Self)
+    fn parameter(&mut self, _key: &'de KeyRef) -> impl BareItemVisitor<'de> {
+        Self
     }
 
-    fn finish(self) -> Result<Self::Out, Self::Error> {
-        Ok(())
-    }
+    fn finish(self) -> Self::Out {}
 }
 
 impl<'de> EntryVisitor<'de> for Ignored {
-    type Error = Infallible;
-
-    fn item(self) -> Result<impl ItemVisitor<'de>, Self::Error> {
-        Ok(Ignored)
+    fn item(self) -> impl ItemVisitor<'de> {
+        Ignored
     }
 
-    fn inner_list(self) -> Result<impl InnerListVisitor<'de>, Self::Error> {
-        Ok(Ignored)
+    fn inner_list(self) -> impl InnerListVisitor<'de> {
+        Ignored
     }
 }
 
 impl<'de> InnerListVisitor<'de> for Ignored {
-    type Error = Infallible;
-
-    fn item(&mut self) -> Result<impl ItemVisitor<'de>, Self::Error> {
-        Ok(Ignored)
+    fn item(&mut self) -> impl ItemVisitor<'de> {
+        Ignored
     }
 
-    fn finish(self) -> Result<impl ParameterVisitor<'de>, Self::Error> {
-        Ok(Ignored)
+    fn finish(self) -> impl ParameterVisitor<'de> {
+        Ignored
     }
 }
 
 impl<'de> DictionaryVisitor<'de> for Ignored {
     type Out = ();
-    type Error = Infallible;
 
-    fn entry(&mut self, _key: &'de KeyRef) -> Result<impl EntryVisitor<'de>, Self::Error> {
-        Ok(Ignored)
+    fn entry(&mut self, _key: &'de KeyRef) -> impl EntryVisitor<'de> {
+        Ignored
     }
 
-    fn finish(self) -> Result<Self::Out, Self::Error> {
-        Ok(())
-    }
+    fn finish(self) -> Self::Out {}
 }
 
 impl<'de> ListVisitor<'de> for Ignored {
     type Out = ();
-    type Error = Infallible;
 
-    fn entry(&mut self) -> Result<impl EntryVisitor<'de>, Self::Error> {
-        Ok(Ignored)
+    fn entry(&mut self) -> impl EntryVisitor<'de> {
+        Ignored
     }
 
-    fn finish(self) -> Result<Self::Out, Self::Error> {
-        Ok(())
-    }
-}
-
-fn map_visitor<V, T, E>(
-    visitor: Option<V>,
-    f: impl FnOnce(V) -> Result<T, E>,
-) -> Result<Option<T>, E> {
-    match visitor {
-        None => Ok(None),
-        Some(visitor) => f(visitor).map(Some),
-    }
+    fn finish(self) -> Self::Out {}
 }
 
 impl<'de, V: BareItemVisitor<'de>> BareItemVisitor<'de> for Option<V> {
     type Out = Option<V::Out>;
-    type Error = V::Error;
 
-    fn bare_item(self, value: BareItemFromInput<'de>) -> Result<Self::Out, Self::Error> {
-        map_visitor(self, |visitor| visitor.bare_item(value))
+    fn bare_item(self, value: BareItemFromInput<'de>) -> Self::Out {
+        self.map(|visitor| visitor.bare_item(value))
     }
 }
 
 impl<'de, V: ParameterVisitor<'de>> ParameterVisitor<'de> for Option<V> {
     type Out = Option<V::Out>;
-    type Error = V::Error;
 
-    fn parameter(&mut self, key: &'de KeyRef) -> Result<impl BareItemVisitor<'de>, Self::Error> {
-        map_visitor(self.as_mut(), |visitor| visitor.parameter(key))
+    fn parameter(&mut self, key: &'de KeyRef) -> impl BareItemVisitor<'de> {
+        self.as_mut().map(|visitor| visitor.parameter(key))
     }
 
-    fn finish(self) -> Result<Self::Out, Self::Error> {
-        map_visitor(self, V::finish)
+    fn finish(self) -> Self::Out {
+        self.map(V::finish)
     }
 }
 
 impl<'de, V: EntryVisitor<'de>> EntryVisitor<'de> for Option<V> {
-    type Error = V::Error;
-
-    fn item(self) -> Result<impl ItemVisitor<'de>, Self::Error> {
-        map_visitor(self, V::item)
+    fn item(self) -> impl ItemVisitor<'de> {
+        self.map(V::item)
     }
 
-    fn inner_list(self) -> Result<impl InnerListVisitor<'de>, Self::Error> {
-        map_visitor(self, V::inner_list)
+    fn inner_list(self) -> impl InnerListVisitor<'de> {
+        self.map(V::inner_list)
     }
 }
 
 impl<'de, V: InnerListVisitor<'de>> InnerListVisitor<'de> for Option<V> {
-    type Error = V::Error;
-
-    fn item(&mut self) -> Result<impl ItemVisitor<'de>, Self::Error> {
-        map_visitor(self.as_mut(), V::item)
+    fn item(&mut self) -> impl ItemVisitor<'de> {
+        self.as_mut().map(V::item)
     }
 
-    fn finish(self) -> Result<impl ParameterVisitor<'de>, Self::Error> {
-        map_visitor(self, V::finish)
-    }
-}
-
-/// A visitor that cannot be instantiated, but can be used as a type in
-/// situations guaranteed to return an error `Result`, analogous to
-/// [`std::convert::Infallible`].
-///
-/// When [`!`] is stabilized, this type will be replaced with an alias for it.
-#[derive(Clone, Copy, Debug)]
-pub enum Never {}
-
-impl<'de> BareItemVisitor<'de> for Never {
-    type Out = Self;
-    type Error = Infallible;
-
-    fn bare_item(self, _value: BareItemFromInput<'de>) -> Result<Self::Out, Self::Error> {
-        match self {}
-    }
-}
-
-impl<'de> ParameterVisitor<'de> for Never {
-    type Out = ();
-    type Error = Infallible;
-
-    fn parameter(&mut self, _key: &'de KeyRef) -> Result<impl BareItemVisitor<'de>, Self::Error> {
-        Ok(*self)
-    }
-
-    fn finish(self) -> Result<Self::Out, Self::Error> {
-        match self {}
-    }
-}
-
-impl<'de> EntryVisitor<'de> for Never {
-    type Error = Infallible;
-
-    fn item(self) -> Result<impl ItemVisitor<'de>, Self::Error> {
-        Ok(self)
-    }
-
-    fn inner_list(self) -> Result<impl InnerListVisitor<'de>, Self::Error> {
-        Ok(self)
-    }
-}
-
-impl<'de> InnerListVisitor<'de> for Never {
-    type Error = Infallible;
-
-    fn item(&mut self) -> Result<impl ItemVisitor<'de>, Self::Error> {
-        Ok(*self)
-    }
-
-    fn finish(self) -> Result<impl ParameterVisitor<'de>, Self::Error> {
-        Ok(self)
+    fn finish(self) -> impl ParameterVisitor<'de> {
+        self.map(V::finish)
     }
 }

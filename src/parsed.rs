@@ -1,5 +1,3 @@
-use std::convert::Infallible;
-
 use indexmap::IndexMap;
 
 use crate::{
@@ -136,64 +134,54 @@ struct Wrapper<T>(T);
 
 impl<'de> BareItemVisitor<'de> for Wrapper<&mut BareItem> {
     type Out = ();
-    type Error = Infallible;
 
-    fn bare_item(self, value: BareItemFromInput<'de>) -> Result<Self::Out, Self::Error> {
+    fn bare_item(self, value: BareItemFromInput<'de>) -> Self::Out {
         *self.0 = value.into_bare_item();
-        Ok(())
     }
 }
 
 impl<'de> ParameterVisitor<'de> for Wrapper<&mut Parameters> {
     type Out = ();
-    type Error = Infallible;
 
-    fn parameter(&mut self, key: &'de KeyRef) -> Result<impl BareItemVisitor<'de>, Self::Error> {
+    fn parameter(&mut self, key: &'de KeyRef) -> impl BareItemVisitor<'de> {
         // TODO: Avoid allocating an owned `Key` when an equivalent key is
         // already present if `IndexMap` adds an `entry_ref`-style API.
-        Ok(Wrapper(
+        Wrapper(
             self.0
                 .entry(key.to_owned())
                 .or_insert(BareItem::Boolean(false)),
-        ))
+        )
     }
 
-    fn finish(self) -> Result<Self::Out, Self::Error> {
-        Ok(())
-    }
+    fn finish(self) -> Self::Out {}
 }
 
 impl<'de, 'a> BareItemVisitor<'de> for Wrapper<&'a mut Item> {
     type Out = Wrapper<&'a mut Parameters>;
-    type Error = Infallible;
 
-    fn bare_item(self, bare_item: BareItemFromInput<'de>) -> Result<Self::Out, Self::Error> {
-        Wrapper(&mut self.0.bare_item).bare_item(bare_item)?;
-        Ok(Wrapper(&mut self.0.params))
+    fn bare_item(self, bare_item: BareItemFromInput<'de>) -> Self::Out {
+        Wrapper(&mut self.0.bare_item).bare_item(bare_item);
+        Wrapper(&mut self.0.params)
     }
 }
 
 impl<'de> InnerListVisitor<'de> for Wrapper<&mut InnerList> {
-    type Error = Infallible;
-
-    fn item(&mut self) -> Result<impl ItemVisitor<'de>, Self::Error> {
-        Ok(Wrapper(self.0.items.push_mut(Item::new(false))))
+    fn item(&mut self) -> impl ItemVisitor<'de> {
+        Wrapper(self.0.items.push_mut(Item::new(false)))
     }
 
-    fn finish(self) -> Result<impl ParameterVisitor<'de>, Self::Error> {
-        Ok(Wrapper(&mut self.0.params))
+    fn finish(self) -> impl ParameterVisitor<'de> {
+        Wrapper(&mut self.0.params)
     }
 }
 
 impl<'de> EntryVisitor<'de> for Wrapper<&mut ListEntry> {
-    type Error = Infallible;
-
-    fn item(self) -> Result<impl ItemVisitor<'de>, Self::Error> {
+    fn item(self) -> impl ItemVisitor<'de> {
         loop {
             match *self.0 {
                 ListEntry::Item(ref mut item) => {
                     item.params.clear();
-                    return Ok(Wrapper(item));
+                    return Wrapper(item);
                 }
                 ListEntry::InnerList(_) => {
                     *self.0 = ListEntry::Item(Item::new(false));
@@ -202,13 +190,13 @@ impl<'de> EntryVisitor<'de> for Wrapper<&mut ListEntry> {
         }
     }
 
-    fn inner_list(self) -> Result<impl InnerListVisitor<'de>, Self::Error> {
+    fn inner_list(self) -> impl InnerListVisitor<'de> {
         loop {
             match *self.0 {
                 ListEntry::InnerList(ref mut inner_list) => {
                     inner_list.items.clear();
                     inner_list.params.clear();
-                    return Ok(Wrapper(inner_list));
+                    return Wrapper(inner_list);
                 }
                 ListEntry::Item(_) => {
                     *self.0 = ListEntry::InnerList(InnerList::default());
@@ -220,34 +208,28 @@ impl<'de> EntryVisitor<'de> for Wrapper<&mut ListEntry> {
 
 impl<'de> DictionaryVisitor<'de> for Wrapper<&mut Dictionary> {
     type Out = ();
-    type Error = Infallible;
 
-    fn entry(&mut self, key: &'de KeyRef) -> Result<impl EntryVisitor<'de>, Self::Error> {
+    fn entry(&mut self, key: &'de KeyRef) -> impl EntryVisitor<'de> {
         // TODO: Avoid allocating an owned `Key` when an equivalent key is
         // already present if `IndexMap` adds an `entry_ref`-style API.
-        Ok(Wrapper(
+        Wrapper(
             self.0
                 .entry(key.to_owned())
                 .or_insert_with(|| Item::new(false).into()),
-        ))
+        )
     }
 
-    fn finish(self) -> Result<Self::Out, Self::Error> {
-        Ok(())
-    }
+    fn finish(self) -> Self::Out {}
 }
 
 impl<'de> ListVisitor<'de> for Wrapper<&mut List> {
     type Out = ();
-    type Error = Infallible;
 
-    fn entry(&mut self) -> Result<impl EntryVisitor<'de>, Self::Error> {
-        Ok(Wrapper(self.0.push_mut(Item::new(false).into())))
+    fn entry(&mut self) -> impl EntryVisitor<'de> {
+        Wrapper(self.0.push_mut(Item::new(false).into()))
     }
 
-    fn finish(self) -> Result<Self::Out, Self::Error> {
-        Ok(())
-    }
+    fn finish(self) -> Self::Out {}
 }
 
 /// A structured-field type, supporting parsing and serialization.

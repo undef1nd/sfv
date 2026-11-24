@@ -53,7 +53,7 @@ impl<'de> Parser<'de> {
     /// the given visitor.
     ///
     /// # Errors
-    /// When the parsing process is unsuccessful, including any error raised by a visitor.
+    /// When the parsing process is unsuccessful.
     pub fn parse_dictionary_with_visitor<V>(self, mut visitor: V) -> SFVResult<V::Out>
     where
         V: DictionaryVisitor<'de>,
@@ -62,21 +62,21 @@ impl<'de> Parser<'de> {
         self.parse_internal(|parser| {
             parser.parse_comma_separated(|parser| {
                 // Note: It is up to the visitor to properly handle duplicate keys.
-                let entry_visitor = visitor.entry(parser.parse_key()?)?;
+                let entry_visitor = visitor.entry(parser.parse_key()?);
 
                 if let Some(b'=') = parser.peek() {
                     parser.next();
                     parser.parse_list_entry(entry_visitor)
                 } else {
                     let param_visitor = entry_visitor
-                        .item()?
-                        .bare_item(BareItemFromInput::Boolean(true))?;
+                        .item()
+                        .bare_item(BareItemFromInput::Boolean(true));
                     parser.parse_parameters(param_visitor)?;
                     Ok(())
                 }
             })?;
 
-            Ok(visitor.finish()?)
+            Ok(visitor.finish())
         })
     }
 
@@ -84,15 +84,15 @@ impl<'de> Parser<'de> {
     /// given visitor.
     ///
     /// # Errors
-    /// When the parsing process is unsuccessful, including any error raised by a visitor.
+    /// When the parsing process is unsuccessful.
     pub fn parse_list_with_visitor<V>(self, mut visitor: V) -> SFVResult<V::Out>
     where
         V: ListVisitor<'de>,
     {
         // https://httpwg.org/specs/rfc9651.html#parse-list
         self.parse_internal(|parser| {
-            parser.parse_comma_separated(|parser| parser.parse_list_entry(visitor.entry()?))?;
-            Ok(visitor.finish()?)
+            parser.parse_comma_separated(|parser| parser.parse_list_entry(visitor.entry()))?;
+            Ok(visitor.finish())
         })
     }
 
@@ -100,7 +100,7 @@ impl<'de> Parser<'de> {
     /// given visitor.
     ///
     /// # Errors
-    /// When the parsing process is unsuccessful, including any error raised by a visitor.
+    /// When the parsing process is unsuccessful.
     pub fn parse_item_with_visitor<V>(
         self,
         visitor: V,
@@ -175,9 +175,9 @@ impl<'de> Parser<'de> {
         // ListEntry represents a tuple (item_or_inner_list, parameters)
 
         if let Some(b'(') = self.peek() {
-            self.parse_inner_list(visitor.inner_list()?)
+            self.parse_inner_list(visitor.inner_list())
         } else {
-            self.parse_item(visitor.item()?)?;
+            self.parse_item(visitor.item())?;
             Ok(())
         }
     }
@@ -199,12 +199,12 @@ impl<'de> Parser<'de> {
 
             if Some(b')') == self.peek() {
                 self.next();
-                let param_visitor = visitor.finish()?;
+                let param_visitor = visitor.finish();
                 self.parse_parameters(param_visitor)?;
                 return Ok(());
             }
 
-            self.parse_item(visitor.item()?)?;
+            self.parse_item(visitor.item())?;
 
             if let Some(c) = self.peek()
                 && c != b' '
@@ -225,7 +225,7 @@ impl<'de> Parser<'de> {
         V: ItemVisitor<'de>,
     {
         // https://httpwg.org/specs/rfc9651.html#parse-item
-        let param_visitor = visitor.bare_item(self.parse_bare_item()?)?;
+        let param_visitor = visitor.bare_item(self.parse_bare_item()?);
         self.parse_parameters(param_visitor)
     }
 
@@ -568,16 +568,16 @@ impl<'de> Parser<'de> {
             self.consume_sp_chars();
 
             // Note: It is up to the visitor to properly handle duplicate keys.
-            let param_visitor = visitor.parameter(self.parse_key()?)?;
+            let param_visitor = visitor.parameter(self.parse_key()?);
             param_visitor.bare_item(if let Some(b'=') = self.peek() {
                 self.next();
                 self.parse_bare_item()?
             } else {
                 BareItemFromInput::Boolean(true)
-            })?;
+            });
         }
 
-        Ok(visitor.finish()?)
+        Ok(visitor.finish())
     }
 
     pub(crate) fn parse_key(&mut self) -> Result<&'de KeyRef, error::Repr> {
