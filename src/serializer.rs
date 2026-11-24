@@ -42,12 +42,14 @@ pub(crate) fn serialize_key(input_key: &KeyRef, output: &mut String) {
 pub(crate) fn serialize_integer(value: Integer, output: &mut String) {
     //https://httpwg.org/specs/rfc9651.html#ser-integer
 
+    // TODO: Use `std::fmt::NumBuffer` once MSRV is >= 1.98.0.
     write!(output, "{value}").unwrap();
 }
 
 pub(crate) fn serialize_decimal(value: Decimal, output: &mut String) {
     // https://httpwg.org/specs/rfc9651.html#ser-decimal
 
+    // TODO: Use `std::fmt::NumBuffer` once MSRV is >= 1.98.0.
     write!(output, "{value}").unwrap();
 }
 
@@ -87,6 +89,7 @@ pub(crate) fn serialize_bool(value: bool, output: &mut String) {
 pub(crate) fn serialize_date(value: Date, output: &mut String) {
     // https://httpwg.org/specs/rfc9651.html#ser-date
 
+    // TODO: Use `std::fmt::NumBuffer` once MSRV is >= 1.98.0.
     write!(output, "{value}").unwrap();
 }
 

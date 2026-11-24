@@ -55,6 +55,7 @@ impl Decimal {
 
 impl fmt::Display for Decimal {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // TODO: Use `std::fmt::NumBuffer` once MSRV is >= 1.98.0.
         let v = i64::from(self.as_integer_scaled_1000());
 
         if v == 0 {
