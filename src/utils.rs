@@ -77,9 +77,17 @@ macro_rules! impl_string_types {
             #[ref_cast::ref_cast_custom]
             const fn cast(v: &str) -> &Self;
 
-            pub(crate) const fn validate_prefix(
-                v: &[u8],
-            ) -> Result<&Self, $crate::error::StringError> {
+            // Assumes that `v` has already been validated by `validate_prefix_len`.
+            const fn cast_validated_bytes(v: &[u8]) -> &Self {
+                // TODO: The UTF-8 validation is redundant with the preceding character checks,
+                // but its removal is only possible with unsafe code.
+                let Ok(s) = std::str::from_utf8(v) else {
+                    unreachable!()
+                };
+                Self::cast(s)
+            }
+
+            const fn validate_prefix_len(v: &[u8]) -> Result<usize, $crate::error::StringError> {
                 let mut index = 0 $( + {
                     if v.is_empty() {
                         return Err($crate::error::StringError::Empty);
@@ -94,27 +102,26 @@ macro_rules! impl_string_types {
                     index += 1;
                 }
 
-                let (prefix, _) = v.split_at(index);
-
-                // TODO: The UTF-8 validation is redundant with the preceding character checks,
-                // but its removal is only possible with unsafe code.
-                let Ok(s) = std::str::from_utf8(prefix) else {
-                    unreachable!()
-                };
-                Ok(Self::cast(s))
+                Ok(index)
             }
 
-            const fn validate(v: &[u8]) -> Result<&Self, $crate::error::StringError> {
-                match Self::validate_prefix(v) {
-                    Ok(prefix) => {
-                        if prefix.0.len() == v.len() {
-                            Ok(prefix)
-                        } else {
-                            Err($crate::error::StringError::InvalidCharacter(
-                                prefix.0.len(),
-                            ))
-                        }
+            #[allow(dead_code, reason = "only used for KeyRef, TokenRef, and Arbitrary")]
+            pub(crate) const fn validate_prefix(
+                v: &[u8],
+            ) -> Result<&Self, $crate::error::StringError> {
+                match Self::validate_prefix_len(v) {
+                    Ok(len) => {
+                        let (prefix, _) = v.split_at(len);
+                        Ok(Self::cast_validated_bytes(prefix))
                     }
+                    Err(err) => Err(err),
+                }
+            }
+
+            const fn validate(v: &[u8]) -> Result<(), $crate::error::StringError> {
+                match Self::validate_prefix_len(v) {
+                    Ok(len) if len == v.len() => Ok(()),
+                    Ok(len) => Err($crate::error::StringError::InvalidCharacter(len)),
                     Err(err) => Err(err),
                 }
             }
@@ -125,7 +132,8 @@ macro_rules! impl_string_types {
             /// The error result reports the reason for any failed validation.
             #[allow(clippy::should_implement_trait)]
             pub fn from_str(v: &str) -> Result<&Self, $crate::Error> {
-                Self::from_bytes(v.as_bytes())
+                Self::validate(v.as_bytes())?;
+                Ok(Self::cast(v))
             }
 
             #[doc = concat!("Creates a `&", stringify!($Ref), "` from a `&[u8]`.")]
@@ -133,7 +141,8 @@ macro_rules! impl_string_types {
             /// # Errors
             /// The error result reports the reason for any failed validation.
             pub fn from_bytes(v: &[u8]) -> Result<&Self, $crate::Error> {
-                Ok(Self::validate(v)?)
+                Self::validate(v)?;
+                Ok(Self::cast_validated_bytes(v))
             }
 
             // Like `from_str`, but assumes that the contents of the string have already
@@ -156,7 +165,7 @@ macro_rules! impl_string_types {
             #[must_use]
             pub const fn constant(v: &str) -> &Self {
                 match Self::validate(v.as_bytes()) {
-                    Ok(res) => res,
+                    Ok(()) => Self::cast(v),
                     Err(err) => panic!("{}", err.parts().0),
                 }
             }
@@ -220,7 +229,7 @@ macro_rules! impl_string_types {
                 v: std::string::String,
             ) -> Result<Self, ($crate::Error, std::string::String)> {
                 match $Ref::validate(v.as_bytes()) {
-                    Ok(_) => Ok(Self(v)),
+                    Ok(()) => Ok(Self(v)),
                     Err(err) => Err((err.into(), v)),
                 }
             }
